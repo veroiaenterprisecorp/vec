@@ -123,13 +123,17 @@ export default function App() {
 
         {/* VIEW 3: LIVE ART VAULT & CURATOR DISCUSSIONS (PUBLIC EXHIBITION) */}
         {activeTab === 'vault' && (
-          <VecVault />
+          <VecVault 
+            onNavigateToStudio={() => setActiveTab('studio')}
+            onNavigateToPrivateVault={() => setActiveTab('private-vault')}
+          />
         )}
 
         {/* VIEW 4: HARDWARE SENSOR STUDIO & C2PA VERIFICATION */}
         {activeTab === 'studio' && (
           <VecStudio 
             onNavigateToPrivateVault={() => setActiveTab('private-vault')}
+            onNavigateToPublicVault={() => setActiveTab('vault')}
           />
         )}
 

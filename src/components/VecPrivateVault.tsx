@@ -81,10 +81,11 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
     const newIsPublished = !newIsPrivate;
     const updated = updateVaultItemPrivacy(item.id, newIsPrivate, newIsPublished);
     setItems(updated);
+    window.dispatchEvent(new Event('storage'));
     if (newIsPrivate) {
       showToast(`Foto "${item.title}" sekarang dikunci kembali ke status 100% Privat.`);
     } else {
-      showToast(`Foto "${item.title}" berhasil didaftarkan ke Live Vault Publik.`);
+      showToast(`Foto "${item.title}" berhasil diterbitkan ke Live Vault Publik!`);
     }
   };
 

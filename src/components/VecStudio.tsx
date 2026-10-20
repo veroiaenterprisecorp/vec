@@ -44,9 +44,13 @@ import {
 
 interface VecStudioProps {
   onNavigateToPrivateVault?: () => void;
+  onNavigateToPublicVault?: () => void;
 }
 
-export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }) => {
+export const VecStudio: React.FC<VecStudioProps> = ({ 
+  onNavigateToPrivateVault,
+  onNavigateToPublicVault
+}) => {
   // Storage Target Mode: defaults to 'cloud_supabase' as requested by user
   const [storageTarget, setStorageTarget] = useState<StorageTargetMode>(() => getStorageMode());
   const [targetBucket, setTargetBucket] = useState<string>(() => getStorageBucketName());
@@ -952,10 +956,11 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
                           setIsPublished(true);
                           if (currentCaptureId) {
                             updateVaultItemPrivacy(currentCaptureId, false, true, artworkTitle);
+                            window.dispatchEvent(new Event('storage'));
                           }
                         }}
                         disabled={isPublished}
-                        className="w-full py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 disabled:bg-emerald-700 text-white font-bold transition flex items-center justify-center gap-1.5 text-xs"
+                        className="w-full py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 disabled:bg-emerald-700 text-white font-bold transition flex items-center justify-center gap-1.5 text-xs cursor-pointer"
                       >
                         {isPublished ? (
                           <>
@@ -966,6 +971,16 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
                           <span>Konfirmasi & Terbitkan ke Live Vault</span>
                         )}
                       </button>
+
+                      {isPublished && onNavigateToPublicVault && (
+                        <button
+                          onClick={onNavigateToPublicVault}
+                          className="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition flex items-center justify-center gap-1.5 text-xs font-mono shadow-md cursor-pointer animate-in fade-in"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Lihat Karya di Live Vault Pameran →</span>
+                        </button>
+                      )}
                     </div>
                   )}
 
