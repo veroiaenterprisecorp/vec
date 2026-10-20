@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { VecOverview } from './components/VecOverview';
 import { VecVault } from './components/VecVault';
@@ -7,6 +7,7 @@ import { VecPrivateVault } from './components/VecPrivateVault';
 import { PostGisSimulator } from './components/PostGisSimulator';
 import { GitHubSupabaseSyncHub } from './components/GitHubSupabaseSyncHub';
 import { VecArchitectureConsole } from './components/VecArchitectureConsole';
+import { MasterAdminPortal } from './components/MasterAdminPortal';
 import { VEC_FULL_SQL_SCRIPT } from './data/vecSqlSchema';
 import { VecOfficialLogo } from './components/VecOfficialLogo';
 import { 
@@ -14,14 +15,56 @@ import {
   ShieldCheck, 
   GitBranch, 
   Database,
-  ExternalLink
+  ExternalLink,
+  Lock
 } from 'lucide-react';
 
+export type AppTab = 'overview' | 'private-vault' | 'vault' | 'studio' | 'spatial' | 'architecture' | 'admin-portal' | 'sync';
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'private-vault' | 'vault' | 'studio' | 'spatial' | 'sync' | 'architecture'>('overview');
+  const [activeTab, setActiveTab] = useState<AppTab>(() => {
+    if (typeof window !== 'undefined') {
+      const search = window.location.search.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      if (search.includes('portal=') || search.includes('admin') || hash.includes('admin') || hash.includes('portal')) {
+        return 'admin-portal';
+      }
+    }
+    return 'overview';
+  });
   const [copied, setCopied] = useState<boolean>(false);
   const [showToast, setShowToast] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string>('');
+
+  // Listen to URL changes (e.g. query param ?portal=master-admin or hash #master-admin)
+  useEffect(() => {
+    const handleUrlCheck = () => {
+      const search = window.location.search.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      if (search.includes('portal=') || search.includes('admin') || hash.includes('admin') || hash.includes('portal')) {
+        setActiveTab('admin-portal');
+      }
+    };
+
+    window.addEventListener('popstate', handleUrlCheck);
+    window.addEventListener('hashchange', handleUrlCheck);
+
+    // Stealth keyboard shortcut for master owner: Ctrl + Shift + A (or Cmd + Shift + A)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setActiveTab((prev) => (prev === 'admin-portal' ? 'overview' : 'admin-portal'));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('popstate', handleUrlCheck);
+      window.removeEventListener('hashchange', handleUrlCheck);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -95,7 +138,7 @@ export default function App() {
           <PostGisSimulator />
         )}
 
-        {/* VIEW 5: GITHUB & SUPABASE SYNC CONTROL CENTER */}
+        {/* VIEW 5: GITHUB & SUPABASE SYNC CONTROL CENTER (LEGACY/FALLBACK) */}
         {activeTab === 'sync' && (
           <GitHubSupabaseSyncHub
             onCopyAllSql={handleCopyAllSql}
@@ -106,6 +149,22 @@ export default function App() {
         {/* VIEW 6: ENTERPRISE ARCHITECTURE & SPECIFICATIONS */}
         {activeTab === 'architecture' && (
           <VecArchitectureConsole
+            onCopyAllSql={handleCopyAllSql}
+            copiedSql={copied}
+            onDownloadSql={handleDownloadSql}
+          />
+        )}
+
+        {/* VIEW 7: MASTER ADMIN FORTRESS PORTAL (SECRET ISOLATED ACCESS) */}
+        {activeTab === 'admin-portal' && (
+          <MasterAdminPortal
+            onBackToPublicSite={() => {
+              if (typeof window !== 'undefined' && window.history.pushState) {
+                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.history.pushState({ path: cleanUrl }, '', cleanUrl);
+              }
+              setActiveTab('overview');
+            }}
             onCopyAllSql={handleCopyAllSql}
             copiedSql={copied}
             onDownloadSql={handleDownloadSql}
@@ -151,6 +210,18 @@ export default function App() {
             <span className="text-slate-700">|</span>
 
             <span>C2PA v2.1 • NTAG424 DNA NFC</span>
+
+            <span className="text-slate-800">|</span>
+
+            {/* Discreet Stealth Access for Owner (Not in primary nav) */}
+            <button
+              onClick={() => setActiveTab('admin-portal')}
+              className="flex items-center gap-1 text-slate-600 hover:text-emerald-400 transition cursor-pointer text-[11px] font-mono group"
+              title="Akses Konsol Master Rahasia (?portal=master-admin | Ctrl+Shift+A)"
+            >
+              <Lock className="w-3 h-3 text-slate-600 group-hover:text-emerald-400 transition" />
+              <span className="opacity-60 group-hover:opacity-100">Root Gate</span>
+            </button>
           </div>
 
         </div>

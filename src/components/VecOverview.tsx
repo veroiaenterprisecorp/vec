@@ -83,11 +83,11 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate }) => {
               </button>
 
               <button
-                onClick={() => onNavigate('sync')}
+                onClick={() => onNavigate('spatial')}
                 className="inline-flex items-center gap-2 px-4 py-3 rounded-xl text-xs sm:text-sm font-semibold text-emerald-300 bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-800/60 transition cursor-pointer"
               >
-                <Workflow className="w-4 h-4 text-emerald-400" />
-                <span>Pusat Sinkronisasi GitHub & Supabase</span>
+                <Radio className="w-4 h-4 text-emerald-400" />
+                <span>Geoprivasi PostGIS</span>
               </button>
             </div>
 

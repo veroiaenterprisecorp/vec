@@ -1,6 +1,6 @@
 import React from 'react';
 import { VecOfficialLogo } from './VecOfficialLogo';
-import { GitBranch, Database, ShieldCheck, ChevronRight } from 'lucide-react';
+import { GitBranch, Database, ShieldCheck, ChevronRight, Camera } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: string;
@@ -92,18 +92,6 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('sync')}
-            className={`whitespace-nowrap shrink-0 transition-colors py-1 flex items-center gap-1.5 ${
-              activeTab === 'sync'
-                ? 'text-cyan-400 border-b-2 border-cyan-400 font-semibold'
-                : 'hover:text-white'
-            }`}
-          >
-            <span>GitHub & Cloud Sync</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('architecture')}
             className={`whitespace-nowrap shrink-0 transition-colors py-1 ${
               activeTab === 'architecture'
@@ -115,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </nav>
 
-        {/* Zone 3: 1 Primary Action + Quick Link */}
+        {/* Zone 3: 1 Primary Action + Clean Links */}
         <div className="flex items-center gap-3 shrink-0">
           <a
             href="https://github.com/veroiaenterprisecorp/vec"
@@ -128,11 +116,11 @@ export const Header: React.FC<HeaderProps> = ({
           </a>
 
           <button
-            onClick={onOpenSyncHub}
+            onClick={() => setActiveTab('studio')}
             className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-lg shadow-sm shadow-cyan-950 transition whitespace-nowrap shrink-0"
           >
-            <Database className="w-3.5 h-3.5" />
-            <span>Sinkronisasi Supabase</span>
+            <Camera className="w-3.5 h-3.5" />
+            <span>Uji Sensor C2PA</span>
           </button>
         </div>
 
@@ -179,14 +167,6 @@ export const Header: React.FC<HeaderProps> = ({
           }`}
         >
           PostGIS
-        </button>
-        <button
-          onClick={() => setActiveTab('sync')}
-          className={`px-2.5 py-1 rounded-md whitespace-nowrap ${
-            activeTab === 'sync' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-400'
-          }`}
-        >
-          GitHub Sync
         </button>
         <button
           onClick={() => setActiveTab('architecture')}
