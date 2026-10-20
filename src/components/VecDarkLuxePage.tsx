@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import { VecOfficialLogo } from './VecOfficialLogo';
 import { 
   ShieldCheck, 
@@ -86,6 +87,68 @@ export default function VecNextPage() {
     }
   ]);
 
+  // Live Supabase Data Fetching & Sync
+  useEffect(() => {
+    const fetchLiveFeed = async () => {
+      try {
+        const { data: postsData } = await supabase
+          .from('posts')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (postsData && postsData.length > 0) {
+          const latestPost = postsData[0];
+          setCapturedDigest(latestPost.c2pa_manifest_hash || capturedDigest);
+          setCapturedTime(new Date(latestPost.created_at).toUTCString().replace('GMT', 'UTC'));
+        }
+
+        const { data: interactionsData } = await supabase
+          .from('interactions')
+          .select(`
+            id,
+            user_id,
+            interaction_type,
+            comment_body,
+            voice_duration_seconds,
+            voice_waveform,
+            voice_transcription,
+            author_authenticity_weight,
+            created_at,
+            users (
+              full_name,
+              trust_tier,
+              authenticity_score
+            )
+          `)
+          .order('created_at', { ascending: false })
+          .limit(15);
+
+        if (interactionsData && interactionsData.length > 0) {
+          const mapped: InteractionItem[] = interactionsData.map((row: any) => {
+            const user = row.users || {};
+            return {
+              id: row.id,
+              author: user.full_name || 'VEC Authenticated User',
+              role: user.trust_tier || 'Hardware Attested',
+              score: user.authenticity_score || (row.author_authenticity_weight ? row.author_authenticity_weight * 100 : 98.0),
+              type: row.interaction_type,
+              content: row.interaction_type === 'VOICE_NOTE' ? (row.voice_transcription || 'Catatan suara kurator') : row.comment_body,
+              voiceDuration: row.voice_duration_seconds,
+              waveform: row.voice_waveform || [30, 60, 90, 70, 40, 80, 50, 30],
+              timestamp: new Date(row.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+            };
+          });
+          setInteractions(mapped);
+        }
+      } catch (err) {
+        console.error('Error fetching Supabase live data:', err);
+      }
+    };
+
+    fetchLiveFeed();
+  }, []);
+
   const handleCapture = () => {
     setIsCapturing(true);
     setTimeout(() => {
@@ -98,19 +161,33 @@ export default function VecNextPage() {
     }, 600);
   };
 
-  const handleSendComment = () => {
+  const handleSendComment = async () => {
     if (!commentInput.trim()) return;
+    const currentText = commentInput.trim();
     const newItem: InteractionItem = {
       id: `int-${Date.now()}`,
       author: 'Anda (Kolektor Terverifikasi)',
       role: 'Hardware Attested Member',
       score: 99.40,
       type: 'COMMENT',
-      content: commentInput,
+      content: currentText,
       timestamp: 'Baru saja'
     };
     setInteractions([newItem, ...interactions]);
     setCommentInput('');
+
+    try {
+      await supabase.from('interactions').insert({
+        user_id: 'a1111111-1111-4111-8111-111111111111',
+        post_id: 'd4444444-4444-4444-8444-444444444444',
+        post_created_at: '2026-06-15 10:30:00+00',
+        interaction_type: 'COMMENT',
+        comment_body: currentText,
+        author_authenticity_weight: 99.40
+      });
+    } catch (e) {
+      console.warn('Could not persist comment to Supabase:', e);
+    }
   };
 
   const handleAddVoiceNote = () => {

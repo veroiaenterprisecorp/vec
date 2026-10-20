@@ -97,6 +97,19 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('explorer')}
+            className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition ${
+              activeTab === 'explorer'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/60 font-bold shadow-sm'
+                : 'text-emerald-400/90 hover:text-emerald-200 hover:bg-emerald-950/40 border border-emerald-800/40'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+            <span>Live Supabase Explorer</span>
+            <span className="text-[10px] bg-emerald-900/60 text-emerald-300 px-1.5 py-0.2 rounded font-bold">LIVE</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('sql')}
             className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition ${
               activeTab === 'sql'

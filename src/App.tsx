@@ -8,6 +8,7 @@ import { ErdVisualizer } from './components/ErdVisualizer';
 import { PostGisSimulator } from './components/PostGisSimulator';
 import { SeedDataGenerator } from './components/SeedDataGenerator';
 import { ArchitectureDocs } from './components/ArchitectureDocs';
+import { LiveSupabaseExplorer } from './components/LiveSupabaseExplorer';
 import { VEC_FULL_SQL_SCRIPT } from './data/vecSqlSchema';
 import { 
   Check, 
@@ -23,7 +24,7 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'luxe' | 'flutter' | 'api' | 'sql' | 'erd' | 'postgis' | 'seed' | 'docs'>('luxe');
+  const [activeTab, setActiveTab] = useState<'luxe' | 'explorer' | 'flutter' | 'api' | 'sql' | 'erd' | 'postgis' | 'seed' | 'docs'>('luxe');
   const [copied, setCopied] = useState<boolean>(false);
   const [showToast, setShowToast] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string>('');
@@ -77,6 +78,7 @@ export default function App() {
             <span>Architecture Hub</span>
             <ChevronRight className="w-3 h-3 text-slate-700" />
             <span className="text-cyan-400 capitalize">
+              {activeTab === 'explorer' && 'Live Supabase Explorer (Real-Time Database Inspector)'}
               {activeTab === 'flutter' && 'Flutter Mobile Client (Hardware-Bypass & NFC)'}
               {activeTab === 'api' && 'Next.js 14 App Router + Prisma ORM Backend'}
               {activeTab === 'sql' && 'Skrip SQL Supabase Ready'}
@@ -88,6 +90,10 @@ export default function App() {
           </div>
 
           {/* Tab Views */}
+          {activeTab === 'explorer' && (
+            <LiveSupabaseExplorer />
+          )}
+
           {activeTab === 'flutter' && (
             <FlutterAppViewer />
           )}

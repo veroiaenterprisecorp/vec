@@ -496,6 +496,34 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
+-- Alias kemudahan pemanggilan (latitude dahulu)
+CREATE OR REPLACE FUNCTION public.fn_vec_query_nearby_posts(
+    center_latitude FLOAT8,
+    center_longitude FLOAT8,
+    radius_meters FLOAT8 DEFAULT 10000.0,
+    min_author_score NUMERIC DEFAULT 60.00
+)
+RETURNS TABLE (
+    post_id UUID,
+    post_created_at TIMESTAMPTZ,
+    title VARCHAR,
+    media_url TEXT,
+    author_username VARCHAR,
+    author_score NUMERIC,
+    distance_meters FLOAT8,
+    fuzzed_coords JSON
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT * FROM public.vec_fn_get_nearby_posts(
+        center_longitude,
+        center_latitude,
+        radius_meters,
+        min_author_score
+    );
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
 -- ---------------------------------------------------------------------
 -- 10. ROW LEVEL SECURITY (RLS) POLICIES FOR SUPABASE
 -- ---------------------------------------------------------------------
