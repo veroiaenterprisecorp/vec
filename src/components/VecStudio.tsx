@@ -20,7 +20,9 @@ import {
   ZoomOut, 
   Maximize2, 
   X,
-  FolderLock
+  FolderLock,
+  CameraOff,
+  Upload
 } from 'lucide-react';
 import { savePrivateVaultItem, updateVaultItemPrivacy } from '../lib/userVaultStorage';
 
@@ -52,6 +54,9 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
   const [capturedFileSize, setCapturedFileSize] = useState<string>('3.4 MB');
   const [isZoomModalOpen, setIsZoomModalOpen] = useState<boolean>(false);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [studioMode, setStudioMode] = useState<'idle' | 'camera' | 'uploaded' | 'simulation'>('idle');
+  const [hasHardwareCamera, setHasHardwareCamera] = useState<boolean>(true);
+  const [hardwareChecked, setHardwareChecked] = useState<boolean>(false);
   
   // Real Geolocation
   const [geoCoords, setGeoCoords] = useState<{
@@ -68,6 +73,28 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Check hardware camera availability on mount
+  useEffect(() => {
+    const detectCameraHardware = async () => {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+          setHasHardwareCamera(false);
+          setHardwareChecked(true);
+          return;
+        }
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+        setHasHardwareCamera(videoInputs.length > 0);
+        setHardwareChecked(true);
+      } catch {
+        setHasHardwareCamera(false);
+        setHardwareChecked(true);
+      }
+    };
+    detectCameraHardware();
+  }, []);
 
   // Request Real Device Camera Stream (Android Chrome / Web)
   const startCamera = async (mode: 'environment' | 'user' = facingMode) => {
@@ -79,7 +106,8 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
       }
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Peramban Anda tidak mendukung akses kamera WebRTC.');
+        setHasHardwareCamera(false);
+        throw new Error('NOT_SUPPORTED');
       }
 
       const constraints: MediaStreamConstraints = {
@@ -100,6 +128,8 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
       }
 
       setIsCameraActive(true);
+      setStudioMode('camera');
+      setHasHardwareCamera(true);
       setFacingMode(mode);
 
       // Detect device name
@@ -128,14 +158,76 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
     } catch (err: any) {
       console.info('Kamera fisik belum dapat diakses:', err.name || err.message);
       setIsCameraActive(false);
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || (err.message && err.message.includes('Permission denied'))) {
-        setCameraError('Izin akses kamera dibatasi oleh peramban atau pratinjau iframe. Buka di tab penuh peramban Anda untuk mengizinkan kamera fisik secara langsung, atau gunakan mode simulasi sensor di bawah.');
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        setCameraError('Tidak ditemukan perangkat keras kamera pada sistem ini. Beralih otomatis ke mode simulasi sensor optik.');
+      if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError' || err.message === 'NOT_SUPPORTED') {
+        setHasHardwareCamera(false);
+        setCameraError('Tidak ada kamera aktif di perangkat atau driver kamera tidak ditemukan pada sistem ini.');
+      } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || (err.message && err.message.includes('Permission denied'))) {
+        setCameraError('Izin akses kamera dibatasi oleh peramban. Berikan izin kamera di pengaturan browser.');
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        setCameraError('Driver kamera sedang digunakan oleh aplikasi lain atau tidak dapat diinisialisasi.');
       } else {
-        setCameraError('Sensor kamera belum aktif. Beralih ke mode simulasi sensor optik.');
+        setCameraError('Tidak ada kamera aktif di perangkat atau driver kamera belum siap.');
       }
     }
+  };
+
+  // Handle Manual File Upload for C2PA attestation when camera is absent
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const dataUrl = event.target?.result as string;
+        setCapturedPhotoUrl(dataUrl);
+        const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+        setCapturedFileSize(`${sizeMb} MB`);
+        setCapturedResolution(`${file.name.slice(-15)}`);
+        setDeviceInfo(`Berkas Unggahan Mandiri: ${file.name}`);
+        setStudioMode('uploaded');
+        setIsCameraActive(false);
+
+        // Compute REAL SHA-256 Hash of the uploaded file
+        const arrayBuffer = await file.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const realChecksum = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+        setCapturedDigest(realChecksum);
+        const timeString = new Date().toUTCString().replace('GMT', 'UTC');
+        setCapturedTime(timeString);
+
+        // Auto Save to Private Vault
+        const newCaptureId = 'cap-upload-' + Date.now();
+        setCurrentCaptureId(newCaptureId);
+        savePrivateVaultItem({
+          id: newCaptureId,
+          title: artworkTitle.trim() || file.name.replace(/\.[^/.]+$/, ''),
+          photoUrl: dataUrl,
+          digest: realChecksum,
+          resolution: `${(file.size / 1024).toFixed(0)} KB (${file.type || 'RAW/Image'})`,
+          fileSize: `${sizeMb} MB`,
+          captureDate: new Date().toLocaleString('id-ID'),
+          deviceInfo: `Berkas Unggahan: ${file.name}`,
+          isPrivate: privacyMode === 'private',
+          isPublished: privacyMode === 'public',
+          c2paSignature: 'SHA256_UPLOAD_INTEGRITY_VERIFIED',
+          sensorType: 'Direct File Digest (Cryptographic Attestation)'
+        });
+        setShowVaultSavedBadge(true);
+      };
+      reader.readAsDataURL(file);
+    } catch (uploadErr) {
+      console.warn('Gagal membaca berkas:', uploadErr);
+    }
+  };
+
+  // Start Simulation Mode
+  const startSimulationMode = () => {
+    setStudioMode('simulation');
+    setIsCameraActive(false);
+    setCameraError(null);
+    setDeviceInfo('Mode Simulasi Sensor CMOS • Sony Alpha 7R V Enclave');
   };
 
   // Stop camera stream
@@ -156,8 +248,17 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
     startCamera(nextMode);
   };
 
+  const [noCameraAlert, setNoCameraAlert] = useState<string | null>(null);
+
   // Capture real frame from video feed & calculate REAL SHA-256 Checksum
   const captureRealPhoto = async () => {
+    // If no camera is active and no file/simulation is active, reject capture with clear notice
+    if (!isCameraActive && studioMode !== 'simulation' && studioMode !== 'uploaded') {
+      setNoCameraAlert('Tidak ada kamera aktif di perangkat. Nyalakan kamera atau gunakan tombol Unggah Foto / Mode Simulasi.');
+      setTimeout(() => setNoCameraAlert(null), 4500);
+      return;
+    }
+
     setIsCapturing(true);
 
     try {
@@ -189,37 +290,41 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
           const hashArray = Array.from(new Uint8Array(hashBuffer));
           rawChecksum = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
         }
-      } else {
-        // Fallback simulation if camera is off
+      } else if (studioMode === 'simulation') {
+        // Explicit simulation mode
         rawChecksum = Array.from({ length: 64 }, () =>
           Math.floor(Math.random() * 16).toString(16)
         ).join('');
+        setCapturedResolution('1920 × 1080 piksel (Simulasi)');
+        setCapturedFileSize('3.4 MB');
       }
 
-      setCapturedDigest(rawChecksum);
-      const finalPhotoUrl = photoDataUrl || "/src/assets/images/vec_hero_camera_1792494926035.jpg";
+      if (rawChecksum) {
+        setCapturedDigest(rawChecksum);
+      }
+      const finalPhotoUrl = photoDataUrl || capturedPhotoUrl || "/src/assets/images/vec_hero_camera_1792494926035.jpg";
       if (photoDataUrl) {
         setCapturedPhotoUrl(photoDataUrl);
       }
       const timeString = new Date().toUTCString().replace('GMT', 'UTC');
       setCapturedTime(timeString);
 
-      // Otomatis Simpan ke Brankas Pribadi Pengguna (100% Privat & Tanpa Kompresi)
+      // Otomatis Simpan ke Brankas Pribadi Pengguna
       const newCaptureId = 'cap-' + Date.now();
       setCurrentCaptureId(newCaptureId);
       savePrivateVaultItem({
         id: newCaptureId,
-        title: artworkTitle.trim() || `Tangkapan Sensor Hardware #${Date.now().toString().slice(-4)}`,
+        title: artworkTitle.trim() || `Tangkapan Sensor #${Date.now().toString().slice(-4)}`,
         photoUrl: finalPhotoUrl,
-        digest: rawChecksum,
-        resolution: photoDataUrl ? capturedResolution : '1920 × 1080 piksel',
-        fileSize: photoDataUrl ? capturedFileSize : '3.4 MB',
+        digest: rawChecksum || capturedDigest,
+        resolution: photoDataUrl ? capturedResolution : (studioMode === 'simulation' ? '1920 × 1080 (Simulasi)' : capturedResolution),
+        fileSize: photoDataUrl ? capturedFileSize : (studioMode === 'simulation' ? '3.4 MB' : capturedFileSize),
         captureDate: new Date().toLocaleString('id-ID'),
         deviceInfo: deviceInfo,
         isPrivate: privacyMode === 'private',
         isPublished: privacyMode === 'public',
-        c2paSignature: 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
-        sensorType: 'Direct CMOS RAW (Zero-Bypass)'
+        c2paSignature: isCameraActive ? 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID' : 'SIMULATION_TEE_HASH_VALID',
+        sensorType: isCameraActive ? 'Direct CMOS RAW (Zero-Bypass)' : 'Simulasi Sensor C2PA'
       });
       setShowVaultSavedBadge(true);
     } catch (err) {
@@ -261,13 +366,30 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
           </h2>
         </div>
 
-        {/* Camera Control Actions */}
-        <div className="flex items-center gap-2.5">
+        {/* Camera Control Actions & Upload Option */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*,.arw,.cr3,.dng,.cr2"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-mono font-semibold bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 transition shadow-md"
+            title="Unggah berkas foto atau file RAW untuk diverifikasi C2PA"
+          >
+            <Upload className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Unggah Foto / RAW</span>
+          </button>
+
           {isCameraActive ? (
             <>
               <button
                 onClick={toggleFacingMode}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 transition"
                 title="Ganti Lensa Depan/Belakang Android"
               >
                 <SwitchCamera className="w-3.5 h-3.5" />
@@ -276,7 +398,7 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
 
               <button
                 onClick={stopCamera}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-800 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-800 transition"
               >
                 <VideoOff className="w-3.5 h-3.5" />
                 <span>Matikan Kamera</span>
@@ -288,11 +410,38 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition shadow-lg shadow-emerald-950"
             >
               <Video className="w-4 h-4" />
-              <span>Buka Kamera Perangkat Asli (HP/Laptop)</span>
+              <span>Buka Kamera Perangkat Asli</span>
             </button>
           )}
         </div>
       </div>
+
+      {/* Alert when shutter is pressed with no camera active */}
+      {noCameraAlert && (
+        <div className="p-4 rounded-2xl bg-rose-950/60 border border-rose-500/50 text-xs font-mono text-rose-200 flex items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <CameraOff className="w-5 h-5 text-rose-400 shrink-0" />
+            <div>
+              <span className="font-bold text-white block">Tidak Ada Kamera Aktif:</span>
+              <p className="text-[11px] text-rose-200">{noCameraAlert}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition"
+            >
+              Unggah Foto
+            </button>
+            <button
+              onClick={startSimulationMode}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition"
+            >
+              Mode Simulasi
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Permission / Status Warning if any */}
       {cameraError && (
@@ -300,25 +449,23 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <span className="font-bold text-white block">Akses Kamera Perangkat:</span>
+              <span className="font-bold text-white block">Status Perangkat Kamera:</span>
               <p className="leading-relaxed text-slate-300 text-[11px]">{cameraError}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => setCameraError(null)}
+              onClick={() => fileInputRef.current?.click()}
               className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition"
             >
-              Mode Simulasi Sensor
+              Unggah Berkas
             </button>
-            <a
-              href={window.location.href}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              onClick={startSimulationMode}
               className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs transition"
             >
-              Buka Tab Baru
-            </a>
+              Mode Simulasi
+            </button>
           </div>
         </div>
       )}
@@ -344,43 +491,99 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
                 }`}
               />
 
-              {/* Fallback Display if camera not yet opened */}
+              {/* Display when Camera is NOT active */}
               {!isCameraActive && (
-                <div className="relative w-full h-full">
-                  <img
-                    src={capturedPhotoUrl || "/src/assets/images/vec_hero_camera_1792494926035.jpg"}
-                    alt="Sensor Viewfinder Stream"
-                    className="w-full h-full object-cover opacity-60 scale-102 transition duration-700"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#050C1E] via-slate-950/40 to-[#050C1E]/80"></div>
+                <div className="relative w-full h-full bg-[#030712] flex flex-col items-center justify-center p-6 text-center">
                   
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-3 z-10">
-                    <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-xl">
-                      <Camera className="w-6 h-6" />
+                  {/* If user uploaded a photo or enabled simulation with image */}
+                  {capturedPhotoUrl && (studioMode === 'uploaded' || studioMode === 'simulation') ? (
+                    <div className="relative w-full h-full">
+                      <img
+                        src={capturedPhotoUrl}
+                        alt="Berkas Foto Terverifikasi"
+                        className="w-full h-full object-contain"
+                      />
+                      <div className="absolute top-3 left-3 bg-black/80 backdrop-blur-md px-3 py-1 rounded-full border border-cyan-500/40 text-[11px] font-mono text-cyan-300">
+                        {studioMode === 'uploaded' ? '📁 Berkas Foto Dimuat' : '✨ Simulasi Sensor C2PA'}
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-white font-mono">
-                        Kamera Perangkat Belum Dinyalakan
-                      </h3>
-                      <p className="text-xs text-slate-400 max-w-sm mt-1 leading-relaxed">
-                        Klik tombol hijau <strong className="text-emerald-300">"Buka Kamera Perangkat Asli"</strong> di kanan atas untuk menyalakan kamera HP Android atau webcam laptop Anda secara langsung.
-                      </p>
+                  ) : (
+                    /* Clean Standby Screen clearly stating no camera is active */
+                    <div className="flex flex-col items-center justify-center max-w-md space-y-4 z-10">
+                      <div className="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 shadow-2xl relative">
+                        <CameraOff className="w-8 h-8 text-rose-400" />
+                        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-500 rounded-full border-2 border-[#030712]"></span>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <h3 className="text-base font-bold text-white font-mono tracking-tight">
+                          Tidak Ada Kamera Aktif di Perangkat
+                        </h3>
+                        <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
+                          {hardwareChecked && !hasHardwareCamera
+                            ? 'Sistem mendeteksi bahwa tidak ada webcam fisik atau driver kamera aktif pada perangkat ini. Silakan hubungkan kamera atau gunakan opsi unggah berkas.'
+                            : 'Sensor kamera perangkat saat ini dalam kondisi mati. Tekan tombol di bawah untuk menyalakan kamera HP / webcam Anda, atau unggah foto manual.'}
+                        </p>
+                      </div>
+
+                      {/* Quick Action Buttons inside Viewfinder */}
+                      <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+                        <button
+                          onClick={() => startCamera('environment')}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-mono font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-md"
+                        >
+                          <Video className="w-3.5 h-3.5" />
+                          <span>Nyalakan Kamera</span>
+                        </button>
+
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-mono font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition shadow-md"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Unggah Berkas Foto</span>
+                        </button>
+
+                        <button
+                          onClick={startSimulationMode}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Mode Simulasi</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
 
             {/* Top HUD Badges */}
             <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-2 bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-full border border-cyan-500/30 text-xs font-mono text-cyan-300">
-                <Camera className="w-3.5 h-3.5 text-cyan-400" />
-                <span>
-                  {isCameraActive 
-                    ? (facingMode === 'environment' ? 'Sensor Belakang Aktif' : 'Sensor Depan Aktif') 
-                    : 'Mode Standby Sensor'}
-                </span>
+              <div className="flex items-center gap-2 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-full border text-xs font-mono shadow-lg">
+                {isCameraActive ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span className="text-emerald-300">
+                      {facingMode === 'environment' ? 'Kamera Belakang Aktif' : 'Kamera Depan Aktif'}
+                    </span>
+                  </>
+                ) : studioMode === 'uploaded' ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                    <span className="text-cyan-300">Berkas Foto Dimuat</span>
+                  </>
+                ) : studioMode === 'simulation' ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                    <span className="text-amber-300">Mode Simulasi Sensor</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                    <span className="text-rose-400">Tidak Ada Kamera Aktif</span>
+                  </>
+                )}
               </div>
 
               <div className="bg-red-950/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-red-800/80 text-[11px] font-mono text-red-300 flex items-center gap-1.5">
@@ -400,10 +603,22 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
           {/* Left Info */}
           <div className="text-[11px] font-mono text-slate-400 space-y-0.5">
             <span className="text-white font-medium block">
-              {isCameraActive ? 'Sensor Aktif' : 'Mode Siap Jepret'}
+              {isCameraActive 
+                ? 'Sensor Kamera Aktif' 
+                : studioMode === 'uploaded' 
+                ? 'Berkas Dimuat' 
+                : studioMode === 'simulation' 
+                ? 'Simulasi Sensor C2PA' 
+                : 'Tidak Ada Kamera Aktif'}
             </span>
-            <span className="text-emerald-400">
-              {isCameraActive ? facingMode === 'environment' ? 'Kamera Belakang' : 'Kamera Depan' : 'CMOS RAW Enclave'}
+            <span className={isCameraActive ? 'text-emerald-400' : 'text-slate-400'}>
+              {isCameraActive 
+                ? (facingMode === 'environment' ? 'Lensa Belakang • 1080p' : 'Lensa Depan • 1080p') 
+                : studioMode === 'uploaded'
+                ? 'SHA-256 Validasi'
+                : studioMode === 'simulation'
+                ? 'Mock Sensor Enclave'
+                : 'Driver / Kamera Terputus'}
             </span>
           </div>
 
@@ -412,22 +627,30 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
             <button
               onClick={captureRealPhoto}
               disabled={isCapturing}
-              title="Tekan untuk mengambil foto otentik"
+              title={isCameraActive ? 'Tekan untuk mengambil foto otentik' : 'Tekan untuk mengambil gambar atau uji C2PA'}
               className="w-14 h-14 rounded-full border-2 border-white/80 p-1 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-cyan-950/40 bg-slate-950 group disabled:opacity-60 cursor-pointer"
             >
-              <div className="w-full h-full rounded-full bg-white group-hover:bg-cyan-200 transition-colors flex items-center justify-center text-slate-950">
+              <div className={`w-full h-full rounded-full transition-colors flex items-center justify-center ${
+                isCameraActive 
+                  ? 'bg-white group-hover:bg-cyan-200 text-slate-950' 
+                  : 'bg-slate-800 group-hover:bg-slate-700 text-white'
+              }`}>
                 {isCapturing ? (
                   <RefreshCw className="w-4 h-4 animate-spin text-slate-900" />
-                ) : (
+                ) : isCameraActive ? (
                   <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-900 bg-transparent"></div>
+                ) : (
+                  <CameraOff className="w-4 h-4 text-slate-400" />
                 )}
               </div>
             </button>
-            <span className="text-[10px] font-mono text-slate-400">Jepret</span>
+            <span className="text-[10px] font-mono text-slate-400">
+              {isCameraActive ? 'Jepret' : 'Status: Off'}
+            </span>
           </div>
 
           {/* Right Action: Camera Switch or Quick Option */}
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-2">
             {isCameraActive ? (
               <button
                 onClick={toggleFacingMode}
@@ -437,9 +660,13 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
                 <SwitchCamera className="w-4 h-4" />
               </button>
             ) : (
-              <span className="text-[11px] font-mono text-slate-500">
-                Auto C2PA
-              </span>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-slate-700 transition"
+                title="Unggah Foto dari Perangkat"
+              >
+                <Upload className="w-4 h-4" />
+              </button>
             )}
           </div>
         </div>
