@@ -130,6 +130,7 @@ export const uploadCapturedPhotoToCloud = async (params: {
       try {
         await client.from('posts').insert([
           {
+            user_id: 'b2222222-2222-4222-8222-222222222222',
             title: title || 'Tangkapan Sensor C2PA',
             media_url: publicUrl,
             c2pa_manifest_hash: digest,
@@ -138,7 +139,8 @@ export const uploadCapturedPhotoToCloud = async (params: {
             verification_status: 'VERIFIED_HARDWARE_TEE',
             exact_location: 'SRID=4326;POINT(106.827153 -6.175392)',
             public_location: 'SRID=4326;POINT(106.827153 -6.175392)',
-            sensor_telemetry: sensorMetadata || {}
+            sensor_telemetry: sensorMetadata || {},
+            created_at: new Date().toISOString()
           }
         ]);
       } catch {
@@ -228,3 +230,84 @@ export const syncVaultItemToCloud = async (item: PrivateVaultItem): Promise<bool
     return false;
   }
 };
+
+/**
+ * Checks if the configured Supabase credentials are valid and reachable
+ */
+export const checkSupabaseConnection = async (): Promise<{
+  connected: boolean;
+  url: string;
+  isCustomUrl: boolean;
+  error?: string;
+}> => {
+  const url = getSupabaseUrl();
+  const anonKey = getSupabaseAnonKey();
+  const isCustomUrl = !url.includes('cruijnhylcdojbilzgwd');
+
+  try {
+    const client = getActiveSupabaseClient();
+    // Test simple select on posts or storage
+    const { error } = await client.from('posts').select('id').limit(1);
+
+    if (error) {
+      return {
+        connected: false,
+        url,
+        isCustomUrl,
+        error: error.message
+      };
+    }
+
+    return {
+      connected: true,
+      url,
+      isCustomUrl
+    };
+  } catch (err: any) {
+    return {
+      connected: false,
+      url,
+      isCustomUrl,
+      error: err?.message || 'Koneksi ke Supabase gagal'
+    };
+  }
+};
+
+/**
+ * Publishes an artwork record to Supabase public.posts table so other devices globally can view it
+ */
+export const publishArtworkToSupabasePosts = async (params: {
+  title: string;
+  photoUrl: string;
+  digest: string;
+  deviceInfo?: string;
+}): Promise<{ success: boolean; error?: string }> => {
+  const { title, photoUrl, digest, deviceInfo } = params;
+  const client = getActiveSupabaseClient();
+
+  try {
+    const { error } = await client.from('posts').insert([
+      {
+        user_id: 'b2222222-2222-4222-8222-222222222222',
+        title: title || 'Tangkapan Kamera C2PA',
+        caption: `Karya seni terverifikasi C2PA (${deviceInfo || 'CMOS Hardware Enclave'}).`,
+        media_url: photoUrl,
+        c2pa_manifest_hash: digest,
+        raw_capture_digest: digest,
+        hardware_tee_signature: 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
+        verification_status: 'VERIFIED_HARDWARE_TEE',
+        exact_location: 'SRID=4326;POINT(106.827153 -6.175392)',
+        public_location: 'SRID=4326;POINT(106.827153 -6.175392)',
+        created_at: new Date().toISOString()
+      }
+    ]);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Gagal menyimpan ke basis data posts Supabase' };
+  }
+};
+

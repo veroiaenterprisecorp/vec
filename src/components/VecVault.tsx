@@ -23,8 +23,16 @@ import {
   Check,
   Sparkles,
   ExternalLink,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Globe,
+  Wifi,
+  WifiOff,
+  AlertTriangle,
+  Info,
+  HelpCircle,
+  X
 } from 'lucide-react';
+import { checkSupabaseConnection } from '../lib/cloudStorage';
 
 export interface VaultArtwork {
   id: string;
@@ -90,6 +98,13 @@ export const VecVault: React.FC<VecVaultProps> = ({
   const [artworks, setArtworks] = useState<VaultArtwork[]>([DEFAULT_FEATURED]);
   const [selectedArtworkId, setSelectedArtworkId] = useState<string>(DEFAULT_FEATURED.id);
   const [copiedHash, setCopiedHash] = useState<boolean>(false);
+  const [connectionStatus, setConnectionStatus] = useState<{
+    connected: boolean;
+    url: string;
+    isCustomUrl: boolean;
+    error?: string;
+  } | null>(null);
+  const [showGlobalGuideModal, setShowGlobalGuideModal] = useState<boolean>(false);
 
   const [filterType, setFilterType] = useState<'all' | 'COMMENT' | 'VOICE_NOTE' | 'AUTHENTIC_SEAL'>('all');
   const [commentInput, setCommentInput] = useState<string>('');
@@ -246,12 +261,14 @@ export const VecVault: React.FC<VecVaultProps> = ({
   };
 
   useEffect(() => {
+    checkSupabaseConnection().then(setConnectionStatus);
     loadPublishedArtworks();
     fetchLiveInteractions();
 
     // Listen to localStorage changes in case user published from another component
     const handleStorageChange = () => {
       loadPublishedArtworks();
+      checkSupabaseConnection().then(setConnectionStatus);
     };
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
@@ -377,6 +394,47 @@ export const VecVault: React.FC<VecVaultProps> = ({
           )}
         </div>
       </div>
+
+      {/* GLOBAL CROSS-DEVICE CONNECTIVITY BANNER */}
+      {connectionStatus && !connectionStatus.connected ? (
+        <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs font-mono shadow-xl animate-in fade-in">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+              <Globe className="w-5 h-5 animate-pulse" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-white text-sm">Kenapa foto belum muncul jika dibuka di HP / Laptop lain?</span>
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] border border-amber-500/30">
+                  Mode Penyimpanan Perangkat Lokal
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-200/90 leading-relaxed max-w-3xl">
+                Foto yang baru Anda jepret saat ini tersimpan di memori browser perangkat ini. Proyek Supabase Anda belum dihubungkan ke Vercel (masih menggunakan URL/key demo yang belum aktif). Agar karya dapat dilihat secara <strong>global di semua perangkat</strong> saat membuka link website, pasang kredensial Supabase Anda di Vercel.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowGlobalGuideModal(true)}
+            className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition shrink-0 shadow-lg shadow-amber-950 cursor-pointer whitespace-nowrap flex items-center gap-1.5"
+          >
+            <HelpCircle className="w-4 h-4" />
+            <span>Cara Hubungkan ke Global (3 Langkah)</span>
+          </button>
+        </div>
+      ) : connectionStatus?.connected ? (
+        <div className="p-3 rounded-2xl bg-emerald-950/30 border border-emerald-500/40 flex items-center justify-between gap-3 text-xs font-mono text-emerald-300 shadow-md">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+            <span>
+              <strong>Tersinkronisasi Global:</strong> Terhubung ke Supabase Cloud. Foto yang diterbitkan dapat langsung dilihat oleh seluruh perangkat yang membuka link ini.
+            </span>
+          </div>
+          <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shrink-0 hidden sm:inline">
+            Status: Global Live
+          </span>
+        </div>
+      ) : null}
 
       {/* EXHIBITION GALLERY BAR (List of Published Artworks) */}
       <div className="bg-[#050C1E] border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
@@ -690,6 +748,93 @@ export const VecVault: React.FC<VecVaultProps> = ({
         </div>
 
       </div>
+
+      {/* Global Sync Guide Modal */}
+      {showGlobalGuideModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#050C1E] border border-amber-500/40 rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl relative">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                  <Globe className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white font-mono">
+                    Cara Menghubungkan ke Website Global
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    Agar foto yang Anda ambil di HP otomatis muncul di laptop & perangkat lain
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowGlobalGuideModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs font-mono">
+              <p className="text-slate-300 leading-relaxed text-[11px]">
+                Saat ini, website Anda yang berjalan di Vercel belum memiliki kunci Supabase aktif, sehingga browser HP Anda menyimpannya ke <strong>memori lokal HP</strong> saja. Ikuti 3 langkah berikut agar terhubung ke database global:
+              </p>
+
+              {/* Step 1 */}
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1.5">
+                <div className="flex items-center gap-2 text-cyan-300 font-bold">
+                  <span className="w-5 h-5 rounded-full bg-cyan-600 text-white flex items-center justify-center text-[10px]">1</span>
+                  <span>Buka Supabase Dashboard</span>
+                </div>
+                <p className="text-slate-400 text-[11px] pl-7">
+                  Buka project Anda di <strong>supabase.com</strong> → Masuk ke <strong>Project Settings</strong> → <strong>API</strong>. Salin <strong>Project URL</strong> dan <strong>anon/public key</strong>.
+                </p>
+              </div>
+
+              {/* Step 2 */}
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
+                <div className="flex items-center gap-2 text-amber-300 font-bold">
+                  <span className="w-5 h-5 rounded-full bg-amber-600 text-white flex items-center justify-center text-[10px]">2</span>
+                  <span>Pasang Variabel di Vercel Dashboard</span>
+                </div>
+                <p className="text-slate-400 text-[11px] pl-7">
+                  Buka project Anda di <strong>vercel.com</strong> → Masuk ke <strong>Settings</strong> → <strong>Environment Variables</strong>. Tambahkan 2 variabel ini:
+                </p>
+                <div className="pl-7 space-y-1.5">
+                  <div className="p-2 rounded bg-black border border-slate-800 flex items-center justify-between">
+                    <code>VITE_SUPABASE_URL</code>
+                    <span className="text-[10px] text-slate-500">Nilai: URL Supabase Anda</span>
+                  </div>
+                  <div className="p-2 rounded bg-black border border-slate-800 flex items-center justify-between">
+                    <code>VITE_SUPABASE_ANON_KEY</code>
+                    <span className="text-[10px] text-slate-500">Nilai: Anon Key Supabase</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1.5">
+                <div className="flex items-center gap-2 text-emerald-300 font-bold">
+                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">3</span>
+                  <span>Redeploy di Vercel</span>
+                </div>
+                <p className="text-slate-400 text-[11px] pl-7">
+                  Buka tab <strong>Deployments</strong> di Vercel, lalu klik <strong>Redeploy</strong>. Setelah selesai, seluruh foto yang Anda jepret di HP akan langsung tersimpan di cloud dan otomatis muncul di laptop atau perangkat lain di seluruh dunia!
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setShowGlobalGuideModal(false)}
+                className="px-5 py-2.5 rounded-xl text-xs font-mono font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition shadow-lg shadow-cyan-950 cursor-pointer"
+              >
+                Saya Mengerti
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
