@@ -523,38 +523,47 @@ ALTER TABLE public.art_process_proofs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interactions ENABLE ROW LEVEL SECURITY;
 
 -- Policies: users
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.users;
 CREATE POLICY "Public profiles are viewable by everyone" 
     ON public.users FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON public.users;
 CREATE POLICY "Users can update own profile" 
     ON public.users FOR UPDATE USING (auth.uid() = id);
 
 -- Policies: posts
 -- Publik hanya dapat melihat postingan terverifikasi
+DROP POLICY IF EXISTS "Public can view verified posts" ON public.posts;
 CREATE POLICY "Public can view verified posts" 
     ON public.posts FOR SELECT 
     USING (verification_status IN ('VERIFIED_HARDWARE_TEE', 'VERIFIED_C2PA') OR auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Authenticated users can create posts" ON public.posts;
 CREATE POLICY "Authenticated users can create posts" 
     ON public.posts FOR INSERT 
     WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own posts" ON public.posts;
 CREATE POLICY "Users can update their own posts" 
     ON public.posts FOR UPDATE 
     USING (auth.uid() = user_id);
 
 -- Policies: art_certificates
+DROP POLICY IF EXISTS "Art certificates are public" ON public.art_certificates;
 CREATE POLICY "Art certificates are public" 
     ON public.art_certificates FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Creators can mint certificates" ON public.art_certificates;
 CREATE POLICY "Creators can mint certificates" 
     ON public.art_certificates FOR INSERT 
     WITH CHECK (auth.uid() = creator_id);
 
 -- Policies: art_process_proofs
+DROP POLICY IF EXISTS "Proofs are viewable with certificate" ON public.art_process_proofs;
 CREATE POLICY "Proofs are viewable with certificate" 
     ON public.art_process_proofs FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Certificate creator can insert proofs" ON public.art_process_proofs;
 CREATE POLICY "Certificate creator can insert proofs" 
     ON public.art_process_proofs FOR INSERT 
     WITH CHECK (
@@ -565,13 +574,16 @@ CREATE POLICY "Certificate creator can insert proofs"
     );
 
 -- Policies: interactions
+DROP POLICY IF EXISTS "Interactions are viewable by all" ON public.interactions;
 CREATE POLICY "Interactions are viewable by all" 
     ON public.interactions FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can create interactions" ON public.interactions;
 CREATE POLICY "Authenticated users can create interactions" 
     ON public.interactions FOR INSERT 
     WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own interactions" ON public.interactions;
 CREATE POLICY "Users can delete own interactions" 
     ON public.interactions FOR DELETE 
     USING (auth.uid() = user_id);
