@@ -209,13 +209,13 @@ RETURNS TRIGGER AS $$
 DECLARE
     fuzz_dist_meters FLOAT;
     fuzz_angle_radians FLOAT;
-    fuzz_seed_val FLOAT;
+    fuzz_seed_val BIGINT;
 BEGIN
     -- Jika exact_location disediakan namun public_location tidak ditentukan atau sama persis
     IF NEW.exact_location IS NOT NULL THEN
         -- Gunakan hash deterministik dari post id dan exact location sebagai seed acak terkontrol
         fuzz_seed_val := ('x' || substr(md5(NEW.id::text || ST_AsText(NEW.exact_location)), 1, 8))::bit(32)::bigint;
-        PERFORM setseed((fuzz_seed_val % 1000000)::float / 1000000.0);
+        PERFORM setseed((abs(fuzz_seed_val) % 1000000)::float / 1000000.0);
         
         -- Jarak acak antara 50% hingga 100% dari fuzz_radius_meters
         fuzz_dist_meters := (NEW.fuzz_radius_meters * 0.5) + (random() * (NEW.fuzz_radius_meters * 0.5));
@@ -743,6 +743,26 @@ export const VEC_SAMPLE_SEED_SQL = `-- =========================================
 -- VEC DEMO SEED DATA (Supabase SQL Editor Ready)
 -- Data simulasi zero-trust camera, PostGIS GPS, NFC art & voice notes
 -- =====================================================================
+
+-- 0. Masukkan Akun Mock ke auth.users (Mencegah Error FK users_id_fkey)
+INSERT INTO auth.users (
+  id,
+  instance_id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+VALUES 
+  ('a1111111-1111-4111-8111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'budi@vec.enterprise', crypt('VECsecret2026!', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Budi Hartono"}', NOW(), NOW()),
+  ('b2222222-2222-4222-8222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'sarah@vec.enterprise', crypt('VECsecret2026!', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Sarah Jenkins"}', NOW(), NOW()),
+  ('c3333333-3333-4333-8333-333333333333', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'galeri@vec.enterprise', crypt('VECsecret2026!', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Galeri Seni Nusantara"}', NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
 
 -- 1. Insert Mock Users
 INSERT INTO public.users (id, username, full_name, authenticity_score, trust_tier, kyc_verified, total_verified_captures)
