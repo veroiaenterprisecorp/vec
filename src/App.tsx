@@ -1,30 +1,24 @@
 import React, { useState } from 'react';
 import { Header } from './components/Header';
-import VecDarkLuxePage from './components/VecDarkLuxePage';
-import { SqlViewer } from './components/SqlViewer';
-import { NextjsApiViewer } from './components/NextjsApiViewer';
-import { FlutterAppViewer } from './components/FlutterAppViewer';
-import { ErdVisualizer } from './components/ErdVisualizer';
+import { VecOverview } from './components/VecOverview';
+import { VecVault } from './components/VecVault';
+import { VecStudio } from './components/VecStudio';
+import { VecPrivateVault } from './components/VecPrivateVault';
 import { PostGisSimulator } from './components/PostGisSimulator';
-import { SeedDataGenerator } from './components/SeedDataGenerator';
-import { ArchitectureDocs } from './components/ArchitectureDocs';
-import { LiveSupabaseExplorer } from './components/LiveSupabaseExplorer';
+import { GitHubSupabaseSyncHub } from './components/GitHubSupabaseSyncHub';
+import { VecArchitectureConsole } from './components/VecArchitectureConsole';
 import { VEC_FULL_SQL_SCRIPT } from './data/vecSqlSchema';
+import { VecOfficialLogo } from './components/VecOfficialLogo';
 import { 
   Check, 
-  Terminal, 
-  Database, 
-  MapPin, 
-  Cpu, 
-  FileText,
-  ShieldCheck,
-  ChevronRight,
-  Smartphone,
-  LayoutDashboard
+  ShieldCheck, 
+  GitBranch, 
+  Database,
+  ExternalLink
 } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'luxe' | 'explorer' | 'flutter' | 'api' | 'sql' | 'erd' | 'postgis' | 'seed' | 'docs'>('luxe');
+  const [activeTab, setActiveTab] = useState<'overview' | 'private-vault' | 'vault' | 'studio' | 'spatial' | 'sync' | 'architecture'>('overview');
   const [copied, setCopied] = useState<boolean>(false);
   const [showToast, setShowToast] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string>('');
@@ -34,13 +28,13 @@ export default function App() {
     setShowToast(true);
     setTimeout(() => {
       setShowToast(false);
-    }, 3000);
+    }, 3200);
   };
 
-  const handleCopyAll = () => {
+  const handleCopyAllSql = () => {
     navigator.clipboard.writeText(VEC_FULL_SQL_SCRIPT);
     setCopied(true);
-    triggerToast('Skrip SQL lengkap berhasil disalin ke clipboard!');
+    triggerToast('Skrip SQL Supabase lengkap berhasil disalin!');
     setTimeout(() => setCopied(false), 2500);
   };
 
@@ -56,94 +50,120 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-white">
-      {/* Top Header */}
+    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/25 selection:text-cyan-200">
+      
+      {/* Executive Top Navigation Bar */}
       <Header
-        onCopyAll={handleCopyAll}
-        copied={copied}
-        onDownloadSql={handleDownloadSql}
         activeTab={activeTab}
         setActiveTab={(tab: string) => setActiveTab(tab as any)}
+        onOpenSyncHub={() => setActiveTab('sync')}
+        onCopyAll={handleCopyAllSql}
+        copied={copied}
+        onDownloadSql={handleDownloadSql}
       />
 
-      {/* Main Workspace Body */}
-      {activeTab === 'luxe' ? (
-        <VecDarkLuxePage />
-      ) : (
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Breadcrumb Bar */}
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-5">
-            <span>Veroia Enterprise Corp</span>
-            <ChevronRight className="w-3 h-3 text-slate-700" />
-            <span>Architecture Hub</span>
-            <ChevronRight className="w-3 h-3 text-slate-700" />
-            <span className="text-cyan-400 capitalize">
-              {activeTab === 'explorer' && 'Live Supabase Explorer (Real-Time Database Inspector)'}
-              {activeTab === 'flutter' && 'Flutter Mobile Client (Hardware-Bypass & NFC)'}
-              {activeTab === 'api' && 'Next.js 14 App Router + Prisma ORM Backend'}
-              {activeTab === 'sql' && 'Skrip SQL Supabase Ready'}
-              {activeTab === 'erd' && 'Visual ERD & Skema 5 Tabel'}
-              {activeTab === 'postgis' && 'Simulator PostGIS Fuzzing GPS'}
-              {activeTab === 'seed' && 'Data Simulasi (Seed Mock Data)'}
-              {activeTab === 'docs' && 'Whitepaper Arsitektur Teknis'}
-            </span>
-          </div>
-
-          {/* Tab Views */}
-          {activeTab === 'explorer' && (
-            <LiveSupabaseExplorer />
-          )}
-
-          {activeTab === 'flutter' && (
-            <FlutterAppViewer />
-          )}
-
-          {activeTab === 'api' && (
-            <NextjsApiViewer />
-          )}
-
-          {activeTab === 'sql' && (
-            <SqlViewer onCopyAll={handleCopyAll} copied={copied} />
-          )}
-
-        {activeTab === 'erd' && (
-          <ErdVisualizer />
+      {/* Main Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        
+        {/* VIEW 1: FLAGSHIP PLATFORM OVERVIEW */}
+        {activeTab === 'overview' && (
+          <VecOverview onNavigate={(tab) => setActiveTab(tab)} />
         )}
 
-        {activeTab === 'postgis' && (
+        {/* VIEW 2: BRANKAS PRIBADI SAYA (PERSONAL PRIVATE STORAGE) */}
+        {activeTab === 'private-vault' && (
+          <VecPrivateVault 
+            onNavigateToStudio={() => setActiveTab('studio')}
+            onNavigateToPublicVault={() => setActiveTab('vault')}
+          />
+        )}
+
+        {/* VIEW 3: LIVE ART VAULT & CURATOR DISCUSSIONS (PUBLIC EXHIBITION) */}
+        {activeTab === 'vault' && (
+          <VecVault />
+        )}
+
+        {/* VIEW 4: HARDWARE SENSOR STUDIO & C2PA VERIFICATION */}
+        {activeTab === 'studio' && (
+          <VecStudio 
+            onNavigateToPrivateVault={() => setActiveTab('private-vault')}
+          />
+        )}
+
+        {/* VIEW 4: POSTGIS DIFFERENTIAL GEOPRIVACY RADAR */}
+        {activeTab === 'spatial' && (
           <PostGisSimulator />
         )}
 
-        {activeTab === 'seed' && (
-          <SeedDataGenerator />
+        {/* VIEW 5: GITHUB & SUPABASE SYNC CONTROL CENTER */}
+        {activeTab === 'sync' && (
+          <GitHubSupabaseSyncHub
+            onCopyAllSql={handleCopyAllSql}
+            copiedSql={copied}
+          />
         )}
 
-        {activeTab === 'docs' && (
-          <ArchitectureDocs />
+        {/* VIEW 6: ENTERPRISE ARCHITECTURE & SPECIFICATIONS */}
+        {activeTab === 'architecture' && (
+          <VecArchitectureConsole
+            onCopyAllSql={handleCopyAllSql}
+            copiedSql={copied}
+            onDownloadSql={handleDownloadSql}
+          />
         )}
+
       </main>
-    )}
 
-      {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-5 text-center text-xs font-mono text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-cyan-400" />
-            <span>VEC Zero-Trust Hardware Attestation Platform</span>
+      {/* Modern Executive Footer */}
+      <footer className="border-t border-slate-900 bg-[#02040A] py-8 text-xs font-mono text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 rounded-lg bg-slate-900 border border-slate-800 p-0.5 flex items-center justify-center">
+              <VecOfficialLogo className="w-full h-full" />
+            </div>
+            <div className="text-slate-400">
+              <span className="text-white font-bold font-sans">Veroia Enterprise Corp (VEC)</span>
+              <span className="mx-2">·</span>
+              <span>Zero-Trust Cryptographic Hardware Provenance</span>
+            </div>
           </div>
-          <div>
-            PostgreSQL 16.3 • PostGIS 3.4 • C2PA Manifest • NTAG424 DNA NFC
+
+          <div className="flex flex-wrap items-center gap-4 text-slate-400">
+            <a
+              href="https://github.com/veroiaenterprisecorp/vec"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 hover:text-white transition"
+            >
+              <GitBranch className="w-3.5 h-3.5 text-slate-400" />
+              <span>veroiaenterprisecorp/vec</span>
+              <ExternalLink className="w-3 h-3 text-slate-600" />
+            </a>
+
+            <span className="text-slate-700">|</span>
+
+            <span className="flex items-center gap-1 text-emerald-400">
+              <Database className="w-3.5 h-3.5" />
+              <span>Supabase PostgreSQL 16 & PostGIS 3.4</span>
+            </span>
+
+            <span className="text-slate-700">|</span>
+
+            <span>C2PA v2.1 • NTAG424 DNA NFC</span>
           </div>
+
         </div>
       </footer>
 
       {/* Floating Toast Notification */}
       {showToast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-900 border border-cyan-500/60 shadow-2xl shadow-cyan-950 text-white text-xs font-mono animate-bounce">
-          <Check className="w-4 h-4 text-emerald-400" />
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-slate-900 border border-cyan-500/60 shadow-2xl shadow-cyan-950 text-white text-xs font-mono">
+          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
+
     </div>
   );
 }

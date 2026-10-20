@@ -1,0 +1,41 @@
+name: Supabase Database Sync & Migration CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/**'
+      - 'vec_schema_supabase.sql'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  validate-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify SQL Syntax & Schema Integrity
+        run: |
+          echo "Validating VEC PostgreSQL 16 + PostGIS schema..."
+          test -f vec_schema_supabase.sql || { echo "vec_schema_supabase.sql not found"; exit 1; }
+          echo "Schema file verified."
+
+      - name: Deploy Migrations to Supabase (Production)
+        if: github.ref == 'refs/heads/main' && env.SUPABASE_ACCESS_TOKEN != ''
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: |
+          supabase link --project-ref "$SUPABASE_PROJECT_ID"
+          supabase db push

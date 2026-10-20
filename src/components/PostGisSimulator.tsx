@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { MapPin, ShieldAlert, ShieldCheck, RefreshCw, Eye, EyeOff, Code2, Compass } from 'lucide-react';
+import { MapPin, ShieldAlert, ShieldCheck, RefreshCw, Eye, EyeOff, Compass } from 'lucide-react';
 
 interface PresetLocation {
   name: string;
@@ -273,46 +273,60 @@ export const PostGisSimulator: React.FC = () => {
               </button>
             </div>
 
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Di Supabase, API klien (Flutter/React/iOS) diarahkan membaca view <code className="text-cyan-300 font-mono">v_posts_feed</code>. Kolom <code className="text-red-400 font-mono">exact_location</code> dieliminasi sepenuhnya dari SELECT query!
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Sistem secara otomatis membedakan data yang boleh dilihat masyarakat umum dan data rahasia pemilik karya:
             </p>
 
-            <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-xs text-slate-300 space-y-1">
-              <div className="text-slate-500">// Response Payload JSON API Publik:</div>
-              <div>&quot;id&quot;: &quot;d4444444-4444-4444-8444-444444444444&quot;,</div>
-              <div>&quot;title&quot;: &quot;{selectedPreset.name}&quot;,</div>
-              <div className="text-cyan-300">
-                &quot;public_location&quot;: &#123; &quot;lat&quot;: {spatialData.public.lat.toFixed(6)}, &quot;lng&quot;: {spatialData.public.lng.toFixed(6)} &#125;,
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 text-xs">
+              <div className="space-y-1">
+                <span className="text-[11px] font-semibold text-cyan-400 block">
+                  1. Lokasi yang Dilihat Publik di Peta:
+                </span>
+                <p className="text-slate-300 text-[11px] leading-relaxed">
+                  Titik telah digeser aman sejauh <strong className="text-cyan-300">{spatialData.actualDistanceMeters} meter</strong> dari studio asli. Pengunjung hanya mengetahui kawasan umumnya tanpa mengetahui alamat persisnya.
+                </p>
               </div>
-              <div>&quot;fuzz_radius_meters&quot;: {fuzzRadius},</div>
-              {revealExactInFeed ? (
-                <div className="text-red-400 bg-red-950/40 px-1 rounded">
-                  &quot;exact_location&quot;: &#123; &quot;lat&quot;: {spatialData.exact.lat.toFixed(6)}, &quot;lng&quot;: {spatialData.exact.lng.toFixed(6)} &#125; [HANYA ADMIN/CREATOR]
-                </div>
-              ) : (
-                <div className="text-slate-600 line-through">
-                  &quot;exact_location&quot;: [DIBLOKIR OLEH RLS / VIEW]
-                </div>
-              )}
+
+              <div className="pt-2 border-t border-slate-800/80 space-y-1">
+                <span className="text-[11px] font-semibold text-slate-400 block">
+                  2. Lokasi Studio Asli (Privat):
+                </span>
+                {revealExactInFeed ? (
+                  <div className="text-emerald-400 text-[11px] leading-relaxed bg-emerald-950/30 p-2 rounded border border-emerald-900/40">
+                    Mode Pemilik Aktif: Terbuka untuk Anda di koordinat <span className="font-bold">{spatialData.exact.lat.toFixed(6)}, {spatialData.exact.lng.toFixed(6)}</span>.
+                  </div>
+                ) : (
+                  <div className="text-rose-400 text-[11px] leading-relaxed bg-rose-950/20 p-2 rounded border border-rose-900/30">
+                    Terkunci Rapat: Koordinat asli disembunyikan otomatis oleh database untuk mencegah pelacakan atau risiko keamanan studio.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* PostGIS SQL Snippet */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
-            <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-slate-300 mb-1.5">
-              <Code2 className="w-3.5 h-3.5 text-cyan-400" />
-              <span>PostGIS Spatial Calculation SQL</span>
+          {/* Human-Readable Privacy Measurement Card */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-cyan-400" />
+              <span className="text-xs font-bold text-white">
+                Hasil Uji Pengaburan Lokasi
+              </span>
             </div>
-            <pre className="text-[11px] font-mono text-slate-300 bg-slate-900 p-2.5 rounded border border-slate-800 overflow-x-auto leading-relaxed">
-{`-- Jarak exact vs public (PostGIS):
-SELECT ST_Distance(
-  exact_location::geography, 
-  public_location::geography
-) AS distance_meters
-FROM public.posts
-WHERE id = 'd4444444...';
--- Hasil: ${spatialData.actualDistanceMeters} meter`}
-            </pre>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                <span className="text-[11px] text-slate-500 block">Jarak Selisih Aman:</span>
+                <span className="text-cyan-300 font-bold">{spatialData.actualDistanceMeters} meter</span>
+              </div>
+              <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                <span className="text-[11px] text-slate-500 block">Status Privasi:</span>
+                <span className="text-emerald-400 font-bold">100% Terlindungi</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-400 leading-relaxed pt-1">
+              Perhitungan kelengkungan bumi ini diproses langsung di database Supabase secara instan tanpa memperlambat perangkat Anda.
+            </p>
           </div>
         </div>
       </div>
