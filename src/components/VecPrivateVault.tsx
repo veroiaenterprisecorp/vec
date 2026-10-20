@@ -4,17 +4,20 @@ import {
   updateVaultItemPrivacy, 
   deletePrivateVaultItem, 
   getUserVaultProfile,
+  mergeRemoteItemsIntoVault,
   PrivateVaultItem,
   UserVaultProfile
 } from '../lib/userVaultStorage';
 import {
   syncVaultItemToCloud,
+  publishArtworkToSupabasePosts,
   getStorageBucketName,
   setStorageBucketName,
   getStorageMode,
   setStorageMode as saveStorageModePref,
   StorageTargetMode
 } from '../lib/cloudStorage';
+import { supabase } from '../lib/supabase';
 import { 
   ShieldCheck, 
   Lock, 
@@ -58,6 +61,7 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [isSyncingAll, setIsSyncingAll] = useState<boolean>(false);
+  const [isPullingCloud, setIsPullingCloud] = useState<boolean>(false);
   const [showCloudSettingsModal, setShowCloudSettingsModal] = useState<boolean>(false);
   const [bucketInput, setBucketInput] = useState<string>(() => getStorageBucketName());
   
@@ -71,21 +75,79 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  const pullRemotePostsIntoVault = async (silent = false) => {
+    setIsPullingCloud(true);
+    try {
+      const { data: posts, error } = await supabase
+        .from('posts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (!error && posts && posts.length > 0) {
+        const mapped: PrivateVaultItem[] = posts.map((p: any) => ({
+          id: p.id,
+          title: p.title || 'Tangkapan C2PA',
+          photoUrl: p.media_url,
+          digest: p.c2pa_manifest_hash || p.raw_capture_digest || 'hash',
+          resolution: p.sensor_telemetry?.resolution || '1920 × 1080',
+          fileSize: '3.4 MB',
+          captureDate: new Date(p.created_at).toLocaleString('id-ID'),
+          deviceInfo: `${p.camera_make || 'Sony'} ${p.camera_model || 'Alpha C2PA'}`,
+          isPrivate: false,
+          isPublished: true,
+          c2paSignature: p.hardware_tee_signature || 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
+          sensorType: 'Direct CMOS RAW (Zero-Bypass)',
+          storageTarget: 'cloud_supabase',
+          uploadStatus: 'uploaded'
+        }));
+        const updated = mergeRemoteItemsIntoVault(mapped);
+        setItems(updated);
+        if (!silent) {
+          showToast(`Berhasil menyinkronkan ${mapped.length} karya dari Supabase Cloud!`);
+        }
+      } else if (!silent) {
+        showToast('Tidak ada data tambahan di Supabase Cloud.');
+      }
+    } catch (e: any) {
+      if (!silent) showToast(`Catatan sinkronisasi cloud: ${e?.message || 'Koneksi database'}`);
+    } finally {
+      setIsPullingCloud(false);
+    }
+  };
+
   useEffect(() => {
-    setItems(getPrivateVaultItems());
+    const current = getPrivateVaultItems();
+    setItems(current);
     setProfile(getUserVaultProfile());
+    // Auto-pull from cloud database in background so other devices sync seamlessly
+    pullRemotePostsIntoVault(true);
   }, []);
 
-  const handleTogglePrivacy = (item: PrivateVaultItem) => {
+  const handleTogglePrivacy = async (item: PrivateVaultItem) => {
     const newIsPrivate = !item.isPrivate;
     const newIsPublished = !newIsPrivate;
     const updated = updateVaultItemPrivacy(item.id, newIsPrivate, newIsPublished);
     setItems(updated);
     window.dispatchEvent(new Event('storage'));
-    if (newIsPrivate) {
-      showToast(`Foto "${item.title}" sekarang dikunci kembali ke status 100% Privat.`);
+
+    if (newIsPublished) {
+      showToast(`Menerbitkan "${item.title}" ke Live Vault & Supabase...`);
+      // Publish directly to Supabase posts table so ALL devices globally can see it
+      const res = await publishArtworkToSupabasePosts({
+        title: item.title,
+        photoUrl: (item.cloudStorageUrl && item.cloudStorageUrl.startsWith('http')) ? item.cloudStorageUrl : item.photoUrl,
+        digest: item.digest,
+        deviceInfo: item.deviceInfo,
+        resolution: item.resolution
+      });
+      if (res.success) {
+        showToast(`Foto "${item.title}" berhasil diterbitkan ke Live Vault & tersimpan di Supabase Cloud!`);
+      } else {
+        showToast(`Foto "${item.title}" diterbitkan ke Live Vault lokal.`);
+      }
     } else {
-      showToast(`Foto "${item.title}" berhasil diterbitkan ke Live Vault Publik!`);
+      showToast(`Foto "${item.title}" sekarang dikunci kembali ke status 100% Privat.`);
     }
   };
 
@@ -106,7 +168,7 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
     if (success) {
       showToast(`"${item.title}" berhasil tersimpan di Cloud Storage!`);
     } else {
-      showToast(`Gagal mengunggah "${item.title}" ke cloud.`);
+      showToast(`Catatan: ${item.title} tersimpan secara lokal. Periksa bucket Supabase.`);
     }
   };
 
@@ -181,6 +243,16 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
 
         {/* Quick Action Buttons */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            onClick={() => pullRemotePostsIntoVault(false)}
+            disabled={isPullingCloud}
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-mono font-bold bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-slate-700 transition shadow-md disabled:opacity-50 cursor-pointer"
+            title="Tarik karya yang tersimpan di Supabase Cloud dari perangkat lain"
+          >
+            <RefreshCw className={`w-4 h-4 text-emerald-400 ${isPullingCloud ? 'animate-spin' : ''}`} />
+            <span>{isPullingCloud ? 'Menarik...' : 'Tarik dari Cloud (Multi-Device)'}</span>
+          </button>
+
           <button
             onClick={handleSyncAllToCloud}
             disabled={isSyncingAll}
@@ -406,6 +478,12 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
                   src={item.photoUrl}
                   alt={item.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  onError={(e) => {
+                    const el = e.currentTarget;
+                    if (!el.src.includes('vec_vault_artwork')) {
+                      el.src = '/assets/images/vec_vault_artwork_1792494925679.jpg';
+                    }
+                  }}
                 />
 
                 {/* Top Overlay Badges */}
@@ -665,6 +743,12 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
                 src={selectedPhoto.photoUrl}
                 alt={selectedPhoto.title}
                 className="max-h-[70vh] max-w-[85vw] object-contain rounded-xl shadow-2xl border border-slate-800"
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  if (!el.src.includes('vec_vault_artwork')) {
+                    el.src = '/assets/images/vec_vault_artwork_1792494925679.jpg';
+                  }
+                }}
               />
             </div>
           </div>
@@ -736,18 +820,35 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
                   </span>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(`INSERT INTO storage.buckets (id, name, public) VALUES ('${bucketInput.trim() || 'vec-captures'}', '${bucketInput.trim() || 'vec-captures'}', true) ON CONFLICT (id) DO NOTHING;`);
-                      showToast('Perintah SQL berhasil disalin!');
+                      const bName = bucketInput.trim() || 'vec-captures';
+                      navigator.clipboard.writeText(`-- 1. Buat bucket public
+INSERT INTO storage.buckets (id, name, public) VALUES ('${bName}', '${bName}', true) ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- 2. Beri izin akses upload dan baca public
+DROP POLICY IF EXISTS "Public can view capture objects" ON storage.objects;
+CREATE POLICY "Public can view capture objects" ON storage.objects FOR SELECT USING (bucket_id = '${bName}');
+
+DROP POLICY IF EXISTS "Public can upload capture objects" ON storage.objects;
+CREATE POLICY "Public can upload capture objects" ON storage.objects FOR INSERT WITH CHECK (bucket_id = '${bName}');`);
+                      showToast('Perintah SQL lengkap berhasil disalin!');
                     }}
                     className="text-[10px] text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
                   >
-                    Salin SQL
+                    Salin SQL Lengkap
                   </button>
                 </div>
                 <pre className="p-2.5 rounded-lg bg-black text-[10px] text-slate-300 overflow-x-auto leading-relaxed border border-slate-900">
-{`INSERT INTO storage.buckets (id, name, public)
-VALUES ('${bucketInput.trim() || 'vec-captures'}', '${bucketInput.trim() || 'vec-captures'}', true)
-ON CONFLICT (id) DO NOTHING;`}
+{`-- 1. Buat bucket public
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('${bucketInput.trim() || 'vec-captures'}', '${bucketInput.trim() || 'vec-captures'}', true) 
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- 2. Izinkan upload & baca public
+DROP POLICY IF EXISTS "Public can view capture objects" ON storage.objects;
+CREATE POLICY "Public can view capture objects" ON storage.objects FOR SELECT USING (bucket_id = '${bucketInput.trim() || 'vec-captures'}');
+
+DROP POLICY IF EXISTS "Public can upload capture objects" ON storage.objects;
+CREATE POLICY "Public can upload capture objects" ON storage.objects FOR INSERT WITH CHECK (bucket_id = '${bucketInput.trim() || 'vec-captures'}');`}
                 </pre>
               </div>
 

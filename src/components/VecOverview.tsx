@@ -109,10 +109,16 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate }) => {
           <div className="lg:col-span-5 relative">
             <div className="relative rounded-2xl overflow-hidden border border-slate-700/80 bg-slate-950 shadow-2xl group">
               <img
-                src="/src/assets/images/vec_hero_camera_1792494926035.jpg"
+                src="/assets/images/vec_hero_camera_1792494926035.jpg"
                 alt="VEC Hardware Camera Attestation"
                 className="w-full h-80 sm:h-96 object-cover object-center group-hover:scale-102 transition duration-700"
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  if (!el.src.includes('vec_vault_artwork')) {
+                    el.src = '/assets/images/vec_vault_artwork_1792494925679.jpg';
+                  }
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent"></div>
 
@@ -210,7 +216,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate }) => {
 
             <div className="relative h-44 rounded-xl overflow-hidden border border-slate-800">
               <img
-                src="/src/assets/images/vec_chip_nfc_1792494926609.jpg"
+                src="/assets/images/vec_chip_nfc_1792494926609.jpg"
                 alt="Cryptographic Hardware Chip"
                 className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                 referrerPolicy="no-referrer"
@@ -246,7 +252,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate }) => {
 
             <div className="relative h-44 rounded-xl overflow-hidden border border-slate-800">
               <img
-                src="/src/assets/images/vec_vault_artwork_1792494925679.jpg"
+                src="/assets/images/vec_vault_artwork_1792494925679.jpg"
                 alt="Museum Vault Exhibition"
                 className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                 referrerPolicy="no-referrer"
@@ -320,7 +326,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate }) => {
 
             <div className="relative h-44 rounded-xl overflow-hidden border border-slate-800">
               <img
-                src="/src/assets/images/vec_curator_portrait_1792494927295.jpg"
+                src="/assets/images/vec_curator_portrait_1792494927295.jpg"
                 alt="Master Curator Review"
                 className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                 referrerPolicy="no-referrer"

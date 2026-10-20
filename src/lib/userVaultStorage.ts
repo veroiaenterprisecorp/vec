@@ -39,7 +39,7 @@ const DEFAULT_ITEMS: PrivateVaultItem[] = [
   {
     id: 'vault-item-001',
     title: 'Studi Komposisi Lukisan Minyak - Silsilah Kanvas #01',
-    photoUrl: '/src/assets/images/vec_vault_artwork_1792494925679.jpg',
+    photoUrl: '/assets/images/vec_vault_artwork_1792494925679.jpg',
     digest: '4a6b2c8e1d9f3a5b7c0e2d4f6a8b1c3d5e7f9a0b2c4d6e8f1a3b5c7d9e0f2a4b',
     resolution: '1920 × 1440 piksel',
     fileSize: '4.8 MB',
@@ -58,7 +58,7 @@ const DEFAULT_ITEMS: PrivateVaultItem[] = [
   {
     id: 'vault-item-002',
     title: 'Dokumentasi Microchip NFC NTAG424 DNA Fisik',
-    photoUrl: '/src/assets/images/vec_chip_nfc_1792494926609.jpg',
+    photoUrl: '/assets/images/vec_chip_nfc_1792494926609.jpg',
     digest: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
     resolution: '1080 × 1080 piksel',
     fileSize: '3.2 MB',
@@ -83,11 +83,53 @@ export const getPrivateVaultItems = (): PrivateVaultItem[] => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_ITEMS));
       return DEFAULT_ITEMS;
     }
-    return JSON.parse(raw);
+    const items: PrivateVaultItem[] = JSON.parse(raw);
+    // Sanitize any outdated /src/assets paths in user's saved items
+    let hasFix = false;
+    const sanitized = items.map((i) => {
+      if (i.photoUrl && i.photoUrl.startsWith('/src/assets/')) {
+        hasFix = true;
+        return { ...i, photoUrl: i.photoUrl.replace('/src/assets/', '/assets/') };
+      }
+      return i;
+    });
+    if (hasFix) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+      return sanitized;
+    }
+    return items;
   } catch (e) {
     console.error('Failed to parse private vault items from storage:', e);
     return DEFAULT_ITEMS;
   }
+};
+
+/**
+ * Merges items fetched from Supabase cloud into the local vault
+ * Useful for cross-device synchronization (e.g. phone to laptop)
+ */
+export const mergeRemoteItemsIntoVault = (remoteItems: PrivateVaultItem[]): PrivateVaultItem[] => {
+  const current = getPrivateVaultItems();
+  const existingIds = new Set(current.map((item) => item.id));
+  const existingDigests = new Set(current.map((item) => item.digest));
+
+  const newItems: PrivateVaultItem[] = [];
+  for (const r of remoteItems) {
+    if (!existingIds.has(r.id) && !existingDigests.has(r.digest)) {
+      newItems.push(r);
+    }
+  }
+
+  if (newItems.length > 0) {
+    const merged = [...newItems, ...current];
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    } catch (e) {
+      console.warn('Failed to save merged items:', e);
+    }
+    return merged;
+  }
+  return current;
 };
 
 export const savePrivateVaultItem = (item: PrivateVaultItem): PrivateVaultItem[] => {

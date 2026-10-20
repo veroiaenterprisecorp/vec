@@ -36,6 +36,7 @@ import {
 } from '../lib/userVaultStorage';
 import {
   uploadCapturedPhotoToCloud,
+  publishArtworkToSupabasePosts,
   getStorageMode,
   setStorageMode as saveStorageModePref,
   getStorageBucketName,
@@ -362,7 +363,7 @@ export const VecStudio: React.FC<VecStudioProps> = ({
       if (rawChecksum) {
         setCapturedDigest(rawChecksum);
       }
-      const finalPhotoUrl = photoDataUrl || capturedPhotoUrl || "/src/assets/images/vec_hero_camera_1792494926035.jpg";
+      const finalPhotoUrl = photoDataUrl || capturedPhotoUrl || "/assets/images/vec_hero_camera_1792494926035.jpg";
       if (photoDataUrl) {
         setCapturedPhotoUrl(photoDataUrl);
       }
@@ -952,12 +953,30 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                         className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-white placeholder-slate-600 text-xs focus:outline-none focus:border-cyan-500"
                       />
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           setIsPublished(true);
                           if (currentCaptureId) {
                             updateVaultItemPrivacy(currentCaptureId, false, true, artworkTitle);
                             window.dispatchEvent(new Event('storage'));
                           }
+                          // Also publish to Supabase posts table so all other devices receive this artwork immediately
+                          const photoToPublish = (cloudObjectUrl && cloudObjectUrl.startsWith('http')) 
+                            ? cloudObjectUrl 
+                            : (capturedPhotoUrl || "/assets/images/vec_hero_camera_1792494926035.jpg");
+
+                          await publishArtworkToSupabasePosts({
+                            title: artworkTitle.trim() || `Tangkapan Sensor #${Date.now().toString().slice(-4)}`,
+                            photoUrl: photoToPublish,
+                            digest: capturedDigest,
+                            deviceInfo: deviceInfo,
+                            resolution: capturedResolution,
+                            sensorMetadata: {
+                              fileSize: capturedFileSize,
+                              geo: geoCoords,
+                              deviceInfo: deviceInfo
+                            }
+                          });
+                          window.dispatchEvent(new Event('storage'));
                         }}
                         disabled={isPublished}
                         className="w-full py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 disabled:bg-emerald-700 text-white font-bold transition flex items-center justify-center gap-1.5 text-xs cursor-pointer"
@@ -965,10 +984,10 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                         {isPublished ? (
                           <>
                             <Check className="w-3.5 h-3.5" />
-                            <span>Karya Berhasil Didaftarkan ke Live Vault!</span>
+                            <span>Karya Berhasil Didaftarkan ke Live Vault & Cloud!</span>
                           </>
                         ) : (
-                          <span>Konfirmasi & Terbitkan ke Live Vault</span>
+                          <span>Konfirmasi & Terbitkan ke Live Vault (Semua Perangkat)</span>
                         )}
                       </button>
 

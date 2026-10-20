@@ -74,7 +74,7 @@ const DEFAULT_FEATURED: VaultArtwork = {
   artistRole: 'Verified Master Vault',
   medium: 'Akrilik & Pigmen Emas di Atas Kanvas',
   dimensions: '120 × 150 cm',
-  photoUrl: '/src/assets/images/vec_vault_artwork_1792494925679.jpg',
+  photoUrl: '/assets/images/vec_vault_artwork_1792494925679.jpg',
   authenticityScore: 99.80,
   digest: '4a6b2c8e1d9f3a5b7c0e2d4f6a8b1c3d5e7f9a0b2c4d6e8f1a3b5c7d9e0f2a4b',
   c2paSignature: 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
@@ -154,61 +154,85 @@ export const VecVault: React.FC<VecVaultProps> = ({
       const localVaultItems = getPrivateVaultItems();
       const userPublishedList: VaultArtwork[] = localVaultItems
         .filter((item) => item.isPublished)
-        .map((item, idx) => ({
-          id: item.id,
-          title: item.title,
-          artist: 'Anda (Seniman Terverifikasi VEC)',
-          artistRole: 'Hardware Attested Creator',
-          medium: item.sensorType || 'Digital Fine Art / Sensor C2PA RAW',
-          dimensions: item.resolution,
-          photoUrl: item.cloudStorageUrl || item.photoUrl,
-          authenticityScore: 99.40,
-          digest: item.digest,
-          c2paSignature: item.c2paSignature,
-          deviceInfo: item.deviceInfo,
-          curationNumber: `VEC-PUB-${item.id.slice(-4).toUpperCase()}`,
-          description: `Karya fotografi otentik tervalidasi langsung via sensor kamera & C2PA. Berkas telah dipublikasikan ke Live Vault dan tersimpan pada ${item.storageTarget === 'cloud_supabase' ? 'Cloud Supabase Storage (' + (item.cloudBucket || 'vec-captures') + ')' : 'Brankas VEC'}.`,
-          isUserUploaded: true,
-          publishedAt: item.captureDate,
-          storageTarget: item.storageTarget,
-          cloudBucket: item.cloudBucket
-        }));
+        .map((item) => {
+          // Robust photo URL selection: If cloudStorageUrl is verified HTTP, use it; otherwise fallback to item.photoUrl
+          let resolvedPhoto = item.photoUrl;
+          if (item.uploadStatus === 'uploaded' && item.cloudStorageUrl && item.cloudStorageUrl.startsWith('http') && !item.cloudStorageUrl.includes('undefined')) {
+            resolvedPhoto = item.cloudStorageUrl;
+          }
+          if (resolvedPhoto && resolvedPhoto.startsWith('/src/assets/')) {
+            resolvedPhoto = resolvedPhoto.replace('/src/assets/', '/assets/');
+          }
+          return {
+            id: item.id,
+            title: item.title,
+            artist: 'Anda (Seniman Terverifikasi VEC)',
+            artistRole: 'Hardware Attested Creator',
+            medium: item.sensorType || 'Digital Fine Art / Sensor C2PA RAW',
+            dimensions: item.resolution,
+            photoUrl: resolvedPhoto || '/assets/images/vec_vault_artwork_1792494925679.jpg',
+            authenticityScore: 99.40,
+            digest: item.digest,
+            c2paSignature: item.c2paSignature,
+            deviceInfo: item.deviceInfo,
+            curationNumber: `VEC-PUB-${item.id.slice(-4).toUpperCase()}`,
+            description: `Karya fotografi otentik tervalidasi langsung via sensor kamera & C2PA. Berkas telah dipublikasikan ke Live Vault dan tersimpan pada ${item.storageTarget === 'cloud_supabase' ? 'Cloud Supabase Storage (' + (item.cloudBucket || 'vec-captures') + ')' : 'Brankas VEC'}.`,
+            isUserUploaded: true,
+            publishedAt: item.captureDate,
+            storageTarget: item.storageTarget,
+            cloudBucket: item.cloudBucket
+          };
+        });
 
-      // 2. Fetch any remote posts from Supabase posts table if accessible
+      // 2. Fetch remote posts from Supabase posts table so other devices show the exact same artworks
       let remoteArtworks: VaultArtwork[] = [];
       try {
         const { data: postsData, error } = await supabase
           .from('posts')
           .select('*')
           .order('created_at', { ascending: false })
-          .limit(10);
+          .limit(20);
 
         if (!error && postsData && postsData.length > 0) {
-          remoteArtworks = postsData.map((post: any) => ({
-            id: post.id,
-            title: post.title || 'Tangkapan C2PA Publik',
-            artist: 'Kolektor Terverifikasi',
-            artistRole: 'Hardware Attested Member',
-            medium: 'Sensor CMOS RAW Attested',
-            dimensions: '1920 × 1080 piksel',
-            photoUrl: post.media_url,
-            authenticityScore: Number(post.authenticity_confidence || 98.5),
-            digest: post.c2pa_manifest_hash || post.raw_capture_digest || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-            c2paSignature: post.hardware_tee_signature || 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
-            deviceInfo: `${post.camera_make || 'Sony'} ${post.camera_model || 'Alpha C2PA'}`,
-            curationNumber: `VEC-SDB-${post.id.slice(0, 4).toUpperCase()}`,
-            description: post.caption || 'Karya terverifikasi yang tersinkronisasi via cluster Supabase PostgreSQL.',
-            isUserUploaded: false,
-            publishedAt: new Date(post.created_at).toLocaleDateString('id-ID')
-          }));
+          remoteArtworks = postsData.map((post: any) => {
+            let mUrl = post.media_url || '/assets/images/vec_vault_artwork_1792494925679.jpg';
+            if (mUrl.startsWith('/src/assets/')) {
+              mUrl = mUrl.replace('/src/assets/', '/assets/');
+            }
+            return {
+              id: post.id,
+              title: post.title || 'Tangkapan C2PA Publik',
+              artist: post.author_name || 'Kolektor Terverifikasi',
+              artistRole: 'Hardware Attested Member',
+              medium: 'Sensor CMOS RAW Attested',
+              dimensions: post.sensor_telemetry?.resolution || '1920 × 1080 piksel',
+              photoUrl: mUrl,
+              authenticityScore: Number(post.authenticity_confidence || 98.5),
+              digest: post.c2pa_manifest_hash || post.raw_capture_digest || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+              c2paSignature: post.hardware_tee_signature || 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
+              deviceInfo: `${post.camera_make || 'Sony'} ${post.camera_model || 'Alpha C2PA'}`,
+              curationNumber: `VEC-SDB-${post.id.slice(0, 4).toUpperCase()}`,
+              description: post.caption || 'Karya terverifikasi yang tersinkronisasi via cluster Supabase PostgreSQL.',
+              isUserUploaded: false,
+              publishedAt: new Date(post.created_at).toLocaleDateString('id-ID')
+            };
+          });
         }
       } catch (dbErr) {
         console.warn('Supabase posts query note:', dbErr);
       }
 
-      // Merge: Featured master item + User published items + Remote items (deduplicated)
+      // Merge: Featured master item + User published items + Remote items (deduplicated by id and digest)
       const combined = [DEFAULT_FEATURED, ...userPublishedList, ...remoteArtworks];
-      const uniqueCombined = Array.from(new Map(combined.map(item => [item.id, item])).values());
+      const seenDigests = new Set<string>();
+      const uniqueCombined: VaultArtwork[] = [];
+      for (const item of combined) {
+        const key = item.id + '_' + (item.digest || '');
+        if (!seenDigests.has(key)) {
+          seenDigests.add(key);
+          uniqueCombined.push(item);
+        }
+      }
 
       setArtworks(uniqueCombined);
 
@@ -475,6 +499,12 @@ export const VecVault: React.FC<VecVaultProps> = ({
                     src={art.photoUrl}
                     alt={art.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                    onError={(e) => {
+                      const el = e.currentTarget;
+                      if (!el.src.includes('vec_vault_artwork')) {
+                        el.src = '/assets/images/vec_vault_artwork_1792494925679.jpg';
+                      }
+                    }}
                   />
                   {art.isUserUploaded && (
                     <span className="absolute top-1.5 left-1.5 bg-emerald-600/90 backdrop-blur-md px-1.5 py-0.5 rounded text-[9px] font-mono font-bold text-white shadow">
@@ -512,6 +542,12 @@ export const VecVault: React.FC<VecVaultProps> = ({
             alt={activeArtwork.title}
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
+            onError={(e) => {
+              const el = e.currentTarget;
+              if (!el.src.includes('vec_vault_artwork')) {
+                el.src = '/assets/images/vec_vault_artwork_1792494925679.jpg';
+              }
+            }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-slate-900/90"></div>
           
