@@ -7,6 +7,14 @@ import {
   PrivateVaultItem,
   UserVaultProfile
 } from '../lib/userVaultStorage';
+import {
+  syncVaultItemToCloud,
+  getStorageBucketName,
+  setStorageBucketName,
+  getStorageMode,
+  setStorageMode as saveStorageModePref,
+  StorageTargetMode
+} from '../lib/cloudStorage';
 import { 
   ShieldCheck, 
   Lock, 
@@ -27,7 +35,12 @@ import {
   Cpu, 
   FileCheck,
   Search,
-  Filter
+  Filter,
+  Cloud,
+  CloudUpload,
+  RefreshCw,
+  Settings,
+  ExternalLink
 } from 'lucide-react';
 
 interface VecPrivateVaultProps {
@@ -41,8 +54,12 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
 }) => {
   const [items, setItems] = useState<PrivateVaultItem[]>([]);
   const [profile, setProfile] = useState<UserVaultProfile>(getUserVaultProfile());
-  const [activeFilter, setActiveFilter] = useState<'all' | 'private' | 'published'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'private' | 'published' | 'cloud' | 'local'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [isSyncingAll, setIsSyncingAll] = useState<boolean>(false);
+  const [showCloudSettingsModal, setShowCloudSettingsModal] = useState<boolean>(false);
+  const [bucketInput, setBucketInput] = useState<string>(() => getStorageBucketName());
   
   // High-Resolution Lightbox Zoom Modal States
   const [selectedPhoto, setSelectedPhoto] = useState<PrivateVaultItem | null>(null);
@@ -75,13 +92,50 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
     if (window.confirm(`Hapus "${title}" secara permanen dari Brankas Pribadi Anda?`)) {
       const updated = deletePrivateVaultItem(id);
       setItems(updated);
-      showToast(`Foto berhasil dihapus dari penyimpanan pribadi.`);
+      showToast(`Foto berhasil dihapus dari penyimpanan.`);
     }
+  };
+
+  const handleSyncToCloud = async (item: PrivateVaultItem) => {
+    setSyncingId(item.id);
+    showToast(`Mengunggah "${item.title}" ke Supabase Cloud Storage...`);
+    const success = await syncVaultItemToCloud(item);
+    setSyncingId(null);
+    setItems(getPrivateVaultItems());
+    if (success) {
+      showToast(`"${item.title}" berhasil tersimpan di Cloud Storage!`);
+    } else {
+      showToast(`Gagal mengunggah "${item.title}" ke cloud.`);
+    }
+  };
+
+  const handleSyncAllToCloud = async () => {
+    const unuploaded = items.filter((i) => i.storageTarget !== 'cloud_supabase' || i.uploadStatus !== 'uploaded');
+    if (unuploaded.length === 0) {
+      showToast('Semua foto sudah tersinkron di Cloud Supabase!');
+      return;
+    }
+    setIsSyncingAll(true);
+    showToast(`Memulai sinkronisasi ${unuploaded.length} berkas ke Cloud Supabase...`);
+    for (const item of unuploaded) {
+      await syncVaultItemToCloud(item);
+    }
+    setIsSyncingAll(false);
+    setItems(getPrivateVaultItems());
+    showToast(`Selesai! Seluruh foto telah disinkronkan ke Cloud Supabase.`);
   };
 
   const filteredItems = items.filter((item) => {
     if (activeFilter === 'private' && !item.isPrivate) return false;
     if (activeFilter === 'published' && !item.isPublished) return false;
+    if (activeFilter === 'cloud') {
+      const isCloud = item.storageTarget === 'cloud_supabase' || item.uploadStatus === 'uploaded';
+      if (!isCloud) return false;
+    }
+    if (activeFilter === 'local') {
+      const isLocal = item.storageTarget === 'device_local' || (!item.storageTarget && item.uploadStatus !== 'uploaded');
+      if (!isLocal) return false;
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       return (
@@ -95,6 +149,8 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
 
   const totalPrivateCount = items.filter((i) => i.isPrivate).length;
   const totalPublishedCount = items.filter((i) => i.isPublished).length;
+  const cloudCount = items.filter((i) => i.storageTarget === 'cloud_supabase' || i.uploadStatus === 'uploaded').length;
+  const localCount = items.filter((i) => i.storageTarget === 'device_local' || (!i.storageTarget && i.uploadStatus !== 'uploaded')).length;
 
   return (
     <div className="space-y-6">
@@ -122,8 +178,30 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
           </p>
         </div>
 
-        {/* Quick Action Button */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Quick Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            onClick={handleSyncAllToCloud}
+            disabled={isSyncingAll}
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-mono font-bold bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 transition shadow-md disabled:opacity-50 cursor-pointer"
+            title="Sinkronkan seluruh foto di brankas ke Supabase Cloud Storage"
+          >
+            {isSyncingAll ? (
+              <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
+            ) : (
+              <CloudUpload className="w-4 h-4 text-cyan-400" />
+            )}
+            <span>{isSyncingAll ? 'Menyinkronkan...' : 'Sinkronkan Semua ke Cloud'}</span>
+          </button>
+
+          <button
+            onClick={() => setShowCloudSettingsModal(true)}
+            className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition cursor-pointer"
+            title="Pengaturan Cloud Bucket Supabase"
+          >
+            <Settings className="w-4 h-4 text-slate-400" />
+          </button>
+
           <button
             onClick={onNavigateToStudio}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-mono font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition shadow-lg shadow-cyan-950 cursor-pointer"
@@ -223,38 +301,60 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
         
         {/* Filter Buttons */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800 text-xs font-mono">
+        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800 text-xs font-mono">
           <button
             onClick={() => setActiveFilter('all')}
-            className={`px-3 py-1.5 rounded-lg transition ${
+            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
               activeFilter === 'all'
                 ? 'bg-slate-800 text-white font-bold shadow'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Semua Koleksi ({items.length})
+            Semua ({items.length})
+          </button>
+          <button
+            onClick={() => setActiveFilter('cloud')}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1 transition cursor-pointer ${
+              activeFilter === 'cloud'
+                ? 'bg-cyan-600 text-white font-bold shadow'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Cloud className="w-3.5 h-3.5" />
+            <span>Cloud Supabase ({cloudCount})</span>
+          </button>
+          <button
+            onClick={() => setActiveFilter('local')}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1 transition cursor-pointer ${
+              activeFilter === 'local'
+                ? 'bg-amber-600 text-white font-bold shadow'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <HardDrive className="w-3.5 h-3.5" />
+            <span>Lokal Perangkat ({localCount})</span>
           </button>
           <button
             onClick={() => setActiveFilter('private')}
-            className={`px-3 py-1.5 rounded-lg flex items-center gap-1 transition ${
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1 transition cursor-pointer ${
               activeFilter === 'private'
                 ? 'bg-emerald-600 text-white font-bold shadow'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
             <Lock className="w-3 h-3" />
-            <span>Tersimpan Privat ({totalPrivateCount})</span>
+            <span>Privat ({totalPrivateCount})</span>
           </button>
           <button
             onClick={() => setActiveFilter('published')}
-            className={`px-3 py-1.5 rounded-lg flex items-center gap-1 transition ${
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1 transition cursor-pointer ${
               activeFilter === 'published'
-                ? 'bg-cyan-600 text-white font-bold shadow'
+                ? 'bg-indigo-600 text-white font-bold shadow'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
             <Share2 className="w-3 h-3" />
-            <span>Diterbitkan ke Vault ({totalPublishedCount})</span>
+            <span>Publik ({totalPublishedCount})</span>
           </button>
         </div>
 
@@ -308,18 +408,30 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
                 />
 
                 {/* Top Overlay Badges */}
-                <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-                  {item.isPrivate ? (
-                    <span className="px-2.5 py-1 rounded-full bg-emerald-950/90 backdrop-blur-md border border-emerald-500/40 text-[10px] font-mono text-emerald-300 flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-emerald-400" /> 100% Privat
-                    </span>
-                  ) : (
-                    <span className="px-2.5 py-1 rounded-full bg-cyan-950/90 backdrop-blur-md border border-cyan-500/40 text-[10px] font-mono text-cyan-300 flex items-center gap-1">
-                      <Share2 className="w-3 h-3 text-cyan-400" /> Diterbitkan Publik
-                    </span>
-                  )}
+                <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {item.isPrivate ? (
+                      <span className="px-2.5 py-1 rounded-full bg-emerald-950/90 backdrop-blur-md border border-emerald-500/40 text-[10px] font-mono text-emerald-300 flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-emerald-400" /> 100% Privat
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-full bg-indigo-950/90 backdrop-blur-md border border-indigo-500/40 text-[10px] font-mono text-indigo-300 flex items-center gap-1">
+                        <Share2 className="w-3 h-3 text-indigo-400" /> Publik
+                      </span>
+                    )}
 
-                  <span className="px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md text-[10px] font-mono text-slate-300 border border-slate-700">
+                    {(item.storageTarget === 'cloud_supabase' || item.uploadStatus === 'uploaded') ? (
+                      <span className="px-2 py-1 rounded-full bg-cyan-950/90 backdrop-blur-md border border-cyan-500/40 text-[10px] font-mono text-cyan-300 flex items-center gap-1">
+                        <Cloud className="w-3 h-3 text-cyan-400" /> Cloud
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 rounded-full bg-amber-950/90 backdrop-blur-md border border-amber-500/40 text-[10px] font-mono text-amber-300 flex items-center gap-1">
+                        <HardDrive className="w-3 h-3 text-amber-400" /> Lokal
+                      </span>
+                    )}
+                  </div>
+
+                  <span className="px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md text-[10px] font-mono text-slate-300 border border-slate-700 shrink-0">
                     {item.fileSize}
                   </span>
                 </div>
@@ -362,6 +474,40 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
                       <span className="truncate">{item.deviceInfo}</span>
                     </div>
                   </div>
+
+                  {/* Cloud Storage Location & Sync Status */}
+                  {(item.storageTarget === 'cloud_supabase' || item.uploadStatus === 'uploaded') ? (
+                    <div className="p-2 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-[10px] font-mono text-cyan-300 flex items-center justify-between gap-1.5">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <Cloud className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <span className="truncate" title={item.cloudPath || 'vec-captures'}>
+                          Bucket: {item.cloudBucket || 'vec-captures'}
+                        </span>
+                      </div>
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] shrink-0 font-bold">
+                        Tersinkron
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="p-2 rounded-xl bg-amber-950/30 border border-amber-500/30 text-[10px] font-mono text-amber-300 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <HardDrive className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate">Tersimpan di Perangkat</span>
+                      </div>
+                      <button
+                        onClick={() => handleSyncToCloud(item)}
+                        disabled={syncingId === item.id}
+                        className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-[9px] transition shrink-0 flex items-center gap-1 cursor-pointer shadow-sm"
+                      >
+                        {syncingId === item.id ? (
+                          <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                        ) : (
+                          <CloudUpload className="w-2.5 h-2.5" />
+                        )}
+                        <span>{syncingId === item.id ? 'Mengunggah...' : 'Unggah ke Cloud'}</span>
+                      </button>
+                    </div>
+                  )}
 
                   {/* SHA-256 Checksum snippet */}
                   <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-[10px] font-mono text-slate-400">
@@ -534,6 +680,100 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
             </div>
           </div>
 
+        </div>
+      )}
+
+      {/* Cloud Storage Settings Modal */}
+      {showCloudSettingsModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#050C1E] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-cyan-950 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+                  <Cloud className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white font-mono">
+                    Konfigurasi Cloud Supabase Storage
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    Penyimpanan media dan file biner tangkapan kamera VEC
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCloudSettingsModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs font-mono">
+              <div className="space-y-1.5">
+                <label className="text-slate-300 font-bold block">
+                  Nama Bucket Supabase Storage:
+                </label>
+                <input
+                  type="text"
+                  value={bucketInput}
+                  onChange={(e) => setBucketInput(e.target.value)}
+                  placeholder="e.g. vec-captures"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-cyan-500"
+                />
+                <span className="text-[10px] text-slate-500">
+                  Default bucket: <code>vec-captures</code>. File foto akan disimpan di direktori <code>captures/YYYY-MM-DD/</code>.
+                </span>
+              </div>
+
+              {/* Bucket Creation SQL Guide */}
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-cyan-400 font-bold flex items-center gap-1.5">
+                    <FileCheck className="w-3.5 h-3.5" />
+                    SQL Pembuatan Bucket (Supabase SQL Editor):
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`INSERT INTO storage.buckets (id, name, public) VALUES ('${bucketInput.trim() || 'vec-captures'}', '${bucketInput.trim() || 'vec-captures'}', true) ON CONFLICT (id) DO NOTHING;`);
+                      showToast('Perintah SQL berhasil disalin!');
+                    }}
+                    className="text-[10px] text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
+                  >
+                    Salin SQL
+                  </button>
+                </div>
+                <pre className="p-2.5 rounded-lg bg-black text-[10px] text-slate-300 overflow-x-auto leading-relaxed border border-slate-900">
+{`INSERT INTO storage.buckets (id, name, public)
+VALUES ('${bucketInput.trim() || 'vec-captures'}', '${bucketInput.trim() || 'vec-captures'}', true)
+ON CONFLICT (id) DO NOTHING;`}
+                </pre>
+              </div>
+
+              <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-[11px] text-emerald-300 leading-relaxed">
+                ✓ <strong>Arsitektur Cloud Aktif:</strong> Setiap foto yang dijepret di Studio sekarang langsung diproses untuk disimpan ke Supabase Storage, menjaga memori HP/browser Anda tetap bersih dan foto tidak hilang ketika cache dibersihkan.
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+              <button
+                onClick={() => setShowCloudSettingsModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-mono text-slate-400 hover:text-white transition cursor-pointer"
+              >
+                Tutup
+              </button>
+              <button
+                onClick={() => {
+                  setStorageBucketName(bucketInput.trim());
+                  setShowCloudSettingsModal(false);
+                  showToast(`Bucket "${bucketInput.trim() || 'vec-captures'}" berhasil disimpan.`);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition shadow-lg shadow-cyan-950 cursor-pointer"
+              >
+                Simpan Konfigurasi
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

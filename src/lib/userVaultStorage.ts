@@ -12,6 +12,13 @@ export interface PrivateVaultItem {
   fuzzedLocation?: string;
   c2paSignature: string;
   sensorType: string;
+  // Cloud Supabase Storage Attributes
+  storageTarget?: 'cloud_supabase' | 'device_local';
+  cloudStorageUrl?: string;
+  cloudBucket?: string;
+  cloudPath?: string;
+  uploadStatus?: 'uploaded' | 'uploading' | 'failed' | 'local_only';
+  uploadError?: string;
 }
 
 export interface UserVaultProfile {
@@ -23,6 +30,7 @@ export interface UserVaultProfile {
   encryptionMode: string;
   storageUsedBytes: number;
   maxStorageBytes: number;
+  cloudStorageEnabled?: boolean;
 }
 
 const STORAGE_KEY = 'vec_user_private_vault_items';
@@ -41,7 +49,11 @@ const DEFAULT_ITEMS: PrivateVaultItem[] = [
     isPublished: false,
     fuzzedLocation: 'Jakarta Pusat (Radius 500m)',
     c2paSignature: 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
-    sensorType: 'Direct CMOS RAW (Zero-Bypass)'
+    sensorType: 'Direct CMOS RAW (Zero-Bypass)',
+    storageTarget: 'cloud_supabase',
+    cloudBucket: 'vec-captures',
+    cloudPath: 'captures/2026-10-20/c2pa_oil_painting_canvas.jpg',
+    uploadStatus: 'uploaded'
   },
   {
     id: 'vault-item-002',
@@ -56,7 +68,11 @@ const DEFAULT_ITEMS: PrivateVaultItem[] = [
     isPublished: false,
     fuzzedLocation: 'Bandung Dago (Radius 500m)',
     c2paSignature: 'TEE_STRONG_BOX_ATTESTATION_PASS',
-    sensorType: 'Cryptographic Hardware Module'
+    sensorType: 'Cryptographic Hardware Module',
+    storageTarget: 'cloud_supabase',
+    cloudBucket: 'vec-captures',
+    cloudPath: 'captures/2026-10-20/c2pa_nfc_chip_dna.jpg',
+    uploadStatus: 'uploaded'
   }
 ];
 
@@ -122,6 +138,28 @@ export const deletePrivateVaultItem = (id: string): PrivateVaultItem[] => {
   return updated;
 };
 
+export const updateVaultItemCloudStatus = (
+  id: string,
+  cloudData: Partial<Pick<PrivateVaultItem, 'storageTarget' | 'cloudStorageUrl' | 'cloudBucket' | 'cloudPath' | 'uploadStatus' | 'uploadError'>>
+): PrivateVaultItem[] => {
+  const current = getPrivateVaultItems();
+  const updated = current.map((item) => {
+    if (item.id === id) {
+      return {
+        ...item,
+        ...cloudData
+      };
+    }
+    return item;
+  });
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  } catch (e) {
+    console.warn('Failed to update storage item cloud status:', e);
+  }
+  return updated;
+};
+
 export const getUserVaultProfile = (): UserVaultProfile => {
   return {
     userId: 'usr_vec_78942a0c',
@@ -129,8 +167,9 @@ export const getUserVaultProfile = (): UserVaultProfile => {
     trustTier: 'HARDWARE_ATTESTED',
     authenticityScore: 99.40,
     hardwareEnclaveId: 'TEE-KNOX-TITAN-0x8892FA1B',
-    encryptionMode: 'AES-256-GCM + Postgres RLS Isolation',
+    encryptionMode: 'AES-256-GCM + Supabase Storage Vault',
     storageUsedBytes: 8.0 * 1024 * 1024, // 8.0 MB
-    maxStorageBytes: 5 * 1024 * 1024 * 1024 // 5 GB
+    maxStorageBytes: 5 * 1024 * 1024 * 1024, // 5 GB
+    cloudStorageEnabled: true
   };
 };

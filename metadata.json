@@ -1,6 +1,9 @@
 {
   "name": "Veroia Enterprise Corp (VEC) - Database Architect Studio",
   "description": "Production PostgreSQL 16 + PostGIS database schema, ERD, and deployment script for Veroia Enterprise Corp zero-trust camera and art provenance platform.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

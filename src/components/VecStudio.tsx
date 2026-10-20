@@ -22,15 +22,39 @@ import {
   X,
   FolderLock,
   CameraOff,
-  Upload
+  Upload,
+  Cloud,
+  CloudUpload,
+  HardDrive,
+  ExternalLink,
+  Server
 } from 'lucide-react';
-import { savePrivateVaultItem, updateVaultItemPrivacy } from '../lib/userVaultStorage';
+import { 
+  savePrivateVaultItem, 
+  updateVaultItemPrivacy, 
+  updateVaultItemCloudStatus 
+} from '../lib/userVaultStorage';
+import {
+  uploadCapturedPhotoToCloud,
+  getStorageMode,
+  setStorageMode as saveStorageModePref,
+  getStorageBucketName,
+  StorageTargetMode
+} from '../lib/cloudStorage';
 
 interface VecStudioProps {
   onNavigateToPrivateVault?: () => void;
 }
 
 export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }) => {
+  // Storage Target Mode: defaults to 'cloud_supabase' as requested by user
+  const [storageTarget, setStorageTarget] = useState<StorageTargetMode>(() => getStorageMode());
+  const [targetBucket, setTargetBucket] = useState<string>(() => getStorageBucketName());
+  const [isUploadingToCloud, setIsUploadingToCloud] = useState<boolean>(false);
+  const [cloudUploadMessage, setCloudUploadMessage] = useState<string | null>(null);
+  const [cloudObjectUrl, setCloudObjectUrl] = useState<string | null>(null);
+  const [cloudObjectPath, setCloudObjectPath] = useState<string | null>(null);
+
   // Camera Stream States
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
@@ -200,6 +224,8 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
         // Auto Save to Private Vault
         const newCaptureId = 'cap-upload-' + Date.now();
         setCurrentCaptureId(newCaptureId);
+        const isCloudTarget = storageTarget === 'cloud_supabase';
+
         savePrivateVaultItem({
           id: newCaptureId,
           title: artworkTitle.trim() || file.name.replace(/\.[^/.]+$/, ''),
@@ -212,9 +238,39 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
           isPrivate: privacyMode === 'private',
           isPublished: privacyMode === 'public',
           c2paSignature: 'SHA256_UPLOAD_INTEGRITY_VERIFIED',
-          sensorType: 'Direct File Digest (Cryptographic Attestation)'
+          sensorType: 'Direct File Digest (Cryptographic Attestation)',
+          storageTarget: storageTarget,
+          uploadStatus: isCloudTarget ? 'uploading' : 'local_only',
+          cloudBucket: targetBucket
         });
         setShowVaultSavedBadge(true);
+
+        if (isCloudTarget) {
+          setIsUploadingToCloud(true);
+          setCloudUploadMessage('Mengunggah berkas ke Supabase Cloud Storage...');
+          uploadCapturedPhotoToCloud({
+            photoDataUrl: dataUrl,
+            digest: realChecksum,
+            title: artworkTitle.trim() || file.name,
+            captureId: newCaptureId
+          }).then((res) => {
+            setIsUploadingToCloud(false);
+            setCloudUploadMessage(res.message);
+            if (res.cloudStorageUrl) setCloudObjectUrl(res.cloudStorageUrl);
+            if (res.cloudPath) setCloudObjectPath(res.cloudPath);
+            updateVaultItemCloudStatus(newCaptureId, {
+              storageTarget: 'cloud_supabase',
+              cloudStorageUrl: res.cloudStorageUrl,
+              cloudBucket: res.cloudBucket,
+              cloudPath: res.cloudPath,
+              uploadStatus: res.success ? 'uploaded' : 'failed',
+              uploadError: res.error
+            });
+          }).catch((err) => {
+            setIsUploadingToCloud(false);
+            setCloudUploadMessage('Gagal mengunggah ke cloud: ' + err.message);
+          });
+        }
       };
       reader.readAsDataURL(file);
     } catch (uploadErr) {
@@ -312,6 +368,8 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
       // Otomatis Simpan ke Brankas Pribadi Pengguna
       const newCaptureId = 'cap-' + Date.now();
       setCurrentCaptureId(newCaptureId);
+      const isCloudTarget = storageTarget === 'cloud_supabase';
+
       savePrivateVaultItem({
         id: newCaptureId,
         title: artworkTitle.trim() || `Tangkapan Sensor #${Date.now().toString().slice(-4)}`,
@@ -324,9 +382,45 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
         isPrivate: privacyMode === 'private',
         isPublished: privacyMode === 'public',
         c2paSignature: isCameraActive ? 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID' : 'SIMULATION_TEE_HASH_VALID',
-        sensorType: isCameraActive ? 'Direct CMOS RAW (Zero-Bypass)' : 'Simulasi Sensor C2PA'
+        sensorType: isCameraActive ? 'Direct CMOS RAW (Zero-Bypass)' : 'Simulasi Sensor C2PA',
+        storageTarget: storageTarget,
+        uploadStatus: isCloudTarget ? 'uploading' : 'local_only',
+        cloudBucket: targetBucket
       });
       setShowVaultSavedBadge(true);
+
+      if (isCloudTarget) {
+        setIsUploadingToCloud(true);
+        setCloudUploadMessage(`Mengunggah foto ke Supabase Cloud Storage (Bucket: ${targetBucket})...`);
+        uploadCapturedPhotoToCloud({
+          photoDataUrl: finalPhotoUrl,
+          digest: rawChecksum || capturedDigest,
+          title: artworkTitle.trim() || `Tangkapan Sensor #${Date.now().toString().slice(-4)}`,
+          captureId: newCaptureId,
+          sensorMetadata: {
+            resolution: capturedResolution,
+            fileSize: capturedFileSize,
+            deviceInfo: deviceInfo,
+            geo: geoCoords
+          }
+        }).then((res) => {
+          setIsUploadingToCloud(false);
+          setCloudUploadMessage(res.message);
+          if (res.cloudStorageUrl) setCloudObjectUrl(res.cloudStorageUrl);
+          if (res.cloudPath) setCloudObjectPath(res.cloudPath);
+          updateVaultItemCloudStatus(newCaptureId, {
+            storageTarget: 'cloud_supabase',
+            cloudStorageUrl: res.cloudStorageUrl,
+            cloudBucket: res.cloudBucket,
+            cloudPath: res.cloudPath,
+            uploadStatus: res.success ? 'uploaded' : 'failed',
+            uploadError: res.error
+          });
+        }).catch((err) => {
+          setIsUploadingToCloud(false);
+          setCloudUploadMessage('Gagal mengunggah ke cloud: ' + err.message);
+        });
+      }
     } catch (err) {
       console.warn('Capture note:', err);
     } finally {
@@ -469,6 +563,67 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
           </div>
         </div>
       )}
+
+      {/* STORAGE DESTINATION ARCHITECTURE (Cloud Supabase Storage vs Local Device) */}
+      <div className="p-3.5 bg-gradient-to-r from-[#050C1E] to-[#0A1628] border border-cyan-500/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+        <div className="flex items-center gap-3">
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+            storageTarget === 'cloud_supabase' 
+              ? 'bg-cyan-950/80 border-cyan-500/50 text-cyan-400' 
+              : 'bg-amber-950/80 border-amber-500/50 text-amber-400'
+          }`}>
+            {storageTarget === 'cloud_supabase' ? <Cloud className="w-5 h-5 animate-pulse" /> : <HardDrive className="w-5 h-5" />}
+          </div>
+          <div>
+            <div className="flex items-center gap-2 text-xs font-mono font-bold text-white">
+              <span>Target Penyimpanan Pengambilan Gambar:</span>
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono border ${
+                storageTarget === 'cloud_supabase'
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+              }`}>
+                {storageTarget === 'cloud_supabase' ? '☁️ Cloud Storage (Supabase)' : '💾 Memori Lokal Perangkat'}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+              {storageTarget === 'cloud_supabase' 
+                ? `Foto otomatis diunggah ke Supabase Cloud Storage (Bucket: "${targetBucket}") & tersimpan di cloud database.` 
+                : 'Foto hanya disimpan secara offline di browser perangkat Anda.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 p-1 bg-slate-950/90 rounded-xl border border-slate-800 text-xs shrink-0">
+          <button
+            onClick={() => {
+              setStorageTarget('cloud_supabase');
+              saveStorageModePref('cloud_supabase');
+            }}
+            className={`px-3 py-1.5 rounded-lg font-mono text-[11px] flex items-center gap-1.5 transition cursor-pointer ${
+              storageTarget === 'cloud_supabase'
+                ? 'bg-cyan-600 text-white font-bold shadow-md shadow-cyan-950'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Cloud className="w-3.5 h-3.5" />
+            <span>Cloud Supabase (Default)</span>
+          </button>
+          <button
+            onClick={() => {
+              setStorageTarget('device_local');
+              saveStorageModePref('device_local');
+            }}
+            className={`px-3 py-1.5 rounded-lg font-mono text-[11px] flex items-center gap-1.5 transition cursor-pointer ${
+              storageTarget === 'device_local'
+                ? 'bg-amber-600 text-white font-bold shadow-md shadow-amber-950'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <HardDrive className="w-3.5 h-3.5" />
+            <span>Perangkat Lokal</span>
+          </button>
+        </div>
+      </div>
 
       {/* Main Viewfinder Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -814,22 +969,63 @@ export const VecStudio: React.FC<VecStudioProps> = ({ onNavigateToPrivateVault }
                     </div>
                   )}
 
-                  {/* Private Vault Storage Badge & Direct Navigation */}
+                  {/* Storage Status & Cloud Storage Indicator */}
                   {showVaultSavedBadge && (
-                    <div className="p-2.5 rounded-xl bg-slate-950 border border-emerald-500/30 flex items-center justify-between gap-3 text-[11px] font-mono">
-                      <div className="flex items-center gap-1.5 text-emerald-300">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span>Foto tersimpan di Brankas Pribadi</span>
+                    <div className="space-y-2 pt-1">
+                      {/* Live Cloud Upload Progress / Confirmation */}
+                      {isUploadingToCloud ? (
+                        <div className="p-3 rounded-xl bg-cyan-950/60 border border-cyan-500/50 flex items-center gap-3 text-[11px] font-mono text-cyan-200 shadow-lg">
+                          <RefreshCw className="w-4 h-4 animate-spin text-cyan-400 shrink-0" />
+                          <div className="space-y-0.5">
+                            <span className="font-bold text-white block">Sinkronisasi Cloud Supabase:</span>
+                            <p className="text-[10px] text-cyan-300">Mengunggah file biner foto ke bucket "{targetBucket}"...</p>
+                          </div>
+                        </div>
+                      ) : cloudUploadMessage && storageTarget === 'cloud_supabase' ? (
+                        <div className="p-3 rounded-xl bg-gradient-to-r from-emerald-950/60 to-cyan-950/60 border border-emerald-500/40 space-y-1.5 text-[11px] font-mono shadow-md">
+                          <div className="flex items-center justify-between text-emerald-300 font-bold">
+                            <span className="flex items-center gap-1.5">
+                              <CloudUpload className="w-4 h-4 text-emerald-400" />
+                              <span>Tersimpan di Cloud Storage</span>
+                            </span>
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                              Bucket: {targetBucket}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-300 leading-relaxed">
+                            {cloudUploadMessage}
+                          </p>
+                          {cloudObjectPath && (
+                            <div className="flex items-center justify-between text-[10px] bg-slate-950/90 px-2 py-1 rounded border border-slate-800 text-cyan-300">
+                              <span className="truncate max-w-[200px]" title={cloudObjectPath}>
+                                Path: {cloudObjectPath}
+                              </span>
+                              <span className="text-emerald-400 font-bold shrink-0">100% RAW Cloud</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+
+                      {/* General Vault Storage Badge & Direct Navigation */}
+                      <div className="p-2.5 rounded-xl bg-slate-950 border border-emerald-500/30 flex items-center justify-between gap-3 text-[11px] font-mono">
+                        <div className="flex items-center gap-1.5 text-emerald-300">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span>
+                            {storageTarget === 'cloud_supabase' 
+                              ? 'Foto tersinkron di Cloud & Brankas' 
+                              : 'Foto tersimpan di Penyimpanan Lokal'}
+                          </span>
+                        </div>
+                        {onNavigateToPrivateVault && (
+                          <button
+                            onClick={onNavigateToPrivateVault}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-700/80 hover:bg-emerald-600 text-white font-bold transition flex items-center gap-1 shrink-0 cursor-pointer"
+                          >
+                            <FolderLock className="w-3 h-3" />
+                            <span>Buka Brankas Pribadi →</span>
+                          </button>
+                        )}
                       </div>
-                      {onNavigateToPrivateVault && (
-                        <button
-                          onClick={onNavigateToPrivateVault}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-700/80 hover:bg-emerald-600 text-white font-bold transition flex items-center gap-1 shrink-0 cursor-pointer"
-                        >
-                          <FolderLock className="w-3 h-3" />
-                          <span>Buka Brankas Pribadi →</span>
-                        </button>
-                      )}
                     </div>
                   )}
                 </div>
