@@ -236,7 +236,10 @@ BEGIN
     NEW.updated_at := TIMEZONE('utc', NOW());
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+-- Cegah pemanggilan langsung trigger melalui RPC API (/rest/v1/rpc)
+REVOKE EXECUTE ON FUNCTION public.fn_vec_fuzz_post_location() FROM anon, authenticated, public;
 
 -- Pasang trigger pada tabel master posts
 DROP TRIGGER IF EXISTS trg_vec_fuzz_post_location ON public.posts;
@@ -409,7 +412,8 @@ CREATE INDEX IF NOT EXISTS idx_interactions_type
 -- 8. VIEW AMAN PUBLIK: v_posts_feed
 -- Menyembunyikan exact_location dari konsumsi publik untuk kepatuhan privasi
 -- ---------------------------------------------------------------------
-CREATE OR REPLACE VIEW public.v_posts_feed AS
+CREATE OR REPLACE VIEW public.v_posts_feed 
+WITH (security_invoker = true) AS
 SELECT 
     p.id,
     p.user_id,
@@ -494,7 +498,7 @@ BEGIN
     ORDER BY distance_meters ASC
     LIMIT 100;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$$ LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = public, pg_temp;
 
 -- Alias kemudahan pemanggilan (latitude dahulu)
 CREATE OR REPLACE FUNCTION public.fn_vec_query_nearby_posts(
@@ -522,7 +526,7 @@ BEGIN
         min_author_score
     );
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$$ LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = public, pg_temp;
 
 -- ---------------------------------------------------------------------
 -- 10. ROW LEVEL SECURITY (RLS) POLICIES FOR SUPABASE
@@ -533,6 +537,15 @@ ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.art_certificates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.art_process_proofs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interactions ENABLE ROW LEVEL SECURITY;
+
+-- PostGIS spatial_ref_sys permission hardening (internal extension table, owned by supabase_admin)
+-- Note: spatial_ref_sys is managed by PostGIS; non-superusers cannot enable RLS on it (error 42501).
+-- We safely enforce read-only permissions for anon/authenticated roles without requiring table ownership.
+DO $$ BEGIN
+    REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON TABLE public.spatial_ref_sys FROM anon, authenticated;
+    GRANT SELECT ON TABLE public.spatial_ref_sys TO anon, authenticated;
+EXCEPTION WHEN OTHERS THEN null;
+END $$;
 
 -- Policies: users
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.users;
@@ -616,10 +629,10 @@ VALUES (
 ON CONFLICT (id) DO UPDATE SET public = true;
 
 -- Storage Policies
+-- Catatan: Bucket 'vec-captures' berstatus public = true, file diakses langsung via CDN URL.
+-- Hapus policy SELECT berlebih agar tidak mengekspos listing seluruh isi bucket ke publik (Lint 0025).
+DROP POLICY IF EXISTS "Allow public view from vec-captures" ON storage.objects;
 DROP POLICY IF EXISTS "Public can view capture objects" ON storage.objects;
-CREATE POLICY "Public can view capture objects" 
-    ON storage.objects FOR SELECT 
-    USING (bucket_id = 'vec-captures');
 
 DROP POLICY IF EXISTS "Public can upload capture objects" ON storage.objects;
 CREATE POLICY "Public can upload capture objects" 
