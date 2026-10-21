@@ -73,6 +73,15 @@ const isDestroyedInRegistry = (candidate: { id?: string; digest?: string; title?
   }
 };
 
+const filterDestroyedItems = <T extends { id?: string; digest?: string; title?: string; photoUrl?: string }>(items: T[]): T[] => {
+  return items.filter((item) => !isDestroyedInRegistry({
+    id: item.id,
+    digest: item.digest,
+    title: item.title,
+    photoUrl: item.photoUrl
+  }));
+};
+
 const DEFAULT_ITEMS: PrivateVaultItem[] = [
   {
     id: 'vault-item-001',
@@ -190,12 +199,19 @@ export const getPrivateVaultItems = (): PrivateVaultItem[] => {
       return DEFAULT_ITEMS;
     }
     const items: PrivateVaultItem[] = JSON.parse(raw);
-    const sanitized = items.map((i) => {
-      if (i.photoUrl && i.photoUrl.startsWith('/src/assets/')) {
-        return { ...i, photoUrl: i.photoUrl.replace('/src/assets/', '/assets/') };
-      }
-      return i;
-    });
+    const sanitized = items
+      .map((i) => {
+        if (i.photoUrl && i.photoUrl.startsWith('/src/assets/')) {
+          return { ...i, photoUrl: i.photoUrl.replace('/src/assets/', '/assets/') };
+        }
+        return i;
+      })
+      .filter((item) => !isDestroyedInRegistry({
+        id: item.id,
+        digest: item.digest,
+        title: item.title,
+        photoUrl: item.photoUrl
+      }));
     // Sort so newest user captures are always on top
     sanitized.sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
     memoryCache = sanitized;
@@ -227,9 +243,16 @@ export const initVaultAsync = async (onLoaded?: (items: PrivateVaultItem[]) => v
         });
       });
       
-      const merged = Array.from(mergedMap.values()).sort((a, b) => {
-        return getItemTimestamp(b) - getItemTimestamp(a);
-      });
+      const merged = Array.from(mergedMap.values())
+        .filter((item) => !isDestroyedInRegistry({
+          id: item.id,
+          digest: item.digest,
+          title: item.title,
+          photoUrl: item.photoUrl
+        }))
+        .sort((a, b) => {
+          return getItemTimestamp(b) - getItemTimestamp(a);
+        });
       
       memoryCache = merged;
       safeSaveToLocalStorage(merged);
@@ -248,22 +271,22 @@ export const initVaultAsync = async (onLoaded?: (items: PrivateVaultItem[]) => v
  * Merges items fetched from Supabase cloud into the local vault
  */
 export const mergeRemoteItemsIntoVault = (remoteItems: PrivateVaultItem[]): PrivateVaultItem[] => {
-  const current = getPrivateVaultItems();
+  const current = getPrivateVaultItems().filter((item) => !isDestroyedInRegistry({
+    id: item.id,
+    digest: item.digest,
+    title: item.title,
+    photoUrl: item.photoUrl
+  }));
+  const filteredRemote = filterDestroyedItems(remoteItems);
   const existingIds = new Set(current.map((item) => item.id));
   const existingDigests = new Set(current.filter((i) => i.digest).map((item) => item.digest.trim().toLowerCase()));
   const existingTitles = new Set(current.filter((i) => i.title).map((item) => item.title.trim().toLowerCase()));
 
   const newItems: PrivateVaultItem[] = [];
-  for (const r of remoteItems) {
+  for (const r of filteredRemote) {
     const rd = (r.digest || '').trim().toLowerCase();
     const rt = (r.title || '').trim().toLowerCase();
-    const isDestroyed = isDestroyedInRegistry({
-      id: r.id,
-      digest: r.digest,
-      title: r.title,
-      photoUrl: r.photoUrl
-    });
-    const isDup = isDestroyed || existingIds.has(r.id) || 
+    const isDup = existingIds.has(r.id) ||
       (rd.length > 8 && existingDigests.has(rd)) ||
       (rt.length > 0 && existingTitles.has(rt));
     if (!isDup) {
