@@ -1,6 +1,6 @@
 import React from 'react';
 import { VecOfficialLogo } from './VecOfficialLogo';
-import { GitBranch, Database, ShieldCheck, ChevronRight, Camera, LockKeyhole } from 'lucide-react';
+import { ShieldCheck, Camera, LockKeyhole } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: string;
@@ -20,7 +20,6 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="border-b border-slate-800/80 bg-[#030712]/95 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-8">
         
-        {/* Zone 1: Brand Wordmark (Single text element with logo) */}
         <button
           onClick={() => setActiveTab('overview')}
           className="flex items-center gap-3 text-left whitespace-nowrap shrink-0 group focus:outline-none"
@@ -33,7 +32,6 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
         </button>
 
-        {/* Zone 2: Top navigation menu */}
         <nav className="hidden xl:flex items-center gap-6 text-sm font-medium text-slate-300">
           <button
             onClick={() => setActiveTab('overview')}
@@ -92,18 +90,6 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
-            onClick={onOpenSyncHub}
-            className={`whitespace-nowrap shrink-0 transition-colors py-1 flex items-center gap-1.5 ${
-              activeTab === 'sync'
-                ? 'text-violet-400 border-b-2 border-violet-400 font-semibold'
-                : 'hover:text-white'
-            }`}
-          >
-            <GitBranch className="w-3.5 h-3.5 text-violet-400" />
-            <span>Sync Hub</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('architecture')}
             className={`whitespace-nowrap shrink-0 transition-colors py-1 ${
               activeTab === 'architecture'
@@ -115,7 +101,6 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </nav>
 
-        {/* Zone 3: CTA & hidden admin gate */}
         <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={() => setActiveTab('admin-portal')}
@@ -126,16 +111,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Root Gate</span>
           </button>
 
-          <a
-            href="https://github.com/veroiaenterprisecorp/vec"
-            target="_blank"
-            rel="noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-colors"
-          >
-            <GitBranch className="w-3.5 h-3.5 text-slate-400" />
-            <span>GitHub Repo</span>
-          </a>
-
           <button
             onClick={() => setActiveTab('studio')}
             className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-lg shadow-lg shadow-cyan-950/40 transition-colors"
@@ -144,10 +119,8 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Uji Sensor C2PA</span>
           </button>
         </div>
-
       </div>
 
-      {/* Mobile Navigation Strip */}
       <div className="xl:hidden flex items-center gap-2 overflow-x-auto px-4 py-2 border-t border-slate-900 bg-slate-950 text-xs">
         <button
           onClick={() => setActiveTab('overview')}
@@ -188,14 +161,6 @@ export const Header: React.FC<HeaderProps> = ({
           }`}
         >
           PostGIS
-        </button>
-        <button
-          onClick={onOpenSyncHub}
-          className={`px-2.5 py-1 rounded-md whitespace-nowrap ${
-            activeTab === 'sync' ? 'bg-violet-500/20 text-violet-300 font-bold' : 'text-slate-400'
-          }`}
-        >
-          Sync Hub
         </button>
         <button
           onClick={() => setActiveTab('architecture')}
