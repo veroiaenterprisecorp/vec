@@ -20,6 +20,7 @@ import {
   setStorageMode as saveStorageModePref,
   StorageTargetMode
 } from '../lib/cloudStorage';
+import { PermanentDeleteModal, DeleteArtworkTarget } from './PermanentDeleteModal';
 import { supabase } from '../lib/supabase';
 import { 
   ShieldCheck, 
@@ -63,7 +64,7 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
 }) => {
   const [items, setItems] = useState<PrivateVaultItem[]>([]);
   const [profile, setProfile] = useState<UserVaultProfile>(getUserVaultProfile());
-  const [activeFilter, setActiveFilter] = useState<'all' | 'private' | 'published' | 'cloud' | 'local'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'private' | 'published'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [isSyncingAll, setIsSyncingAll] = useState<boolean>(false);
@@ -75,6 +76,7 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
   const [selectedPhoto, setSelectedPhoto] = useState<PrivateVaultItem | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [itemPendingDelete, setItemPendingDelete] = useState<DeleteArtworkTarget | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -175,9 +177,6 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
     window.addEventListener('vec-vault-updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
 
-    // 4. Auto-pull from cloud database in background so other devices sync seamlessly
-    pullRemotePostsIntoVault(true);
-
     return () => {
       window.removeEventListener('vec-vault-updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
@@ -270,14 +269,6 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
   const filteredItems = items.filter((item) => {
     if (activeFilter === 'private' && !item.isPrivate) return false;
     if (activeFilter === 'published' && !item.isPublished) return false;
-    if (activeFilter === 'cloud') {
-      const isCloud = item.storageTarget === 'cloud_supabase' || item.uploadStatus === 'uploaded';
-      if (!isCloud) return false;
-    }
-    if (activeFilter === 'local') {
-      const isLocal = item.storageTarget === 'device_local' || (!item.storageTarget && item.uploadStatus !== 'uploaded');
-      if (!isLocal) return false;
-    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       return (
@@ -329,30 +320,6 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
 
         {/* Quick Action Buttons */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <button
-            onClick={() => pullRemotePostsIntoVault(false)}
-            disabled={isPullingCloud}
-            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-mono font-bold bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-slate-700 transition shadow-md disabled:opacity-50 cursor-pointer"
-            title="Tarik karya yang tersimpan di Supabase Cloud dari perangkat lain"
-          >
-            <RefreshCw className={`w-4 h-4 text-emerald-400 ${isPullingCloud ? 'animate-spin' : ''}`} />
-            <span>{isPullingCloud ? 'Menarik...' : 'Tarik dari Cloud (Multi-Device)'}</span>
-          </button>
-
-          <button
-            onClick={handleSyncAllToCloud}
-            disabled={isSyncingAll}
-            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-mono font-bold bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 transition shadow-md disabled:opacity-50 cursor-pointer"
-            title="Sinkronkan seluruh foto di brankas ke Supabase Cloud Storage"
-          >
-            {isSyncingAll ? (
-              <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
-            ) : (
-              <CloudUpload className="w-4 h-4 text-cyan-400" />
-            )}
-            <span>{isSyncingAll ? 'Menyinkronkan...' : 'Sinkronkan Semua ke Cloud'}</span>
-          </button>
-
           <button
             onClick={() => setShowCloudSettingsModal(true)}
             className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition cursor-pointer"
@@ -472,47 +439,25 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
             Semua ({items.length})
           </button>
           <button
-            onClick={() => setActiveFilter('cloud')}
-            className={`px-3 py-1.5 rounded-lg flex items-center gap-1 transition cursor-pointer ${
-              activeFilter === 'cloud'
-                ? 'bg-cyan-600 text-white font-bold shadow'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Cloud className="w-3.5 h-3.5" />
-            <span>Cloud Supabase ({cloudCount})</span>
-          </button>
-          <button
-            onClick={() => setActiveFilter('local')}
-            className={`px-3 py-1.5 rounded-lg flex items-center gap-1 transition cursor-pointer ${
-              activeFilter === 'local'
-                ? 'bg-amber-600 text-white font-bold shadow'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <HardDrive className="w-3.5 h-3.5" />
-            <span>Lokal Perangkat ({localCount})</span>
-          </button>
-          <button
             onClick={() => setActiveFilter('private')}
-            className={`px-3 py-1.5 rounded-lg flex items-center gap-1 transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
               activeFilter === 'private'
                 ? 'bg-emerald-600 text-white font-bold shadow'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            <Lock className="w-3 h-3" />
+            <Lock className="w-3.5 h-3.5" />
             <span>Privat ({totalPrivateCount})</span>
           </button>
           <button
             onClick={() => setActiveFilter('published')}
-            className={`px-3 py-1.5 rounded-lg flex items-center gap-1 transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
               activeFilter === 'published'
                 ? 'bg-indigo-600 text-white font-bold shadow'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            <Share2 className="w-3 h-3" />
+            <Share2 className="w-3.5 h-3.5" />
             <span>Publik ({totalPublishedCount})</span>
           </button>
         </div>
@@ -698,39 +643,16 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
                     </div>
                   </div>
 
-                  {/* Cloud Storage Location & Sync Status */}
-                  {(item.storageTarget === 'cloud_supabase' || item.uploadStatus === 'uploaded') ? (
-                    <div className="p-2 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-[10px] font-mono text-cyan-300 flex items-center justify-between gap-1.5">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <Cloud className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                        <span className="truncate" title={item.cloudPath || 'vec-captures'}>
-                          Bucket: {item.cloudBucket || 'vec-captures'}
-                        </span>
-                      </div>
-                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] shrink-0 font-bold">
-                        Tersinkron
-                      </span>
+                  {/* Storage Enclave Status */}
+                  <div className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 text-[10px] font-mono text-slate-300 flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span className="truncate">Enclave Pribadi • Edisi Tunggal</span>
                     </div>
-                  ) : (
-                    <div className="p-2 rounded-xl bg-amber-950/30 border border-amber-500/30 text-[10px] font-mono text-amber-300 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <HardDrive className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                        <span className="truncate">Tersimpan di Perangkat</span>
-                      </div>
-                      <button
-                        onClick={() => handleSyncToCloud(item)}
-                        disabled={syncingId === item.id}
-                        className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-[9px] transition shrink-0 flex items-center gap-1 cursor-pointer shadow-sm"
-                      >
-                        {syncingId === item.id ? (
-                          <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-                        ) : (
-                          <CloudUpload className="w-2.5 h-2.5" />
-                        )}
-                        <span>{syncingId === item.id ? 'Mengunggah...' : 'Unggah ke Cloud'}</span>
-                      </button>
-                    </div>
-                  )}
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] shrink-0 font-bold">
+                      {item.isPrivate ? '100% Privat' : 'Live Vault'}
+                    </span>
+                  </div>
 
                   {/* SHA-256 Checksum snippet */}
                   <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-[10px] font-mono text-slate-400">
@@ -792,9 +714,9 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
                     </button>
 
                     <button
-                      onClick={() => handleDeleteItem(item.id, item.title)}
+                      onClick={() => setItemPendingDelete(item)}
                       className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-900 transition cursor-pointer"
-                      title="Hapus foto dari Brankas Pribadi"
+                      title="Pemusnahan Mutlak Karya Permanen (Zero-Trace - Ketik HAPUS)"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -1023,6 +945,18 @@ CREATE POLICY "Public can upload capture objects" ON storage.objects FOR INSERT 
         </div>
       )}
 
+      {/* Permanent Zero-Trace Proof-of-Burn Deletion Modal */}
+      <PermanentDeleteModal
+        artwork={itemPendingDelete}
+        isOpen={Boolean(itemPendingDelete)}
+        onClose={() => setItemPendingDelete(null)}
+        onDeleted={(deletedId) => {
+          setItems(getPrivateVaultItems());
+          showToast('Karya berhasil dimusnahkan secara permanen dari Cloud & Perangkat tanpa jejak (Zero-Trace Verified).');
+        }}
+      />
+
     </div>
   );
 };
+

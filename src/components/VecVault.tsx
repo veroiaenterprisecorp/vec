@@ -43,10 +43,13 @@ import {
   Maximize2,
   ZoomIn,
   ZoomOut,
-  Download
+  Download,
+  Flame,
+  Trash2
 } from 'lucide-react';
 import { checkSupabaseConnection } from '../lib/cloudStorage';
 import { setManualSupabaseCredentials, getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabase';
+import { PermanentDeleteModal, DeleteArtworkTarget } from './PermanentDeleteModal';
 
 export interface VaultArtwork {
   id: string;
@@ -128,6 +131,7 @@ export const VecVault: React.FC<VecVaultProps> = ({
   const [manualKeyInput, setManualKeyInput] = useState<string>(() => getSupabaseAnonKey());
   const [manualSaveToast, setManualSaveToast] = useState<string | null>(null);
   const [vaultToast, setVaultToast] = useState<string | null>(null);
+  const [artworkPendingDelete, setArtworkPendingDelete] = useState<DeleteArtworkTarget | null>(null);
 
   const [filterType, setFilterType] = useState<'all' | 'COMMENT' | 'VOICE_NOTE' | 'AUTHENTIC_SEAL'>('all');
   const [commentInput, setCommentInput] = useState<string>('');
@@ -286,8 +290,21 @@ export const VecVault: React.FC<VecVaultProps> = ({
         console.warn('Supabase posts query note:', dbErr);
       }
 
-      // 4. Merge: User published items FIRST + Featured master item + Remote items
-      const combined = [...userPublishedList, DEFAULT_FEATURED, ...remoteArtworks];
+      // 4. Merge: User published items FIRST + Remote items
+      // Only append DEFAULT_FEATURED if there are NO published artworks yet
+      const hasRealArtworks = userPublishedList.length > 0 || remoteArtworks.length > 0;
+      const combined = hasRealArtworks 
+        ? [...userPublishedList, ...remoteArtworks] 
+        : [DEFAULT_FEATURED];
+
+      const getNormalizedUrlKey = (url: string) => {
+        if (!url) return '';
+        if (url.startsWith('data:')) {
+          return `data_${url.slice(0, 80)}_${url.length}`;
+        }
+        return url.toLowerCase().trim();
+      };
+
       const seenDigests = new Set<string>();
       const seenImageUrls = new Set<string>();
       const seenIds = new Set<string>();
@@ -297,6 +314,7 @@ export const VecVault: React.FC<VecVaultProps> = ({
       for (const item of combined) {
         const d = (item.digest || '').trim().toLowerCase();
         const u = (item.photoUrl || '').trim();
+        const urlKey = getNormalizedUrlKey(u);
         const t = (item.title || '').trim().toLowerCase();
 
         // Skip if marked private
@@ -307,13 +325,13 @@ export const VecVault: React.FC<VecVaultProps> = ({
 
         // Skip duplicates across digest, photoUrl, title, and ID
         const isDigestDup = d.length > 8 && seenDigests.has(d);
-        const isUrlDup = u.length > 0 && !u.startsWith('data:') && seenImageUrls.has(u);
+        const isUrlDup = urlKey.length > 0 && seenImageUrls.has(urlKey);
         const isTitleDup = t.length > 0 && seenTitles.has(t);
         const isIdDup = seenIds.has(item.id);
 
         if (!isDigestDup && !isUrlDup && !isTitleDup && !isIdDup) {
           if (d.length > 8) seenDigests.add(d);
-          if (u.length > 0 && !u.startsWith('data:')) seenImageUrls.add(u);
+          if (urlKey.length > 0) seenImageUrls.add(urlKey);
           if (t.length > 0) seenTitles.add(t);
           seenIds.add(item.id);
           uniqueCombined.push(item);
@@ -810,6 +828,24 @@ export const VecVault: React.FC<VecVaultProps> = ({
                   >
                     <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
                     <span>Ubah Judul</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setArtworkPendingDelete({
+                        id: activeArtwork.id,
+                        title: activeArtwork.title,
+                        digest: activeArtwork.digest,
+                        photoUrl: activeArtwork.photoUrl,
+                        resolution: activeArtwork.dimensions,
+                        cloudBucket: activeArtwork.cloudBucket
+                      });
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-rose-300 hover:text-white bg-rose-950/70 hover:bg-rose-900 border border-rose-800 transition cursor-pointer text-xs font-mono flex items-center gap-1.5 shadow-sm"
+                    title="Musnahkan karya ini secara permanen dari Cloud dan Perangkat tanpa menyisakan jejak (Ketik HAPUS)"
+                  >
+                    <Flame className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Musnahkan Karya</span>
                   </button>
                 </div>
               )}
@@ -1316,6 +1352,18 @@ export const VecVault: React.FC<VecVaultProps> = ({
           </div>
         </div>
       )}
+
+      {/* Permanent Zero-Trace Proof-of-Burn Deletion Modal */}
+      <PermanentDeleteModal
+        artwork={artworkPendingDelete}
+        isOpen={Boolean(artworkPendingDelete)}
+        onClose={() => setArtworkPendingDelete(null)}
+        onDeleted={(deletedId) => {
+          setVaultToast('Karya berhasil dimusnahkan secara permanen dari Cloud & Perangkat tanpa menyisakan sedikitpun jejak (Zero-Trace Destruction Verified).');
+          setTimeout(() => setVaultToast(null), 4000);
+          loadPublishedArtworks();
+        }}
+      />
 
     </div>
   );

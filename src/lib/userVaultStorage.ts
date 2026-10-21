@@ -101,29 +101,37 @@ export const getItemTimestamp = (item: PrivateVaultItem): number => {
   return 0;
 };
 
-// Safe localStorage saver that handles browser quota limits gracefully without corrupting user images
+// Compact items for localStorage metadata cache so browser storage quota (~5MB) is never exceeded.
+// The complete uncompressed full-resolution RAW captures and base64 payloads are safely persisted in IndexedDB.
+const prepareItemsForLocalStorage = (items: PrivateVaultItem[]): PrivateVaultItem[] => {
+  return items.slice(0, 50).map((item) => {
+    const isLargeDataUrl = Boolean(item.photoUrl && (item.photoUrl.startsWith('data:') || item.photoUrl.length > 2048));
+    return {
+      ...item,
+      // If photoUrl is a huge data URI, store the cloudStorageUrl or empty string in localStorage.
+      // IndexedDB will rehydrate the original high-resolution photoUrl into memoryCache.
+      photoUrl: isLargeDataUrl ? (item.cloudStorageUrl || '') : item.photoUrl
+    };
+  });
+};
+
 const safeSaveToLocalStorage = (items: PrivateVaultItem[]) => {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-  } catch (e: any) {
-    console.warn('LocalStorage quota limit reached, saving metadata cache with IDB backing:', e?.message);
+    const compactItems = prepareItemsForLocalStorage(items);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(compactItems));
+  } catch {
+    // If browser localStorage quota is constrained by other keys or legacy data,
+    // safely prune old oversized storage and retry with minimal metadata
     try {
-      // If quota exceeded, preserve the metadata and full item references
-      // IndexedDB already stores the complete high-resolution captures safely
-      const lightweightItems = items.slice(0, 30).map((item) => {
-        // If dataUrl is extraordinarily large, retain it in IndexedDB and keep memoryCache intact
-        if (item.photoUrl && item.photoUrl.length > 500000 && !item.photoUrl.startsWith('http')) {
-          return {
-            ...item,
-            photoUrl: item.cloudStorageUrl || item.photoUrl
-          };
-        }
-        return item;
-      });
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(lightweightItems));
+      localStorage.removeItem(STORAGE_KEY);
+      const minimal = items.slice(0, 20).map((item) => ({
+        ...item,
+        photoUrl: item.cloudStorageUrl || ''
+      }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
     } catch {
-      // Memory cache and IndexedDB hold the items safely
+      // IndexedDB and memoryCache safely retain 100% of the artwork and attestation data
     }
   }
 };
@@ -378,3 +386,9 @@ export const getUserVaultProfile = (): UserVaultProfile => {
     cloudStorageEnabled: true
   };
 };
+
+// Eagerly hydrate high-resolution image data from IndexedDB on browser startup
+if (typeof window !== 'undefined') {
+  initVaultAsync().catch(() => {});
+}
+
