@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { getPrivateVaultItems, initVaultAsync, updateVaultItemTitle, PrivateVaultItem } from '../lib/userVaultStorage';
+import { 
+  getPrivateVaultItems, 
+  initVaultAsync, 
+  updateVaultItemTitle, 
+  updateVaultItemPrivacy, 
+  savePrivateVaultItem,
+  PrivateVaultItem 
+} from '../lib/userVaultStorage';
 import { 
   ShieldCheck, 
   Award, 
@@ -32,7 +39,11 @@ import {
   HelpCircle,
   HardDrive,
   X,
-  Edit3
+  Edit3,
+  Maximize2,
+  ZoomIn,
+  ZoomOut,
+  Download
 } from 'lucide-react';
 import { checkSupabaseConnection } from '../lib/cloudStorage';
 import { setManualSupabaseCredentials, getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabase';
@@ -79,7 +90,7 @@ const DEFAULT_FEATURED: VaultArtwork = {
   dimensions: '120 × 150 cm',
   photoUrl: '/assets/images/vec_vault_artwork_1792494925679.jpg',
   authenticityScore: 99.80,
-  digest: '4a6b2c8e1d9f3a5b7c0e2d4f6a8b1c3d5e7f9a0b2c4d6e8f1a3b5c7d9e0f2a4b',
+  digest: 'e1a7b8c9d0e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8',
   c2paSignature: 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
   deviceInfo: 'Direct CMOS RAW • Sony Alpha 7R V Enclave',
   curationNumber: 'VEC-2026-0042',
@@ -101,6 +112,8 @@ export const VecVault: React.FC<VecVaultProps> = ({
   const [artworks, setArtworks] = useState<VaultArtwork[]>([DEFAULT_FEATURED]);
   const [selectedArtworkId, setSelectedArtworkId] = useState<string>(DEFAULT_FEATURED.id);
   const [copiedHash, setCopiedHash] = useState<boolean>(false);
+  const [isViewerModalOpen, setIsViewerModalOpen] = useState<boolean>(false);
+  const [viewerZoomLevel, setViewerZoomLevel] = useState<number>(1);
   const [connectionStatus, setConnectionStatus] = useState<{
     connected: boolean;
     url: string;
@@ -114,6 +127,7 @@ export const VecVault: React.FC<VecVaultProps> = ({
   const [manualUrlInput, setManualUrlInput] = useState<string>(() => getSupabaseUrl());
   const [manualKeyInput, setManualKeyInput] = useState<string>(() => getSupabaseAnonKey());
   const [manualSaveToast, setManualSaveToast] = useState<string | null>(null);
+  const [vaultToast, setVaultToast] = useState<string | null>(null);
 
   const [filterType, setFilterType] = useState<'all' | 'COMMENT' | 'VOICE_NOTE' | 'AUTHENTIC_SEAL'>('all');
   const [commentInput, setCommentInput] = useState<string>('');
@@ -156,45 +170,72 @@ export const VecVault: React.FC<VecVaultProps> = ({
   ]);
 
   // Load all artworks published by user from Private Vault + Supabase
-  // Load all artworks captured by user from Private Vault + Supabase
+  // Load all public artworks: strictly filters out private items and eliminates duplicates
   const loadPublishedArtworks = async () => {
     setIsRefreshing(true);
     try {
-      // 1. Get all user items from Private Vault (both public and private so user always sees their photos)
+      // 1. Get all user items from Private Vault
       const localVaultItems = getPrivateVaultItems();
-      const userPublishedList: VaultArtwork[] = localVaultItems.map((item) => {
-        // Robust photo URL selection: If cloudStorageUrl is verified HTTP, use it; otherwise fallback to item.photoUrl
-        let resolvedPhoto = item.photoUrl;
-        if (item.uploadStatus === 'uploaded' && item.cloudStorageUrl && item.cloudStorageUrl.startsWith('http') && !item.cloudStorageUrl.includes('undefined')) {
-          resolvedPhoto = item.cloudStorageUrl;
+
+      // Collect digests, titles, IDs, and URLs of items that user has marked as PRIVATE so they are hidden from the public catalog
+      const privateDigests = new Set<string>();
+      const privateTitles = new Set<string>();
+      const privateIds = new Set<string>();
+      const privateUrls = new Set<string>();
+
+      localVaultItems.forEach((item) => {
+        if (item.isPrivate || !item.isPublished) {
+          if (item.digest && item.digest.trim().length > 8) {
+            privateDigests.add(item.digest.trim().toLowerCase());
+          }
+          if (item.title && item.title.trim().length > 0) {
+            privateTitles.add(item.title.trim().toLowerCase());
+          }
+          if (item.id) {
+            privateIds.add(item.id);
+          }
+          if (item.cloudStorageUrl) {
+            privateUrls.add(item.cloudStorageUrl.trim());
+          }
+          if (item.photoUrl && !item.photoUrl.startsWith('data:')) {
+            privateUrls.add(item.photoUrl.trim());
+          }
         }
-        if (resolvedPhoto && resolvedPhoto.startsWith('/src/assets/')) {
-          resolvedPhoto = resolvedPhoto.replace('/src/assets/', '/assets/');
-        }
-        return {
-          id: item.id,
-          title: item.title || 'Tangkapan Kamera Sensor',
-          artist: 'Anda (Koleksi / Jepretan Anda)',
-          artistRole: item.isPublished ? 'Hardware Attested Creator • Diterbitkan' : 'Tangkapan Kamera Anda • Status Privat',
-          medium: item.sensorType || 'Digital Fine Art / Sensor C2PA RAW',
-          dimensions: item.resolution,
-          photoUrl: resolvedPhoto || '/assets/images/vec_vault_artwork_1792494925679.jpg',
-          authenticityScore: 99.40,
-          digest: item.digest,
-          c2paSignature: item.c2paSignature,
-          deviceInfo: item.deviceInfo,
-          curationNumber: `VEC-${item.isPublished ? 'PUB' : 'PRIV'}-${item.id.slice(-4).toUpperCase()}`,
-          description: item.isPublished
-            ? `Karya otentik telah diterbitkan ke Live Vault dan tersimpan di ${item.storageTarget === 'cloud_supabase' ? 'Cloud Supabase (' + (item.cloudBucket || 'vec-captures') + ')' : 'Brankas VEC'}.`
-            : `Tangkapan kamera otentik Anda. Foto ini tersimpan aman di Brankas dan dapat dilihat oleh Anda. Klik tombol "Publikasikan" jika ingin menampilkan karya ini ke publik global.`,
-          isUserUploaded: true,
-          publishedAt: item.captureDate,
-          storageTarget: item.storageTarget,
-          cloudBucket: item.cloudBucket
-        };
       });
 
-      // 2. Fetch remote posts from Supabase posts table so other devices show the exact same artworks
+      // 2. Only include user items that are explicitly PUBLISHED and NOT PRIVATE
+      const userPublishedList: VaultArtwork[] = localVaultItems
+        .filter((item) => item.isPublished === true && item.isPrivate !== true)
+        .map((item) => {
+          let resolvedPhoto = item.photoUrl;
+          if (item.uploadStatus === 'uploaded' && item.cloudStorageUrl && item.cloudStorageUrl.startsWith('http') && !item.cloudStorageUrl.includes('undefined')) {
+            resolvedPhoto = item.cloudStorageUrl;
+          }
+          if (resolvedPhoto && resolvedPhoto.startsWith('/src/assets/')) {
+            resolvedPhoto = resolvedPhoto.replace('/src/assets/', '/assets/');
+          }
+          return {
+            id: item.id,
+            title: item.title || 'Tangkapan Kamera Sensor',
+            artist: 'Anda (Koleksi / Jepretan Anda)',
+            artistRole: 'Hardware Attested Creator • Diterbitkan',
+            medium: item.sensorType || 'Digital Fine Art / Sensor C2PA RAW',
+            dimensions: item.resolution,
+            photoUrl: resolvedPhoto || '/assets/images/vec_vault_artwork_1792494925679.jpg',
+            authenticityScore: 99.40,
+            digest: item.digest,
+            c2paSignature: item.c2paSignature,
+            deviceInfo: item.deviceInfo,
+            curationNumber: `VEC-PUB-${item.id.slice(-4).toUpperCase()}`,
+            description: item.description || `Karya otentik telah diterbitkan ke Live Vault dan tersimpan di ${item.storageTarget === 'cloud_supabase' ? 'Cloud Supabase (' + (item.cloudBucket || 'vec-captures') + ')' : 'Brankas VEC'}.`,
+            isUserUploaded: true,
+            publishedAt: item.captureDate,
+            storageTarget: item.storageTarget,
+            cloudBucket: item.cloudBucket
+          };
+        });
+
+      // 3. Fetch remote posts from Supabase posts table
       let remoteArtworks: VaultArtwork[] = [];
       try {
         const { data: postsData, error } = await supabase
@@ -204,51 +245,88 @@ export const VecVault: React.FC<VecVaultProps> = ({
           .limit(20);
 
         if (!error && postsData && postsData.length > 0) {
-          remoteArtworks = postsData.map((post: any) => {
-            let mUrl = post.media_url || '/assets/images/vec_vault_artwork_1792494925679.jpg';
-            if (mUrl.startsWith('/src/assets/')) {
-              mUrl = mUrl.replace('/src/assets/', '/assets/');
-            }
-            return {
-              id: post.id,
-              title: post.title || 'Tangkapan C2PA Publik',
-              artist: post.author_name || 'Kolektor Terverifikasi',
-              artistRole: 'Hardware Attested Member',
-              medium: 'Sensor CMOS RAW Attested',
-              dimensions: post.sensor_telemetry?.resolution || '1920 × 1080 piksel',
-              photoUrl: mUrl,
-              authenticityScore: Number(post.authenticity_confidence || 98.5),
-              digest: post.c2pa_manifest_hash || post.raw_capture_digest || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-              c2paSignature: post.hardware_tee_signature || 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
-              deviceInfo: `${post.camera_make || 'Sony'} ${post.camera_model || 'Alpha C2PA'}`,
-              curationNumber: `VEC-SDB-${post.id.slice(0, 4).toUpperCase()}`,
-              description: post.caption || 'Karya terverifikasi yang tersinkronisasi via cluster Supabase PostgreSQL.',
-              isUserUploaded: false,
-              publishedAt: new Date(post.created_at).toLocaleDateString('id-ID')
-            };
-          });
+          remoteArtworks = postsData
+            .filter((post: any) => {
+              const d = (post.c2pa_manifest_hash || post.raw_capture_digest || '').trim().toLowerCase();
+              const t = (post.title || '').trim().toLowerCase();
+              const u = (post.media_url || '').trim();
+              const pid = post.id;
+              // Exclude if user marked this digest, title, URL, or ID as private
+              if (d && privateDigests.has(d)) return false;
+              if (t && privateTitles.has(t)) return false;
+              if (u && privateUrls.has(u)) return false;
+              if (pid && privateIds.has(pid)) return false;
+              return true;
+            })
+            .map((post: any) => {
+              let mUrl = post.media_url || '/assets/images/vec_vault_artwork_1792494925679.jpg';
+              if (mUrl.startsWith('/src/assets/')) {
+                mUrl = mUrl.replace('/src/assets/', '/assets/');
+              }
+              return {
+                id: post.id,
+                title: post.title || 'Tangkapan C2PA Publik',
+                artist: post.author_name || 'Kolektor Terverifikasi',
+                artistRole: 'Hardware Attested Member',
+                medium: 'Sensor CMOS RAW Attested',
+                dimensions: post.sensor_telemetry?.resolution || '1920 × 1080 piksel',
+                photoUrl: mUrl,
+                authenticityScore: Number(post.authenticity_confidence || 98.5),
+                digest: post.c2pa_manifest_hash || post.raw_capture_digest || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+                c2paSignature: post.hardware_tee_signature || 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
+                deviceInfo: `${post.camera_make || 'Sony'} ${post.camera_model || 'Alpha C2PA'}`,
+                curationNumber: `VEC-SDB-${post.id.slice(0, 4).toUpperCase()}`,
+                description: post.caption || 'Karya terverifikasi yang tersinkronisasi via cluster Supabase PostgreSQL.',
+                isUserUploaded: false,
+                publishedAt: new Date(post.created_at).toLocaleDateString('id-ID')
+              };
+            });
         }
       } catch (dbErr) {
         console.warn('Supabase posts query note:', dbErr);
       }
 
-      // Merge: User items FIRST (newest on top) + Featured master item + Remote items
+      // 4. Merge: User published items FIRST + Featured master item + Remote items
       const combined = [...userPublishedList, DEFAULT_FEATURED, ...remoteArtworks];
       const seenDigests = new Set<string>();
+      const seenImageUrls = new Set<string>();
+      const seenIds = new Set<string>();
+      const seenTitles = new Set<string>();
       const uniqueCombined: VaultArtwork[] = [];
+
       for (const item of combined) {
-        const key = item.id + '_' + (item.digest || '');
-        if (!seenDigests.has(key)) {
-          seenDigests.add(key);
+        const d = (item.digest || '').trim().toLowerCase();
+        const u = (item.photoUrl || '').trim();
+        const t = (item.title || '').trim().toLowerCase();
+
+        // Skip if marked private
+        if (d && privateDigests.has(d)) continue;
+        if (t && privateTitles.has(t)) continue;
+        if (privateIds.has(item.id)) continue;
+        if (u && privateUrls.has(u)) continue;
+
+        // Skip duplicates across digest, photoUrl, title, and ID
+        const isDigestDup = d.length > 8 && seenDigests.has(d);
+        const isUrlDup = u.length > 0 && !u.startsWith('data:') && seenImageUrls.has(u);
+        const isTitleDup = t.length > 0 && seenTitles.has(t);
+        const isIdDup = seenIds.has(item.id);
+
+        if (!isDigestDup && !isUrlDup && !isTitleDup && !isIdDup) {
+          if (d.length > 8) seenDigests.add(d);
+          if (u.length > 0 && !u.startsWith('data:')) seenImageUrls.add(u);
+          if (t.length > 0) seenTitles.add(t);
+          seenIds.add(item.id);
           uniqueCombined.push(item);
         }
       }
 
       setArtworks(uniqueCombined);
 
-      // If user has captured items, auto-select their newest artwork
-      if (userPublishedList.length > 0) {
-        setSelectedArtworkId(userPublishedList[0].id);
+      // Auto-select valid artwork
+      if (uniqueCombined.length > 0) {
+        if (!uniqueCombined.some(a => a.id === selectedArtworkId)) {
+          setSelectedArtworkId(uniqueCombined[0].id);
+        }
       }
     } catch (e) {
       console.warn('Error loading published artworks:', e);
@@ -318,6 +396,77 @@ export const VecVault: React.FC<VecVaultProps> = ({
   }, []);
 
   const activeArtwork = artworks.find((a) => a.id === selectedArtworkId) || artworks[0] || DEFAULT_FEATURED;
+
+  const handleLockToPrivate = async (artwork: VaultArtwork) => {
+    const localVaultItems = getPrivateVaultItems();
+    const found = localVaultItems.find(
+      (i) => i.id === artwork.id || 
+             (artwork.digest && i.digest === artwork.digest) ||
+             (artwork.title && i.title === artwork.title)
+    );
+
+    // 1. Set to private and unpublish in local storage
+    if (found) {
+      updateVaultItemPrivacy(found.id, true, false);
+    } else {
+      savePrivateVaultItem({
+        id: artwork.id,
+        title: artwork.title,
+        photoUrl: artwork.photoUrl,
+        digest: artwork.digest,
+        resolution: artwork.dimensions || '1920 × 1080',
+        fileSize: '3.4 MB',
+        captureDate: artwork.publishedAt || new Date().toLocaleString('id-ID'),
+        deviceInfo: artwork.deviceInfo,
+        isPrivate: true,
+        isPublished: false,
+        c2paSignature: artwork.c2paSignature,
+        sensorType: artwork.medium,
+        storageTarget: 'cloud_supabase'
+      });
+    }
+
+    // 2. Delete or unpublish from Supabase posts so other users/devices don't see it
+    try {
+      if (artwork.digest && artwork.digest.length > 8) {
+        await supabase.from('posts').delete().eq('raw_capture_digest', artwork.digest);
+        await supabase.from('posts').delete().eq('c2pa_manifest_hash', artwork.digest);
+      }
+      if (artwork.title && artwork.title.trim().length > 0) {
+        await supabase.from('posts').delete().eq('title', artwork.title.trim());
+      }
+      if (artwork.photoUrl && artwork.photoUrl.startsWith('http')) {
+        await supabase.from('posts').delete().eq('media_url', artwork.photoUrl);
+      }
+      if (artwork.id && artwork.id.length > 20) {
+        await supabase.from('posts').delete().eq('id', artwork.id);
+      }
+    } catch (err) {
+      console.warn('Post removal from Supabase note:', err);
+    }
+
+    // 3. Immediately exclude from active UI artworks
+    setArtworks((prev) => {
+      const filtered = prev.filter(
+        (a) => a.id !== artwork.id && a.digest !== artwork.digest && a.title !== artwork.title
+      );
+      if (filtered.length > 0) {
+        setSelectedArtworkId(filtered[0].id);
+      } else {
+        setSelectedArtworkId(DEFAULT_FEATURED.id);
+        filtered.push(DEFAULT_FEATURED);
+      }
+      return filtered;
+    });
+
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new CustomEvent('vec-vault-updated'));
+
+    setVaultToast(`Karya "${artwork.title}" berhasil dikunci menjadi 100% PRIVAT dan ditarik dari katalog publik.`);
+    setTimeout(() => setVaultToast(null), 3500);
+
+    await loadPublishedArtworks();
+  };
 
   const handleCopyHash = () => {
     if (!activeArtwork) return;
@@ -568,8 +717,13 @@ export const VecVault: React.FC<VecVaultProps> = ({
           <img
             src={activeArtwork.photoUrl}
             alt={activeArtwork.title}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover cursor-pointer hover:scale-[1.02] transition duration-500"
             referrerPolicy="no-referrer"
+            onClick={() => {
+              setViewerZoomLevel(1);
+              setIsViewerModalOpen(true);
+            }}
+            title="Klik untuk membuka penampil gambar resolusi tinggi & zoom"
             onError={(e) => {
               const el = e.currentTarget;
               if (!el.src.includes('vec_vault_artwork')) {
@@ -577,7 +731,9 @@ export const VecVault: React.FC<VecVaultProps> = ({
               }
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-slate-900/90"></div>
+          <div 
+            className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-slate-900/90 pointer-events-none"
+          ></div>
           
           <div className="absolute top-4 left-4 flex flex-wrap gap-2">
             <div className="bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-xl border border-emerald-500/40 text-xs font-mono text-emerald-300 flex items-center gap-1.5 shadow-lg">
@@ -590,6 +746,20 @@ export const VecVault: React.FC<VecVaultProps> = ({
                 ✓ Diterbitkan dari Brankas Anda
               </div>
             )}
+          </div>
+
+          <div className="absolute top-4 right-4 z-10">
+            <button
+              onClick={() => {
+                setViewerZoomLevel(1);
+                setIsViewerModalOpen(true);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-black/80 hover:bg-slate-900 text-cyan-300 hover:text-white border border-cyan-500/40 text-xs font-mono flex items-center gap-1.5 transition shadow-lg cursor-pointer backdrop-blur-md"
+              title="Buka penampil gambar resolusi penuh & zoom"
+            >
+              <Maximize2 className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Teliti Piksel / Zoom</span>
+            </button>
           </div>
 
           <div className="absolute bottom-4 left-4 right-4 text-[11px] font-mono text-slate-300 bg-black/70 backdrop-blur-md p-2 rounded-xl border border-slate-800 flex items-center justify-between">
@@ -617,20 +787,31 @@ export const VecVault: React.FC<VecVaultProps> = ({
                 {activeArtwork.title}
               </h3>
               {activeArtwork.isUserUploaded && (
-                <button
-                  onClick={() => {
-                    const newTitle = prompt('Masukkan judul baru untuk karya ini:', activeArtwork.title);
-                    if (newTitle && newTitle.trim()) {
-                      updateVaultItemTitle(activeArtwork.id, newTitle.trim());
-                      loadPublishedArtworks();
-                    }
-                  }}
-                  className="px-2.5 py-1 rounded-lg text-slate-300 hover:text-cyan-300 bg-slate-800 hover:bg-slate-700 transition cursor-pointer text-xs font-mono flex items-center gap-1.5 border border-slate-700 shadow-sm"
-                  title="Ubah judul karya foto ini"
-                >
-                  <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Ubah Judul</span>
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => handleLockToPrivate(activeArtwork)}
+                    className="px-2.5 py-1 rounded-lg text-amber-300 hover:text-white bg-amber-950/70 hover:bg-amber-900 border border-amber-800 transition cursor-pointer text-xs font-mono flex items-center gap-1.5 shadow-sm"
+                    title="Kunci karya ini kembali ke status privat dan tarik dari katalog publik"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Kunci Jadi Privat</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const newTitle = prompt('Masukkan judul baru untuk karya ini:', activeArtwork.title);
+                      if (newTitle && newTitle.trim()) {
+                        updateVaultItemTitle(activeArtwork.id, newTitle.trim());
+                        loadPublishedArtworks();
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-slate-300 hover:text-cyan-300 bg-slate-800 hover:bg-slate-700 transition cursor-pointer text-xs font-mono flex items-center gap-1.5 border border-slate-700 shadow-sm"
+                    title="Ubah judul karya foto ini"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Ubah Judul</span>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -1025,6 +1206,112 @@ export const VecVault: React.FC<VecVaultProps> = ({
               >
                 Tutup Panduan
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {vaultToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-slate-900 border border-emerald-500/60 shadow-2xl text-white text-xs font-mono animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{vaultToast}</span>
+        </div>
+      )}
+
+      {/* High-Resolution C2PA Image Viewer Modal */}
+      {isViewerModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/92 backdrop-blur-md flex flex-col p-4 sm:p-6 animate-in fade-in"
+          onClick={() => setIsViewerModalOpen(false)}
+        >
+          {/* Viewer Modal Header */}
+          <div 
+            className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs font-mono"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-white font-bold text-sm line-clamp-1">{activeArtwork.title}</h4>
+                <p className="text-[11px] text-slate-400">{activeArtwork.artist} • {activeArtwork.dimensions || '1920 × 1080'}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1">
+                <button
+                  onClick={() => setViewerZoomLevel((z) => Math.max(0.5, Number((z - 0.25).toFixed(2))))}
+                  disabled={viewerZoomLevel <= 0.5}
+                  className="p-1 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer"
+                  title="Perkecil"
+                >
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-[11px] text-cyan-300 w-12 text-center font-bold">
+                  {Math.round(viewerZoomLevel * 100)}%
+                </span>
+                <button
+                  onClick={() => setViewerZoomLevel((z) => Math.min(3.5, Number((z + 0.25).toFixed(2))))}
+                  disabled={viewerZoomLevel >= 3.5}
+                  className="p-1 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer"
+                  title="Perbesar"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {activeArtwork.photoUrl && (
+                <a
+                  href={activeArtwork.photoUrl}
+                  download={`${activeArtwork.title.replace(/\s+/g, '_')}_VEC_C2PA.jpg`}
+                  className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Unduh Resolusi Asli</span>
+                </a>
+              )}
+
+              <button
+                onClick={() => setIsViewerModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Viewer Image Center Viewport */}
+          <div 
+            className="flex-1 flex items-center justify-center overflow-auto p-4 my-2 relative cursor-grab active:cursor-grabbing"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div 
+              className="transition-transform duration-200 ease-out origin-center"
+              style={{ transform: `scale(${viewerZoomLevel})` }}
+            >
+              <img
+                src={activeArtwork.photoUrl}
+                alt={activeArtwork.title}
+                className="max-h-[75vh] max-w-[90vw] object-contain rounded-2xl shadow-2xl border border-slate-800"
+              />
+            </div>
+          </div>
+
+          {/* Viewer Footer */}
+          <div 
+            className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between text-xs font-mono text-slate-400 gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 truncate max-w-xl">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+              <span className="text-white shrink-0">SHA-256 RAW:</span>
+              <span className="text-cyan-300 truncate">{activeArtwork.digest}</span>
+            </div>
+            <div className="text-[11px] text-slate-500">
+              Sensor: {activeArtwork.deviceInfo} • Keaslian: {activeArtwork.authenticityScore}%
             </div>
           </div>
         </div>

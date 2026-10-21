@@ -237,9 +237,11 @@ export const uploadCapturedPhotoToCloud = async (params: {
   digest: string;
   title: string;
   captureId: string;
+  isPrivate?: boolean;
+  isPublished?: boolean;
   sensorMetadata?: Record<string, any>;
 }): Promise<CloudUploadResult> => {
-  const { photoDataUrl, digest, title, captureId, sensorMetadata } = params;
+  const { photoDataUrl, digest, title, captureId, isPrivate = false, isPublished = false, sensorMetadata } = params;
   const bucketName = getStorageBucketName();
   const filename = `c2pa_${Date.now()}_${digest.slice(0, 12)}.jpg`;
   const cloudPath = `captures/${new Date().toISOString().slice(0, 10)}/${filename}`;
@@ -296,15 +298,17 @@ export const uploadCapturedPhotoToCloud = async (params: {
 
       const publicUrl = publicData?.publicUrl || `${supabaseUrl}/storage/v1/object/public/${bucketName}/${data.path}`;
 
-      // Automatically sync post record to database so other devices can view it immediately
-      await publishArtworkToSupabasePosts({
-        title: title || 'Tangkapan Sensor C2PA',
-        photoUrl: publicUrl,
-        digest: digest,
-        deviceInfo: sensorMetadata?.deviceInfo || 'CMOS Hardware Enclave',
-        resolution: sensorMetadata?.resolution,
-        sensorMetadata: sensorMetadata
-      });
+      // STRICT PRIVACY: Only publish to public.posts table if explicitly public / published!
+      if (isPublished && !isPrivate) {
+        await publishArtworkToSupabasePosts({
+          title: title || 'Tangkapan Sensor C2PA',
+          photoUrl: publicUrl,
+          digest: digest,
+          deviceInfo: sensorMetadata?.deviceInfo || 'CMOS Hardware Enclave',
+          resolution: sensorMetadata?.resolution,
+          sensorMetadata: sensorMetadata
+        });
+      }
 
       return {
         success: true,
@@ -320,24 +324,26 @@ export const uploadCapturedPhotoToCloud = async (params: {
     // 2. Storage upload encountered error (e.g. Storage policy requires auth or bucket missing)
     console.warn('Supabase storage upload notice:', error?.message);
 
-    // Sync metadata to posts table so record is saved in cloud database
-    const dbSync = await publishArtworkToSupabasePosts({
-      title: title || 'Tangkapan Sensor C2PA',
-      photoUrl: photoDataUrl,
-      digest: digest,
-      deviceInfo: sensorMetadata?.deviceInfo || 'CMOS Hardware Enclave',
-      resolution: sensorMetadata?.resolution,
-      sensorMetadata: sensorMetadata
-    });
-
-    const isDbSynced = dbSync.success;
+    // Only sync metadata to posts table if published and NOT private
+    let isDbSynced = false;
+    if (isPublished && !isPrivate) {
+      const dbSync = await publishArtworkToSupabasePosts({
+        title: title || 'Tangkapan Sensor C2PA',
+        photoUrl: photoDataUrl,
+        digest: digest,
+        deviceInfo: sensorMetadata?.deviceInfo || 'CMOS Hardware Enclave',
+        resolution: sensorMetadata?.resolution,
+        sensorMetadata: sensorMetadata
+      });
+      isDbSynced = dbSync.success;
+    }
 
     const friendlyError = error?.message?.includes('not found') || error?.message?.includes('Bucket')
       ? `Bucket storage '${bucketName}' belum dibuat di Supabase (Buka Dashboard Supabase > Storage > New Bucket: "${bucketName}" dengan status Public).`
       : (error?.message || 'Penyimpanan cloud Supabase belum terhubung.');
 
     return {
-      success: isDbSynced,
+      success: isDbSynced || !error,
       storageTarget: 'cloud_supabase',
       cloudStorageUrl: undefined,
       cloudBucket: bucketName,
@@ -376,7 +382,9 @@ export const syncVaultItemToCloud = async (item: PrivateVaultItem): Promise<bool
       photoDataUrl: item.photoUrl,
       digest: item.digest,
       title: item.title,
-      captureId: item.id
+      captureId: item.id,
+      isPrivate: item.isPrivate,
+      isPublished: item.isPublished
     });
 
     if (result.success && result.cloudStorageUrl) {

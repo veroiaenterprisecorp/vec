@@ -22,6 +22,7 @@ export interface PrivateVaultItem {
   uploadStatus?: 'uploaded' | 'uploading' | 'failed' | 'local_only';
   uploadError?: string;
   createdAt?: number;
+  description?: string;
 }
 
 export interface UserVaultProfile {
@@ -207,11 +208,17 @@ export const initVaultAsync = async (onLoaded?: (items: PrivateVaultItem[]) => v
 export const mergeRemoteItemsIntoVault = (remoteItems: PrivateVaultItem[]): PrivateVaultItem[] => {
   const current = getPrivateVaultItems();
   const existingIds = new Set(current.map((item) => item.id));
-  const existingDigests = new Set(current.map((item) => item.digest));
+  const existingDigests = new Set(current.filter((i) => i.digest).map((item) => item.digest.trim().toLowerCase()));
+  const existingTitles = new Set(current.filter((i) => i.title).map((item) => item.title.trim().toLowerCase()));
 
   const newItems: PrivateVaultItem[] = [];
   for (const r of remoteItems) {
-    if (!existingIds.has(r.id) && !existingDigests.has(r.digest)) {
+    const rd = (r.digest || '').trim().toLowerCase();
+    const rt = (r.title || '').trim().toLowerCase();
+    const isDup = existingIds.has(r.id) || 
+      (rd.length > 8 && existingDigests.has(rd)) ||
+      (rt.length > 0 && existingTitles.has(rt));
+    if (!isDup) {
       newItems.push(r);
     }
   }

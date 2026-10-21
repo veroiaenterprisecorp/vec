@@ -207,7 +207,26 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
         showToast(`Foto "${item.title}" diterbitkan ke Live Vault lokal.`);
       }
     } else {
-      showToast(`Foto "${item.title}" sekarang dikunci kembali ke status 100% Privat.`);
+      // Unpublish from Supabase posts so it disappears from public catalog everywhere
+      try {
+        if (item.digest) {
+          await supabase.from('posts').delete().eq('raw_capture_digest', item.digest);
+          await supabase.from('posts').delete().eq('c2pa_manifest_hash', item.digest);
+        }
+        if (item.title?.trim()) {
+          await supabase.from('posts').delete().eq('title', item.title.trim());
+        }
+        if (item.cloudStorageUrl) {
+          await supabase.from('posts').delete().eq('media_url', item.cloudStorageUrl);
+        }
+        if (item.id && item.id.includes('-') && item.id.length > 20) {
+          await supabase.from('posts').delete().eq('id', item.id);
+        }
+      } catch (e) {
+        console.warn('Could not remove post from Supabase:', e);
+      }
+      window.dispatchEvent(new CustomEvent('vec-vault-updated'));
+      showToast(`Foto "${item.title}" sekarang dikunci menjadi 100% Privat dan ditarik dari katalog publik.`);
     }
   };
 

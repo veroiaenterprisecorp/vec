@@ -45,6 +45,7 @@ import {
   StorageTargetMode
 } from '../lib/cloudStorage';
 import { generateAuthenticSensorCapture } from '../lib/sensorArtworkGenerator';
+import { supabase } from '../lib/supabase';
 
 interface VecStudioProps {
   onNavigateToPrivateVault?: () => void;
@@ -77,7 +78,7 @@ export const VecStudio: React.FC<VecStudioProps> = ({
   const [capturedTime, setCapturedTime] = useState<string>('2026-10-20 04:30:12 UTC');
   const [deviceInfo, setDeviceInfo] = useState<string>('Android Camera2 / CMOS Sensor');
   const [copiedRawHash, setCopiedRawHash] = useState<boolean>(false);
-  const [privacyMode, setPrivacyMode] = useState<'private' | 'public'>('public');
+  const [privacyMode, setPrivacyMode] = useState<'private' | 'public'>('private');
   const [artworkTitle, setArtworkTitle] = useState<string>('Gelap Api');
   const [isPublished, setIsPublished] = useState<boolean>(false);
   const [currentCaptureId, setCurrentCaptureId] = useState<string | null>(null);
@@ -269,7 +270,9 @@ export const VecStudio: React.FC<VecStudioProps> = ({
             photoDataUrl: dataUrl,
             digest: realChecksum,
             title: artworkTitle.trim() || file.name,
-            captureId: newCaptureId
+            captureId: newCaptureId,
+            isPrivate: privacyMode === 'private',
+            isPublished: privacyMode === 'public'
           }).then((res) => {
             setIsUploadingToCloud(false);
             setCloudUploadMessage(res.message);
@@ -437,6 +440,8 @@ export const VecStudio: React.FC<VecStudioProps> = ({
           digest: rawChecksum || capturedDigest,
           title: cleanTitle,
           captureId: newCaptureId,
+          isPrivate: privacyMode === 'private',
+          isPublished: privacyMode === 'public',
           sensorMetadata: {
             resolution: capturedResolution,
             fileSize: capturedFileSize,
@@ -969,10 +974,24 @@ export const VecStudio: React.FC<VecStudioProps> = ({
 
                   <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs">
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         setPrivacyMode('private');
+                        setIsPublished(false);
                         if (currentCaptureId) {
                           updateVaultItemPrivacy(currentCaptureId, true, false, artworkTitle);
+                          window.dispatchEvent(new Event('storage'));
+                          window.dispatchEvent(new CustomEvent('vec-vault-updated'));
+                          if (capturedDigest) {
+                            try {
+                              await supabase.from('posts').delete().eq('raw_capture_digest', capturedDigest);
+                              await supabase.from('posts').delete().eq('c2pa_manifest_hash', capturedDigest);
+                              if (artworkTitle?.trim()) {
+                                await supabase.from('posts').delete().eq('title', artworkTitle.trim());
+                              }
+                            } catch (err) {
+                              console.warn('Unpublish note:', err);
+                            }
+                          }
                         }
                       }}
                       className={`py-1.5 px-2 rounded-lg font-mono text-[11px] flex items-center justify-center gap-1.5 transition ${
