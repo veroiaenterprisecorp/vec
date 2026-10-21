@@ -19,7 +19,6 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="border-b border-slate-800/80 bg-[#030712]/95 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-8">
-        
         <button
           onClick={() => setActiveTab('overview')}
           className="flex items-center gap-3 text-left whitespace-nowrap shrink-0 group focus:outline-none"
@@ -77,28 +76,6 @@ export const Header: React.FC<HeaderProps> = ({
           >
             Studio Sensor C2PA
           </button>
-
-          <button
-            onClick={() => setActiveTab('spatial')}
-            className={`whitespace-nowrap shrink-0 transition-colors py-1 ${
-              activeTab === 'spatial'
-                ? 'text-cyan-400 border-b-2 border-cyan-400 font-semibold'
-                : 'hover:text-white'
-            }`}
-          >
-            Geoprivasi PostGIS
-          </button>
-
-          <button
-            onClick={() => setActiveTab('architecture')}
-            className={`whitespace-nowrap shrink-0 transition-colors py-1 ${
-              activeTab === 'architecture'
-                ? 'text-cyan-400 border-b-2 border-cyan-400 font-semibold'
-                : 'hover:text-white'
-            }`}
-          >
-            Arsitektur
-          </button>
         </nav>
 
         <div className="flex items-center gap-3 shrink-0">
@@ -153,22 +130,6 @@ export const Header: React.FC<HeaderProps> = ({
           }`}
         >
           Sensor C2PA
-        </button>
-        <button
-          onClick={() => setActiveTab('spatial')}
-          className={`px-2.5 py-1 rounded-md whitespace-nowrap ${
-            activeTab === 'spatial' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-400'
-          }`}
-        >
-          PostGIS
-        </button>
-        <button
-          onClick={() => setActiveTab('architecture')}
-          className={`px-2.5 py-1 rounded-md whitespace-nowrap ${
-            activeTab === 'architecture' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-400'
-          }`}
-        >
-          Arsitektur
         </button>
         <button
           onClick={() => setActiveTab('admin-portal')}
