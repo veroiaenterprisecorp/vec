@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabase';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { getSupabaseUrl, getSupabaseAnonKey, getActiveSupabaseClient, setManualSupabaseCredentials } from '../lib/supabase';
 import { 
   Database, 
   Key, 
@@ -101,15 +101,9 @@ export const LiveSupabaseExplorer: React.FC = () => {
     return clean;
   };
 
-  // Helper to create client
-  const getClient = (): SupabaseClient | null => {
-    const cleanUrl = sanitizeSupabaseUrl(supabaseUrl);
-    if (!cleanUrl || !supabaseAnonKey.trim()) return null;
-    try {
-      return createClient(cleanUrl, supabaseAnonKey.trim());
-    } catch {
-      return null;
-    }
+  // Helper to get singleton client
+  const getClient = (): SupabaseClient => {
+    return getActiveSupabaseClient();
   };
 
   // Test connection and fetch initial data
@@ -129,17 +123,16 @@ export const LiveSupabaseExplorer: React.FC = () => {
     setConnectionError(null);
 
     try {
-      const client = createClient(cleanUrl, supabaseAnonKey.trim());
+      // Save credentials via centralized singleton setter
+      setManualSupabaseCredentials(cleanUrl, supabaseAnonKey.trim());
+      const client = getActiveSupabaseClient();
+
       // Test query on public.posts
-      const { data, error } = await client.from('posts').select('id, title, created_at').limit(1);
+      const { error } = await client.from('posts').select('id, title, created_at').limit(1);
 
       if (error) {
         throw new Error(error.message);
       }
-
-      // Save credentials locally in this browser only
-      localStorage.setItem('vec_supabase_url', cleanUrl);
-      localStorage.setItem('vec_supabase_anon_key', supabaseAnonKey.trim());
 
       setIsConnected(true);
       fetchLivePosts(client);
@@ -154,8 +147,7 @@ export const LiveSupabaseExplorer: React.FC = () => {
 
   // Disconnect / Clear Local Storage
   const handleDisconnect = () => {
-    localStorage.removeItem('vec_supabase_url');
-    localStorage.removeItem('vec_supabase_anon_key');
+    setManualSupabaseCredentials('', '');
     setSupabaseUrl('');
     setSupabaseAnonKey('');
     setIsConnected(false);

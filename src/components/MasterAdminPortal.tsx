@@ -53,19 +53,25 @@ import {
 } from '../lib/masterAdminStorage';
 import { getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabase';
 import { GitHubSupabaseSyncHub } from './GitHubSupabaseSyncHub';
+import { VecArchitectureConsole } from './VecArchitectureConsole';
+import { PostGisSimulator } from './PostGisSimulator';
+
+export type AdminPortalTab = 'users' | 'guests' | 'architecture' | 'spatial' | 'sync' | 'vercel' | 'audit';
 
 interface MasterAdminPortalProps {
   onBackToPublicSite: () => void;
   onCopyAllSql?: () => void;
   copiedSql?: boolean;
   onDownloadSql?: () => void;
+  initialAdminTab?: AdminPortalTab;
 }
 
 export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
   onBackToPublicSite,
   onCopyAllSql,
   copiedSql = false,
-  onDownloadSql
+  onDownloadSql,
+  initialAdminTab = 'users'
 }) => {
   // Session Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => checkAdminSession());
@@ -77,7 +83,13 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
   const [lockoutTimer, setLockoutTimer] = useState<number>(0);
 
   // Active Tab inside Fortress Admin
-  const [adminTab, setAdminTab] = useState<'users' | 'guests' | 'sync' | 'vercel' | 'audit'>('users');
+  const [adminTab, setAdminTab] = useState<AdminPortalTab>(() => initialAdminTab || 'users');
+
+  useEffect(() => {
+    if (initialAdminTab) {
+      setAdminTab(initialAdminTab);
+    }
+  }, [initialAdminTab]);
 
   // Registered Users Directory State
   const [usersList, setUsersList] = useState<RegisteredUser[]>(() => getRegisteredUsers());
@@ -430,62 +442,86 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
       <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
         <button
           onClick={() => setAdminTab('users')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
             adminTab === 'users'
               ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
           <Users className="w-4 h-4 text-emerald-400" />
-          <span>Direktori Pengguna Terdaftar ({usersList.length})</span>
+          <span>Pengguna ({usersList.length})</span>
         </button>
 
         <button
           onClick={() => setAdminTab('guests')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
             adminTab === 'guests'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
           <BarChart3 className="w-4 h-4 text-cyan-400" />
-          <span>Statistik Pengguna Tamu (Hanya Angka Saja)</span>
+          <span>Statistik Tamu</span>
+        </button>
+
+        <button
+          onClick={() => setAdminTab('architecture')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
+            adminTab === 'architecture'
+              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+          }`}
+        >
+          <Database className="w-4 h-4 text-cyan-400" />
+          <span>Arsitektur & SQL</span>
+        </button>
+
+        <button
+          onClick={() => setAdminTab('spatial')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
+            adminTab === 'spatial'
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+          }`}
+        >
+          <Radio className="w-4 h-4 text-amber-400" />
+          <span>PostGIS Geospasial</span>
         </button>
 
         <button
           onClick={() => setAdminTab('sync')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
             adminTab === 'sync'
               ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-sm'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
           <Workflow className="w-4 h-4 text-blue-400" />
-          <span>Pusat Sinkronisasi GitHub & Supabase</span>
+          <span>Sinkronisasi GitHub</span>
         </button>
 
         <button
           onClick={() => setAdminTab('vercel')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
             adminTab === 'vercel'
               ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-500/40 shadow-sm'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
           <Rocket className="w-4 h-4 text-purple-400" />
-          <span>Sinkronisasi Vercel & Deploy</span>
+          <span>Deploy Vercel</span>
         </button>
 
         <button
           onClick={() => setAdminTab('audit')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
             adminTab === 'audit'
               ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
           <Activity className="w-4 h-4 text-amber-400" />
-          <span>Audit Keamanan & Kriptografi</span>
+          <span>Audit Keamanan</span>
         </button>
       </div>
 
@@ -844,6 +880,42 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
             </div>
           </div>
 
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* SUB-VIEW: ARSITEKTUR BASIS DATA & SKEMA SQL                   */}
+      {/* ------------------------------------------------------------- */}
+      {adminTab === 'architecture' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-cyan-950/40 border border-cyan-850/60 text-xs text-cyan-200 flex items-center gap-3">
+            <Lock className="w-4 h-4 text-cyan-400 shrink-0" />
+            <p>
+              Konsol Arsitektur Database, Skema SQL, ERD Visualizer, dan Seed Generator ini <strong>terisolasi aman di dalam Root Gate</strong> dan tidak terekspos ke publik demi menjaga keamanan dan estetika website.
+            </p>
+          </div>
+
+          <VecArchitectureConsole
+            onCopyAllSql={onCopyAllSql || (() => {})}
+            copiedSql={copiedSql}
+            onDownloadSql={onDownloadSql || (() => {})}
+          />
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* SUB-VIEW: SIMULATOR SPASIAL POSTGIS & GEOPRIVACY               */}
+      {/* ------------------------------------------------------------- */}
+      {adminTab === 'spatial' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-850/60 text-xs text-amber-200 flex items-center gap-3">
+            <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+            <p>
+              Simulator Spasial PostGIS & Differential Geoprivacy Fuzzing ini <strong>dilindungi di dalam Root Gate</strong> untuk simulasi telemetri GPS dan verifikasi koordinat terenkripsi.
+            </p>
+          </div>
+
+          <PostGisSimulator />
         </div>
       )}
 

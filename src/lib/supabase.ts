@@ -51,6 +51,32 @@ export const getSupabaseAnonKey = (): string => {
   return DEFAULT_SUPABASE_ANON_KEY;
 };
 
+// Singleton Client Instance to prevent multiple GoTrueClient warnings
+let cachedClient: SupabaseClient | null = null;
+let cachedUrl = '';
+let cachedKey = '';
+
+export const getActiveSupabaseClient = (): SupabaseClient => {
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
+
+  if (cachedClient && cachedUrl === url && cachedKey === key) {
+    return cachedClient;
+  }
+
+  cachedUrl = url;
+  cachedKey = key;
+  cachedClient = createClient(url, key, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false
+    }
+  });
+
+  return cachedClient;
+};
+
 export const setManualSupabaseCredentials = (url: string, anonKey: string): void => {
   if (typeof window === 'undefined') return;
   if (url && url.trim().startsWith('http')) {
@@ -63,18 +89,24 @@ export const setManualSupabaseCredentials = (url: string, anonKey: string): void
   } else {
     localStorage.removeItem('vec_supabase_anon_key');
   }
+
+  // Invalidate cached client so it refreshes once
+  cachedClient = null;
+  cachedUrl = '';
+  cachedKey = '';
+
   window.dispatchEvent(new Event('storage'));
   window.dispatchEvent(new CustomEvent('vec-supabase-config-updated'));
 };
 
-export const getActiveSupabaseClient = (): SupabaseClient => {
-  return createClient(getSupabaseUrl(), getSupabaseAnonKey(), {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true
+// Singleton export: Proxy guarantees external modules always invoke the cached singleton
+export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    const client = getActiveSupabaseClient();
+    const val = (client as any)[prop];
+    if (typeof val === 'function') {
+      return val.bind(client);
     }
-  });
-};
-
-export const supabase: SupabaseClient = getActiveSupabaseClient();
-
+    return val;
+  }
+});
