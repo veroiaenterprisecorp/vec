@@ -3,9 +3,6 @@ import { supabase } from '../lib/supabase';
 import { 
   getPrivateVaultItems, 
   initVaultAsync, 
-  updateVaultItemTitle, 
-  updateVaultItemPrivacy, 
-  savePrivateVaultItem,
   PrivateVaultItem 
 } from '../lib/userVaultStorage';
 import { 
@@ -16,7 +13,6 @@ import {
   Play, 
   Pause, 
   Send, 
-  Lock, 
   MapPin, 
   CheckCircle2, 
   RefreshCw,
@@ -39,17 +35,13 @@ import {
   HelpCircle,
   HardDrive,
   X,
-  Edit3,
   Maximize2,
   ZoomIn,
   ZoomOut,
-  Download,
-  Flame,
-  Trash2
+  Download
 } from 'lucide-react';
-import { checkSupabaseConnection } from '../lib/cloudStorage';
+import { checkSupabaseConnection, isArtworkPermanentlyDestroyed } from '../lib/cloudStorage';
 import { setManualSupabaseCredentials, getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabase';
-import { PermanentDeleteModal, DeleteArtworkTarget } from './PermanentDeleteModal';
 
 export interface VaultArtwork {
   id: string;
@@ -131,7 +123,6 @@ export const VecVault: React.FC<VecVaultProps> = ({
   const [manualKeyInput, setManualKeyInput] = useState<string>(() => getSupabaseAnonKey());
   const [manualSaveToast, setManualSaveToast] = useState<string | null>(null);
   const [vaultToast, setVaultToast] = useState<string | null>(null);
-  const [artworkPendingDelete, setArtworkPendingDelete] = useState<DeleteArtworkTarget | null>(null);
 
   const [filterType, setFilterType] = useState<'all' | 'COMMENT' | 'VOICE_NOTE' | 'AUTHENTIC_SEAL'>('all');
   const [commentInput, setCommentInput] = useState<string>('');
@@ -255,7 +246,20 @@ export const VecVault: React.FC<VecVaultProps> = ({
               const t = (post.title || '').trim().toLowerCase();
               const u = (post.media_url || '').trim();
               const pid = post.id;
-              // Exclude if user marked this digest, title, URL, or ID as private
+              const curation = `VEC-SDB-${(post.id || '').slice(0, 4).toUpperCase()}`;
+
+              // 1. MUST NOT BE PERMANENTLY DESTROYED (Zero-Trace check)
+              if (isArtworkPermanentlyDestroyed({
+                id: pid,
+                digest: d,
+                title: t,
+                photoUrl: u,
+                curationNumber: curation
+              })) {
+                return false;
+              }
+
+              // 2. Exclude if user marked this digest, title, URL, or ID as private
               if (d && privateDigests.has(d)) return false;
               if (t && privateTitles.has(t)) return false;
               if (u && privateUrls.has(u)) return false;
@@ -291,11 +295,17 @@ export const VecVault: React.FC<VecVaultProps> = ({
       }
 
       // 4. Merge: User published items FIRST + Remote items
-      // Only append DEFAULT_FEATURED if there are NO published artworks yet
+      // Only append DEFAULT_FEATURED if there are NO published artworks yet and DEFAULT_FEATURED was not destroyed
+      const isDefaultDestroyed = isArtworkPermanentlyDestroyed({
+        id: DEFAULT_FEATURED.id,
+        digest: DEFAULT_FEATURED.digest,
+        title: DEFAULT_FEATURED.title,
+        curationNumber: DEFAULT_FEATURED.curationNumber
+      });
       const hasRealArtworks = userPublishedList.length > 0 || remoteArtworks.length > 0;
       const combined = hasRealArtworks 
         ? [...userPublishedList, ...remoteArtworks] 
-        : [DEFAULT_FEATURED];
+        : (isDefaultDestroyed ? [] : [DEFAULT_FEATURED]);
 
       const getNormalizedUrlKey = (url: string) => {
         if (!url) return '';
@@ -312,6 +322,17 @@ export const VecVault: React.FC<VecVaultProps> = ({
       const uniqueCombined: VaultArtwork[] = [];
 
       for (const item of combined) {
+        // Zero-trace destroyed check
+        if (isArtworkPermanentlyDestroyed({
+          id: item.id,
+          digest: item.digest,
+          title: item.title,
+          photoUrl: item.photoUrl,
+          curationNumber: item.curationNumber
+        })) {
+          continue;
+        }
+
         const d = (item.digest || '').trim().toLowerCase();
         const u = (item.photoUrl || '').trim();
         const urlKey = getNormalizedUrlKey(u);
@@ -414,77 +435,6 @@ export const VecVault: React.FC<VecVaultProps> = ({
   }, []);
 
   const activeArtwork = artworks.find((a) => a.id === selectedArtworkId) || artworks[0] || DEFAULT_FEATURED;
-
-  const handleLockToPrivate = async (artwork: VaultArtwork) => {
-    const localVaultItems = getPrivateVaultItems();
-    const found = localVaultItems.find(
-      (i) => i.id === artwork.id || 
-             (artwork.digest && i.digest === artwork.digest) ||
-             (artwork.title && i.title === artwork.title)
-    );
-
-    // 1. Set to private and unpublish in local storage
-    if (found) {
-      updateVaultItemPrivacy(found.id, true, false);
-    } else {
-      savePrivateVaultItem({
-        id: artwork.id,
-        title: artwork.title,
-        photoUrl: artwork.photoUrl,
-        digest: artwork.digest,
-        resolution: artwork.dimensions || '1920 × 1080',
-        fileSize: '3.4 MB',
-        captureDate: artwork.publishedAt || new Date().toLocaleString('id-ID'),
-        deviceInfo: artwork.deviceInfo,
-        isPrivate: true,
-        isPublished: false,
-        c2paSignature: artwork.c2paSignature,
-        sensorType: artwork.medium,
-        storageTarget: 'cloud_supabase'
-      });
-    }
-
-    // 2. Delete or unpublish from Supabase posts so other users/devices don't see it
-    try {
-      if (artwork.digest && artwork.digest.length > 8) {
-        await supabase.from('posts').delete().eq('raw_capture_digest', artwork.digest);
-        await supabase.from('posts').delete().eq('c2pa_manifest_hash', artwork.digest);
-      }
-      if (artwork.title && artwork.title.trim().length > 0) {
-        await supabase.from('posts').delete().eq('title', artwork.title.trim());
-      }
-      if (artwork.photoUrl && artwork.photoUrl.startsWith('http')) {
-        await supabase.from('posts').delete().eq('media_url', artwork.photoUrl);
-      }
-      if (artwork.id && artwork.id.length > 20) {
-        await supabase.from('posts').delete().eq('id', artwork.id);
-      }
-    } catch (err) {
-      console.warn('Post removal from Supabase note:', err);
-    }
-
-    // 3. Immediately exclude from active UI artworks
-    setArtworks((prev) => {
-      const filtered = prev.filter(
-        (a) => a.id !== artwork.id && a.digest !== artwork.digest && a.title !== artwork.title
-      );
-      if (filtered.length > 0) {
-        setSelectedArtworkId(filtered[0].id);
-      } else {
-        setSelectedArtworkId(DEFAULT_FEATURED.id);
-        filtered.push(DEFAULT_FEATURED);
-      }
-      return filtered;
-    });
-
-    window.dispatchEvent(new Event('storage'));
-    window.dispatchEvent(new CustomEvent('vec-vault-updated'));
-
-    setVaultToast(`Karya "${artwork.title}" berhasil dikunci menjadi 100% PRIVAT dan ditarik dari katalog publik.`);
-    setTimeout(() => setVaultToast(null), 3500);
-
-    await loadPublishedArtworks();
-  };
 
   const handleCopyHash = () => {
     if (!activeArtwork) return;
@@ -804,50 +754,15 @@ export const VecVault: React.FC<VecVaultProps> = ({
               <h3 className="text-2xl font-bold text-white tracking-tight">
                 {activeArtwork.title}
               </h3>
-              {activeArtwork.isUserUploaded && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    onClick={() => handleLockToPrivate(activeArtwork)}
-                    className="px-2.5 py-1 rounded-lg text-amber-300 hover:text-white bg-amber-950/70 hover:bg-amber-900 border border-amber-800 transition cursor-pointer text-xs font-mono flex items-center gap-1.5 shadow-sm"
-                    title="Kunci karya ini kembali ke status privat dan tarik dari katalog publik"
-                  >
-                    <Lock className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Kunci Jadi Privat</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      const newTitle = prompt('Masukkan judul baru untuk karya ini:', activeArtwork.title);
-                      if (newTitle && newTitle.trim()) {
-                        updateVaultItemTitle(activeArtwork.id, newTitle.trim());
-                        loadPublishedArtworks();
-                      }
-                    }}
-                    className="px-2.5 py-1 rounded-lg text-slate-300 hover:text-cyan-300 bg-slate-800 hover:bg-slate-700 transition cursor-pointer text-xs font-mono flex items-center gap-1.5 border border-slate-700 shadow-sm"
-                    title="Ubah judul karya foto ini"
-                  >
-                    <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Ubah Judul</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setArtworkPendingDelete({
-                        id: activeArtwork.id,
-                        title: activeArtwork.title,
-                        digest: activeArtwork.digest,
-                        photoUrl: activeArtwork.photoUrl,
-                        resolution: activeArtwork.dimensions,
-                        cloudBucket: activeArtwork.cloudBucket
-                      });
-                    }}
-                    className="px-2.5 py-1 rounded-lg text-rose-300 hover:text-white bg-rose-950/70 hover:bg-rose-900 border border-rose-800 transition cursor-pointer text-xs font-mono flex items-center gap-1.5 shadow-sm"
-                    title="Musnahkan karya ini secara permanen dari Cloud dan Perangkat tanpa menyisakan jejak (Ketik HAPUS)"
-                  >
-                    <Flame className="w-3.5 h-3.5 text-rose-400" />
-                    <span>Musnahkan Karya</span>
-                  </button>
-                </div>
+              {activeArtwork.isUserUploaded && onNavigateToPrivateVault && (
+                <button
+                  onClick={onNavigateToPrivateVault}
+                  className="px-3.5 py-1.5 rounded-xl text-cyan-300 hover:text-white bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 hover:border-cyan-400 transition cursor-pointer text-xs font-mono font-bold flex items-center gap-2 shadow-md shadow-cyan-950/50"
+                  title="Buka Brankas Karya untuk mengubah judul, mengunci status privat, atau memusnahkan karya ini"
+                >
+                  <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                  <span>Kelola di Brankas Karya</span>
+                </button>
               )}
             </div>
 
@@ -1352,18 +1267,6 @@ export const VecVault: React.FC<VecVaultProps> = ({
           </div>
         </div>
       )}
-
-      {/* Permanent Zero-Trace Proof-of-Burn Deletion Modal */}
-      <PermanentDeleteModal
-        artwork={artworkPendingDelete}
-        isOpen={Boolean(artworkPendingDelete)}
-        onClose={() => setArtworkPendingDelete(null)}
-        onDeleted={(deletedId) => {
-          setVaultToast('Karya berhasil dimusnahkan secara permanen dari Cloud & Perangkat tanpa menyisakan sedikitpun jejak (Zero-Trace Destruction Verified).');
-          setTimeout(() => setVaultToast(null), 4000);
-          loadPublishedArtworks();
-        }}
-      />
 
     </div>
   );

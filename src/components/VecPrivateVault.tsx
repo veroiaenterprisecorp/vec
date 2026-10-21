@@ -18,7 +18,8 @@ import {
   setStorageBucketName,
   getStorageMode,
   setStorageMode as saveStorageModePref,
-  StorageTargetMode
+  StorageTargetMode,
+  isArtworkPermanentlyDestroyed
 } from '../lib/cloudStorage';
 import { PermanentDeleteModal, DeleteArtworkTarget } from './PermanentDeleteModal';
 import { supabase } from '../lib/supabase';
@@ -266,7 +267,16 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
     showToast(`Selesai! Seluruh foto telah disinkronkan ke Cloud Supabase.`);
   };
 
-  const filteredItems = items.filter((item) => {
+  const activeItems = items.filter((item) => {
+    return !isArtworkPermanentlyDestroyed({
+      id: item.id,
+      digest: item.digest,
+      title: item.title,
+      photoUrl: item.photoUrl
+    });
+  });
+
+  const filteredItems = activeItems.filter((item) => {
     if (activeFilter === 'private' && !item.isPrivate) return false;
     if (activeFilter === 'published' && !item.isPublished) return false;
     if (searchQuery.trim()) {
@@ -280,10 +290,10 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
     return true;
   });
 
-  const totalPrivateCount = items.filter((i) => i.isPrivate).length;
-  const totalPublishedCount = items.filter((i) => i.isPublished).length;
-  const cloudCount = items.filter((i) => i.storageTarget === 'cloud_supabase' || i.uploadStatus === 'uploaded').length;
-  const localCount = items.filter((i) => i.storageTarget === 'device_local' || (!i.storageTarget && i.uploadStatus !== 'uploaded')).length;
+  const totalPrivateCount = activeItems.filter((i) => i.isPrivate).length;
+  const totalPublishedCount = activeItems.filter((i) => i.isPublished).length;
+  const cloudCount = activeItems.filter((i) => i.storageTarget === 'cloud_supabase' || i.uploadStatus === 'uploaded').length;
+  const localCount = activeItems.filter((i) => i.storageTarget === 'device_local' || (!i.storageTarget && i.uploadStatus !== 'uploaded')).length;
 
   return (
     <div className="space-y-6">
@@ -308,13 +318,13 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
         <div>
           <div className="flex items-center gap-2 text-xs font-mono text-cyan-400">
             <Lock className="w-4 h-4 text-emerald-400" />
-            <span>RUANG PENYIMPANAN PRIBADI TERISOLASI • POSTGRES RLS & LOCAL ENCLAVE</span>
+            <span>KUSTODI EKSKLUSIF • SATU-SATUNYA TEMPAT PENGELOLAAN & PEMUSNAHAN KARYA</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-1">
-            Brankas Pribadi Saya (Personal Vault)
+            Brankas Karya (Personal Artwork Vault)
           </h2>
           <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
-            Semua foto hasil jepretan kamera Anda tersimpan di sini secara privat. File disimpan dalam resolusi 100% tanpa kompresi dan hanya dapat diakses oleh identitas Anda.
+            Semua foto hasil jepretan kamera Anda tersimpan di sini secara privat dalam resolusi 100% tanpa kompresi. Halaman ini adalah <strong>satu-satunya tempat resmi untuk memusnahkan karya secara permanen tanpa jejak (Zero-Trace Burn)</strong>.
           </p>
         </div>
 
@@ -790,6 +800,18 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
               </a>
 
               <button
+                onClick={() => {
+                  const target = selectedPhoto;
+                  setSelectedPhoto(null);
+                  setItemPendingDelete(target);
+                }}
+                className="p-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-300 transition cursor-pointer"
+                title="Pemusnahan Mutlak Karya Permanen (Ketik HAPUS)"
+              >
+                <Trash2 className="w-4 h-4 text-rose-400" />
+              </button>
+
+              <button
                 onClick={() => setSelectedPhoto(null)}
                 className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition cursor-pointer"
                 title="Tutup (Esc)"
@@ -951,7 +973,8 @@ CREATE POLICY "Public can upload capture objects" ON storage.objects FOR INSERT 
         isOpen={Boolean(itemPendingDelete)}
         onClose={() => setItemPendingDelete(null)}
         onDeleted={(deletedId) => {
-          setItems(getPrivateVaultItems());
+          setItems((prev) => prev.filter((i) => i.id !== deletedId && !isArtworkPermanentlyDestroyed(i)));
+          setItemPendingDelete(null);
           showToast('Karya berhasil dimusnahkan secara permanen dari Cloud & Perangkat tanpa jejak (Zero-Trace Verified).');
         }}
       />

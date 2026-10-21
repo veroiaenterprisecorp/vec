@@ -13,6 +13,7 @@ export interface DeleteArtworkTarget {
   cloudPath?: string;
   cloudStorageUrl?: string;
   deviceInfo?: string;
+  curationNumber?: string;
 }
 
 interface PermanentDeleteModalProps {
@@ -56,7 +57,8 @@ export const PermanentDeleteModal: React.FC<PermanentDeleteModalProps> = ({
         cloudBucket: artwork.cloudBucket,
         cloudPath: artwork.cloudPath,
         cloudStorageUrl: artwork.cloudStorageUrl,
-        photoUrl: artwork.photoUrl
+        photoUrl: artwork.photoUrl,
+        curationNumber: artwork.curationNumber
       });
 
       setDeletionStep('Menghapus data dari Secure Enclave lokal & IndexedDB...');

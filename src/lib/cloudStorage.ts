@@ -421,11 +421,110 @@ export interface ZeroTraceDestructionResult {
   message: string;
 }
 
+const DESTROYED_STORAGE_KEY = 'vec_permanently_destroyed_artworks_v1';
+
+export interface DestroyedArtworkRecord {
+  id: string;
+  digest?: string;
+  title?: string;
+  photoUrl?: string;
+  curationNumber?: string;
+  destroyedAt: number;
+}
+
+export const getDestroyedArtworkRecords = (): DestroyedArtworkRecord[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(DESTROYED_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const recordArtworkPermanentlyDestroyed = (params: {
+  id: string;
+  digest?: string;
+  title?: string;
+  photoUrl?: string;
+  curationNumber?: string;
+}): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getDestroyedArtworkRecords();
+    const cleanId = (params.id || '').trim();
+    const cleanDigest = (params.digest || '').trim().toLowerCase();
+    const cleanTitle = (params.title || '').trim().toLowerCase();
+    const cleanUrl = (params.photoUrl || '').trim();
+    const cleanCuration = (params.curationNumber || '').trim().toUpperCase();
+
+    // Prevent duplicates
+    const filtered = current.filter((r) => r.id !== cleanId && (!cleanDigest || r.digest !== cleanDigest));
+    filtered.push({
+      id: cleanId,
+      digest: cleanDigest,
+      title: cleanTitle,
+      photoUrl: cleanUrl,
+      curationNumber: cleanCuration,
+      destroyedAt: Date.now()
+    });
+
+    localStorage.setItem(DESTROYED_STORAGE_KEY, JSON.stringify(filtered.slice(-300)));
+  } catch (e) {
+    console.warn('Error recording destroyed tombstone:', e);
+  }
+};
+
+export const isArtworkPermanentlyDestroyed = (params: {
+  id?: string;
+  digest?: string;
+  title?: string;
+  photoUrl?: string;
+  curationNumber?: string;
+}): boolean => {
+  if (typeof window === 'undefined') return false;
+  const records = getDestroyedArtworkRecords();
+  if (!records || records.length === 0) return false;
+
+  const targetId = (params.id || '').trim().toLowerCase();
+  const targetDigest = (params.digest || '').trim().toLowerCase();
+  const targetTitle = (params.title || '').trim().toLowerCase();
+  const targetUrl = (params.photoUrl || '').trim().toLowerCase();
+  const targetCuration = (params.curationNumber || '').trim().toUpperCase();
+
+  for (const r of records) {
+    if (targetId && r.id && (targetId === r.id.toLowerCase() || targetId.includes(r.id.toLowerCase()) || r.id.toLowerCase().includes(targetId))) {
+      return true;
+    }
+    if (targetDigest && r.digest && targetDigest.length > 8 && r.digest.length > 8) {
+      if (targetDigest === r.digest) return true;
+    }
+    if (targetTitle && r.title && targetTitle === r.title && targetTitle.length > 2) {
+      return true;
+    }
+    if (targetCuration && r.curationNumber && targetCuration === r.curationNumber) {
+      return true;
+    }
+    if (targetUrl && r.photoUrl) {
+      const u1 = targetUrl;
+      const u2 = r.photoUrl.toLowerCase();
+      if (u1 === u2 && u1.length > 5 && !u1.includes('artwork_1792494925679')) return true;
+      if (u1.includes('/captures/') && u2.includes('/captures/')) {
+        const file1 = u1.split('/').pop()?.split('?')[0];
+        const file2 = u2.split('/').pop()?.split('?')[0];
+        if (file1 && file2 && file1 === file2) return true;
+      }
+    }
+  }
+  return false;
+};
+
 /**
  * Permanently and irreversibly destroys an artwork without leaving ANY trace:
  * - Deletes image binary files from Supabase Storage buckets
  * - Deletes posts from Supabase database ('posts' table) by id, digest, title, media_url
  * - Deletes interactions and curations from 'vault_interactions' table
+ * - Registers artwork identifiers in persistent tombstone registry so it NEVER reappears
  * - Deletes local vault item from localStorage and high-resolution IndexedDB
  * - Dispatches global events to immediately purge any cached views
  *
@@ -439,12 +538,22 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
   cloudPath?: string;
   cloudStorageUrl?: string;
   photoUrl?: string;
+  curationNumber?: string;
 }): Promise<ZeroTraceDestructionResult> => {
-  const { id, title, digest, cloudBucket, cloudPath, cloudStorageUrl, photoUrl } = params;
+  const { id, title, digest, cloudBucket, cloudPath, cloudStorageUrl, photoUrl, curationNumber } = params;
   let cloudFilesDeleted = 0;
   let dbRecordsDeleted = 0;
 
   const supabase = getActiveSupabaseClient();
+
+  // 0. Proactively record in permanent tombstone registry so it can never reappear in any query
+  recordArtworkPermanentlyDestroyed({
+    id,
+    digest,
+    title,
+    photoUrl: photoUrl || cloudStorageUrl,
+    curationNumber
+  });
 
   // 1. Supabase Storage files removal
   const targetBucket = (cloudBucket && cloudBucket.trim()) || getStorageBucketName() || DEFAULT_BUCKET_NAME;
@@ -490,8 +599,59 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
     console.warn('Storage wipe note:', storageErr);
   }
 
-  // 2. Database records removal ('posts' table)
+  // 2. Comprehensive Database records removal ('posts' & 'vault_interactions')
   try {
+    // First: query all matching posts to obtain their primary keys in Supabase (e.g., UUIDs)
+    const orFilters: string[] = [];
+    if (id && id.length > 2) {
+      orFilters.push(`id.eq.${id}`);
+    }
+    if (digest && digest.trim().length > 8) {
+      const cd = digest.trim();
+      orFilters.push(`raw_capture_digest.eq.${cd}`);
+      orFilters.push(`c2pa_manifest_hash.eq.${cd}`);
+    }
+    if (title && title.trim().length > 2) {
+      orFilters.push(`title.eq.${title.trim()}`);
+    }
+    if (cloudStorageUrl && cloudStorageUrl.startsWith('http')) {
+      orFilters.push(`media_url.eq.${cloudStorageUrl}`);
+    }
+    if (photoUrl && photoUrl.startsWith('http')) {
+      orFilters.push(`media_url.eq.${photoUrl}`);
+    }
+
+    if (orFilters.length > 0) {
+      try {
+        const { data: matchedPosts } = await supabase
+          .from('posts')
+          .select('id, raw_capture_digest, c2pa_manifest_hash, title, media_url')
+          .or(orFilters.join(','));
+
+        if (matchedPosts && matchedPosts.length > 0) {
+          for (const mp of matchedPosts) {
+            // Delete interactions first to satisfy foreign key constraints
+            await supabase.from('vault_interactions').delete().eq('artwork_id', mp.id);
+            // Delete post directly by exact UUID
+            const delRes = await supabase.from('posts').delete().eq('id', mp.id);
+            if (!delRes.error) dbRecordsDeleted++;
+
+            // Record in destroyed registry
+            recordArtworkPermanentlyDestroyed({
+              id: mp.id,
+              digest: mp.c2pa_manifest_hash || mp.raw_capture_digest,
+              title: mp.title,
+              photoUrl: mp.media_url,
+              curationNumber: `VEC-SDB-${mp.id.slice(0, 4).toUpperCase()}`
+            });
+          }
+        }
+      } catch (matchErr) {
+        console.warn('Matching posts lookup note:', matchErr);
+      }
+    }
+
+    // Direct deletion attempts across all identifying fields
     if (id) {
       const res = await supabase.from('posts').delete().eq('id', id);
       if (!res.error) dbRecordsDeleted++;
@@ -534,7 +694,11 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
 
   // 5. Broadcast instant purge event
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('vec-vault-updated', { detail: { deletedId: id, digest, title } }));
+    window.dispatchEvent(
+      new CustomEvent('vec-vault-updated', {
+        detail: { deletedId: id, digest, title, curationNumber }
+      })
+    );
     window.dispatchEvent(new Event('storage'));
   }
 
