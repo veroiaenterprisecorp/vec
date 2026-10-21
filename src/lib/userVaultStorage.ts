@@ -14,7 +14,6 @@ export interface PrivateVaultItem {
   fuzzedLocation?: string;
   c2paSignature: string;
   sensorType: string;
-  // Cloud Supabase Storage Attributes
   storageTarget?: 'cloud_supabase' | 'device_local';
   cloudStorageUrl?: string;
   cloudBucket?: string;
@@ -40,41 +39,49 @@ export interface UserVaultProfile {
 const STORAGE_KEY = 'vec_user_private_vault_items';
 const DESTROYED_STORAGE_KEY = 'vec_permanently_destroyed_artworks_v1';
 
-const isDestroyedInRegistry = (candidate: { id?: string; digest?: string; title?: string; photoUrl?: string }): boolean => {
-  if (typeof window === 'undefined') return false;
+const normalizeValue = (value?: string): string => (value || '').trim().toLowerCase();
+
+const getDestroyedRecords = (): Array<{ id?: string; digest?: string; title?: string; photoUrl?: string }> => {
+  if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(DESTROYED_STORAGE_KEY);
-    if (!raw) return false;
-    const records = JSON.parse(raw) as Array<{ id?: string; digest?: string; title?: string; photoUrl?: string; curationNumber?: string }>;
-    const targetId = (candidate.id || '').trim().toLowerCase();
-    const targetDigest = (candidate.digest || '').trim().toLowerCase();
-    const targetTitle = (candidate.title || '').trim().toLowerCase();
-    const targetUrl = (candidate.photoUrl || '').trim().toLowerCase();
-
-    return records.some((record) => {
-      const recordId = (record.id || '').trim().toLowerCase();
-      const recordDigest = (record.digest || '').trim().toLowerCase();
-      const recordTitle = (record.title || '').trim().toLowerCase();
-      const recordUrl = (record.photoUrl || '').trim().toLowerCase();
-
-      if (targetId && recordId && (targetId === recordId || targetId.includes(recordId) || recordId.includes(targetId))) return true;
-      if (targetDigest && recordDigest && targetDigest.length > 8 && recordDigest.length > 8 && targetDigest === recordDigest) return true;
-      if (targetTitle && recordTitle && targetTitle.length > 2 && targetTitle === recordTitle) return true;
-      if (targetUrl && recordUrl && targetUrl.length > 5 && targetUrl === recordUrl) return true;
-      if (targetUrl && recordUrl && targetUrl.includes('/captures/') && recordUrl.includes('/captures/')) {
-        const file1 = targetUrl.split('/').pop()?.split('?')[0];
-        const file2 = recordUrl.split('/').pop()?.split('?')[0];
-        if (file1 && file2 && file1 === file2) return true;
-      }
-      return false;
-    });
+    return raw ? JSON.parse(raw) : [];
   } catch {
-    return false;
+    return [];
   }
 };
 
-const filterDestroyedItems = <T extends { id?: string; digest?: string; title?: string; photoUrl?: string }>(items: T[]): T[] => {
-  return items.filter((item) => !isDestroyedInRegistry({
+export const isDestroyedArtworkCandidate = (candidate: { id?: string; digest?: string; title?: string; photoUrl?: string }): boolean => {
+  if (typeof window === 'undefined') return false;
+  const destroyed = getDestroyedRecords();
+  if (!destroyed || destroyed.length === 0) return false;
+
+  const targetId = normalizeValue(candidate.id);
+  const targetDigest = normalizeValue(candidate.digest);
+  const targetTitle = normalizeValue(candidate.title);
+  const targetUrl = normalizeValue(candidate.photoUrl);
+
+  return destroyed.some((record) => {
+    const recordId = normalizeValue(record.id);
+    const recordDigest = normalizeValue(record.digest);
+    const recordTitle = normalizeValue(record.title);
+    const recordUrl = normalizeValue(record.photoUrl);
+
+    if (targetId && recordId && (targetId === recordId || targetId.includes(recordId) || recordId.includes(targetId))) return true;
+    if (targetDigest && recordDigest && targetDigest.length > 8 && recordDigest.length > 8 && targetDigest === recordDigest) return true;
+    if (targetTitle && recordTitle && targetTitle.length > 2 && targetTitle === recordTitle) return true;
+    if (targetUrl && recordUrl && targetUrl.length > 5 && (targetUrl === recordUrl || targetUrl.includes(recordUrl) || recordUrl.includes(targetUrl))) return true;
+    if (targetUrl && recordUrl && targetUrl.includes('/captures/') && recordUrl.includes('/captures/')) {
+      const file1 = targetUrl.split('/').pop()?.split('?')[0];
+      const file2 = recordUrl.split('/').pop()?.split('?')[0];
+      if (file1 && file2 && file1 === file2) return true;
+    }
+    return false;
+  });
+};
+
+export const filterDestroyedItems = <T extends { id?: string; digest?: string; title?: string; photoUrl?: string }>(items: T[]): T[] => {
+  return items.filter((item) => !isDestroyedArtworkCandidate({
     id: item.id,
     digest: item.digest,
     title: item.title,
@@ -123,12 +130,10 @@ const DEFAULT_ITEMS: PrivateVaultItem[] = [
   }
 ];
 
-// In-memory cache to guarantee synchronous access without dropouts
 let memoryCache: PrivateVaultItem[] | null = null;
 
 export const getItemTimestamp = (item: PrivateVaultItem): number => {
   if (item.createdAt && item.createdAt > 0) return item.createdAt;
-  // If id is like 'cap-1729...' or 'cap-upload-1729...'
   const match = item.id.match(/\d{10,14}/);
   if (match) {
     const parsedIdTime = parseInt(match[0], 10);
@@ -138,21 +143,16 @@ export const getItemTimestamp = (item: PrivateVaultItem): number => {
     const parsed = Date.parse(item.captureDate);
     if (!isNaN(parsed)) return parsed;
   }
-  // Default fallback for legacy demo items
   if (item.id === 'vault-item-001') return 1729400000000;
   if (item.id === 'vault-item-002') return 1729300000000;
   return 0;
 };
 
-// Compact items for localStorage metadata cache so browser storage quota (~5MB) is never exceeded.
-// The complete uncompressed full-resolution RAW captures and base64 payloads are safely persisted in IndexedDB.
 const prepareItemsForLocalStorage = (items: PrivateVaultItem[]): PrivateVaultItem[] => {
   return items.slice(0, 50).map((item) => {
     const isLargeDataUrl = Boolean(item.photoUrl && (item.photoUrl.startsWith('data:') || item.photoUrl.length > 2048));
     return {
       ...item,
-      // If photoUrl is a huge data URI, store the cloudStorageUrl or empty string in localStorage.
-      // IndexedDB will rehydrate the original high-resolution photoUrl into memoryCache.
       photoUrl: isLargeDataUrl ? (item.cloudStorageUrl || '') : item.photoUrl
     };
   });
@@ -164,8 +164,6 @@ const safeSaveToLocalStorage = (items: PrivateVaultItem[]) => {
     const compactItems = prepareItemsForLocalStorage(items);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(compactItems));
   } catch {
-    // If browser localStorage quota is constrained by other keys or legacy data,
-    // safely prune old oversized storage and retry with minimal metadata
     try {
       localStorage.removeItem(STORAGE_KEY);
       const minimal = items.slice(0, 20).map((item) => ({
@@ -174,7 +172,7 @@ const safeSaveToLocalStorage = (items: PrivateVaultItem[]) => {
       }));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
     } catch {
-      // IndexedDB and memoryCache safely retain 100% of the artwork and attestation data
+      // noop
     }
   }
 };
@@ -194,9 +192,9 @@ export const getPrivateVaultItems = (): PrivateVaultItem[] => {
   try {
     const raw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
     if (!raw) {
-      memoryCache = DEFAULT_ITEMS;
-      safeSaveToLocalStorage(DEFAULT_ITEMS);
-      return DEFAULT_ITEMS;
+      memoryCache = filterDestroyedItems(DEFAULT_ITEMS);
+      safeSaveToLocalStorage(memoryCache);
+      return memoryCache;
     }
     const items: PrivateVaultItem[] = JSON.parse(raw);
     const sanitized = items
@@ -206,54 +204,36 @@ export const getPrivateVaultItems = (): PrivateVaultItem[] => {
         }
         return i;
       })
-      .filter((item) => !isDestroyedInRegistry({
-        id: item.id,
-        digest: item.digest,
-        title: item.title,
-        photoUrl: item.photoUrl
-      }));
-    // Sort so newest user captures are always on top
+      .filter((item) => !isDestroyedArtworkCandidate({ id: item.id, digest: item.digest, title: item.title, photoUrl: item.photoUrl }));
     sanitized.sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
     memoryCache = sanitized;
     return sanitized;
   } catch (e) {
     console.error('Failed to parse private vault items from storage:', e);
-    memoryCache = DEFAULT_ITEMS;
-    return DEFAULT_ITEMS;
+    memoryCache = filterDestroyedItems(DEFAULT_ITEMS);
+    return memoryCache;
   }
 };
 
-/**
- * Initializes and hydrates vault from IndexedDB asynchronously.
- * Guarantees that high-resolution captures stored in IndexedDB are synced into memory.
- */
 export const initVaultAsync = async (onLoaded?: (items: PrivateVaultItem[]) => void): Promise<PrivateVaultItem[]> => {
   const localItems = getPrivateVaultItems();
   try {
     const idbItems = await getIdbAllItems();
     if (idbItems && idbItems.length > 0) {
-      // Merge idb items with local items (idb has full resolution photo data)
       const mergedMap = new Map<string, PrivateVaultItem>();
       localItems.forEach((item) => mergedMap.set(item.id, item));
-      idbItems.forEach((item) => {
-        // IDB item takes precedence for full photoUrl data
+      const safeIdbItems = filterDestroyedItems(idbItems);
+      safeIdbItems.forEach((item) => {
         mergedMap.set(item.id, {
           ...mergedMap.get(item.id),
           ...item
         });
       });
-      
+
       const merged = Array.from(mergedMap.values())
-        .filter((item) => !isDestroyedInRegistry({
-          id: item.id,
-          digest: item.digest,
-          title: item.title,
-          photoUrl: item.photoUrl
-        }))
-        .sort((a, b) => {
-          return getItemTimestamp(b) - getItemTimestamp(a);
-        });
-      
+        .filter((item) => !isDestroyedArtworkCandidate({ id: item.id, digest: item.digest, title: item.title, photoUrl: item.photoUrl }))
+        .sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
+
       memoryCache = merged;
       safeSaveToLocalStorage(merged);
       if (onLoaded) onLoaded(merged);
@@ -267,23 +247,20 @@ export const initVaultAsync = async (onLoaded?: (items: PrivateVaultItem[]) => v
   return localItems;
 };
 
-/**
- * Merges items fetched from Supabase cloud into the local vault
- */
 export const mergeRemoteItemsIntoVault = (remoteItems: PrivateVaultItem[]): PrivateVaultItem[] => {
-  const current = getPrivateVaultItems().filter((item) => !isDestroyedInRegistry({
+  const current = getPrivateVaultItems().filter((item) => !isDestroyedArtworkCandidate({
     id: item.id,
     digest: item.digest,
     title: item.title,
     photoUrl: item.photoUrl
   }));
-  const filteredRemote = filterDestroyedItems(remoteItems);
+  const safeRemoteItems = filterDestroyedItems(remoteItems);
   const existingIds = new Set(current.map((item) => item.id));
   const existingDigests = new Set(current.filter((i) => i.digest).map((item) => item.digest.trim().toLowerCase()));
   const existingTitles = new Set(current.filter((i) => i.title).map((item) => item.title.trim().toLowerCase()));
 
   const newItems: PrivateVaultItem[] = [];
-  for (const r of filteredRemote) {
+  for (const r of safeRemoteItems) {
     const rd = (r.digest || '').trim().toLowerCase();
     const rt = (r.title || '').trim().toLowerCase();
     const isDup = existingIds.has(r.id) ||
@@ -295,10 +272,7 @@ export const mergeRemoteItemsIntoVault = (remoteItems: PrivateVaultItem[]): Priv
   }
 
   if (newItems.length > 0) {
-    // Merge remote items, then sort so user captures stay at the top if newest
-    const merged = [...current, ...newItems].sort((a, b) => {
-      return getItemTimestamp(b) - getItemTimestamp(a);
-    });
+    const merged = [...current, ...newItems].sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
     memoryCache = merged;
     safeSaveToLocalStorage(merged);
     newItems.forEach((item) => putIdbItem(item));
@@ -309,44 +283,25 @@ export const mergeRemoteItemsIntoVault = (remoteItems: PrivateVaultItem[]): Priv
 };
 
 export const savePrivateVaultItem = (item: PrivateVaultItem): PrivateVaultItem[] => {
+  if (isDestroyedArtworkCandidate({ id: item.id, digest: item.digest, title: item.title, photoUrl: item.photoUrl })) {
+    return getPrivateVaultItems();
+  }
   const current = getPrivateVaultItems();
-  const enrichedItem: PrivateVaultItem = {
-    ...item,
-    createdAt: item.createdAt || Date.now()
-  };
-  // Avoid duplicate if same ID already exists
+  const enrichedItem: PrivateVaultItem = { ...item, createdAt: item.createdAt || Date.now() };
   const filtered = current.filter((i) => i.id !== enrichedItem.id);
-  const updated = [enrichedItem, ...filtered].sort((a, b) => {
-    return getItemTimestamp(b) - getItemTimestamp(a);
-  });
+  const updated = [enrichedItem, ...filtered].sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
   memoryCache = updated;
-
-  // 1. Save to high-capacity IndexedDB (stores full resolution without size limits)
   putIdbItem(enrichedItem);
-
-  // 2. Safe save to localStorage
   safeSaveToLocalStorage(updated);
-
-  // 3. Notify listeners
   notifyVaultChanged(updated);
   return updated;
 };
 
-export const updateVaultItemPrivacy = (
-  id: string, 
-  isPrivate: boolean, 
-  isPublished: boolean,
-  newTitle?: string
-): PrivateVaultItem[] => {
+export const updateVaultItemPrivacy = (id: string, isPrivate: boolean, isPublished: boolean, newTitle?: string): PrivateVaultItem[] => {
   const current = getPrivateVaultItems();
   const updated = current.map((item) => {
     if (item.id === id) {
-      const changed = {
-        ...item,
-        isPrivate,
-        isPublished,
-        title: newTitle !== undefined ? newTitle : item.title
-      };
+      const changed = { ...item, isPrivate, isPublished, title: newTitle !== undefined ? newTitle : item.title };
       putIdbItem(changed);
       return changed;
     }
@@ -358,17 +313,11 @@ export const updateVaultItemPrivacy = (
   return updated;
 };
 
-export const updateVaultItemTitle = (
-  id: string,
-  newTitle: string
-): PrivateVaultItem[] => {
+export const updateVaultItemTitle = (id: string, newTitle: string): PrivateVaultItem[] => {
   const current = getPrivateVaultItems();
   const updated = current.map((item) => {
     if (item.id === id) {
-      const changed = {
-        ...item,
-        title: newTitle.trim() || item.title
-      };
+      const changed = { ...item, title: newTitle.trim() || item.title };
       putIdbItem(changed);
       return changed;
     }
@@ -380,19 +329,11 @@ export const updateVaultItemTitle = (
   return updated;
 };
 
-export const updateVaultItemPhoto = (
-  id: string,
-  newPhotoUrl: string,
-  newDigest?: string
-): PrivateVaultItem[] => {
+export const updateVaultItemPhoto = (id: string, newPhotoUrl: string, newDigest?: string): PrivateVaultItem[] => {
   const current = getPrivateVaultItems();
   const updated = current.map((item) => {
     if (item.id === id) {
-      const changed = {
-        ...item,
-        photoUrl: newPhotoUrl,
-        digest: newDigest || item.digest
-      };
+      const changed = { ...item, photoUrl: newPhotoUrl, digest: newDigest || item.digest };
       putIdbItem(changed);
       return changed;
     }
@@ -421,10 +362,7 @@ export const updateVaultItemCloudStatus = (
   const current = getPrivateVaultItems();
   const updated = current.map((item) => {
     if (item.id === id) {
-      const changed = {
-        ...item,
-        ...cloudData
-      };
+      const changed = { ...item, ...cloudData };
       putIdbItem(changed);
       return changed;
     }
@@ -450,7 +388,6 @@ export const getUserVaultProfile = (): UserVaultProfile => {
   };
 };
 
-// Eagerly hydrate high-resolution image data from IndexedDB on browser startup
 if (typeof window !== 'undefined') {
   initVaultAsync().catch(() => {});
 }
