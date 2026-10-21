@@ -38,6 +38,40 @@ export interface UserVaultProfile {
 }
 
 const STORAGE_KEY = 'vec_user_private_vault_items';
+const DESTROYED_STORAGE_KEY = 'vec_permanently_destroyed_artworks_v1';
+
+const isDestroyedInRegistry = (candidate: { id?: string; digest?: string; title?: string; photoUrl?: string }): boolean => {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = localStorage.getItem(DESTROYED_STORAGE_KEY);
+    if (!raw) return false;
+    const records = JSON.parse(raw) as Array<{ id?: string; digest?: string; title?: string; photoUrl?: string; curationNumber?: string }>;
+    const targetId = (candidate.id || '').trim().toLowerCase();
+    const targetDigest = (candidate.digest || '').trim().toLowerCase();
+    const targetTitle = (candidate.title || '').trim().toLowerCase();
+    const targetUrl = (candidate.photoUrl || '').trim().toLowerCase();
+
+    return records.some((record) => {
+      const recordId = (record.id || '').trim().toLowerCase();
+      const recordDigest = (record.digest || '').trim().toLowerCase();
+      const recordTitle = (record.title || '').trim().toLowerCase();
+      const recordUrl = (record.photoUrl || '').trim().toLowerCase();
+
+      if (targetId && recordId && (targetId === recordId || targetId.includes(recordId) || recordId.includes(targetId))) return true;
+      if (targetDigest && recordDigest && targetDigest.length > 8 && recordDigest.length > 8 && targetDigest === recordDigest) return true;
+      if (targetTitle && recordTitle && targetTitle.length > 2 && targetTitle === recordTitle) return true;
+      if (targetUrl && recordUrl && targetUrl.length > 5 && targetUrl === recordUrl) return true;
+      if (targetUrl && recordUrl && targetUrl.includes('/captures/') && recordUrl.includes('/captures/')) {
+        const file1 = targetUrl.split('/').pop()?.split('?')[0];
+        const file2 = recordUrl.split('/').pop()?.split('?')[0];
+        if (file1 && file2 && file1 === file2) return true;
+      }
+      return false;
+    });
+  } catch {
+    return false;
+  }
+};
 
 const DEFAULT_ITEMS: PrivateVaultItem[] = [
   {
@@ -223,7 +257,13 @@ export const mergeRemoteItemsIntoVault = (remoteItems: PrivateVaultItem[]): Priv
   for (const r of remoteItems) {
     const rd = (r.digest || '').trim().toLowerCase();
     const rt = (r.title || '').trim().toLowerCase();
-    const isDup = existingIds.has(r.id) || 
+    const isDestroyed = isDestroyedInRegistry({
+      id: r.id,
+      digest: r.digest,
+      title: r.title,
+      photoUrl: r.photoUrl
+    });
+    const isDup = isDestroyed || existingIds.has(r.id) || 
       (rd.length > 8 && existingDigests.has(rd)) ||
       (rt.length > 0 && existingTitles.has(rt));
     if (!isDup) {
@@ -391,4 +431,3 @@ export const getUserVaultProfile = (): UserVaultProfile => {
 if (typeof window !== 'undefined') {
   initVaultAsync().catch(() => {});
 }
-
