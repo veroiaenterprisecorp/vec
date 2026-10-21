@@ -5,6 +5,7 @@ import {
   deletePrivateVaultItem, 
   getUserVaultProfile,
   mergeRemoteItemsIntoVault,
+  initVaultAsync,
   PrivateVaultItem,
   UserVaultProfile
 } from '../lib/userVaultStorage';
@@ -117,11 +118,29 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
   };
 
   useEffect(() => {
-    const current = getPrivateVaultItems();
-    setItems(current);
+    // 1. Initial fast synchronous load
+    setItems(getPrivateVaultItems());
     setProfile(getUserVaultProfile());
-    // Auto-pull from cloud database in background so other devices sync seamlessly
+
+    // 2. Hydrate from IndexedDB for high-res captures
+    initVaultAsync((loaded) => {
+      setItems(loaded);
+    });
+
+    // 3. Listen to instant updates from Studio or other components
+    const handleUpdate = () => {
+      setItems(getPrivateVaultItems());
+    };
+    window.addEventListener('vec-vault-updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+
+    // 4. Auto-pull from cloud database in background so other devices sync seamlessly
     pullRemotePostsIntoVault(true);
+
+    return () => {
+      window.removeEventListener('vec-vault-updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
   }, []);
 
   const handleTogglePrivacy = async (item: PrivateVaultItem) => {

@@ -335,8 +335,8 @@ export const VecStudio: React.FC<VecStudioProps> = ({
         if (ctx) {
           ctx.imageSmoothingEnabled = false;
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          // 100% Kualitas Maksimal Tanpa Kompresi (Lossless/High-Bitrate)
-          photoDataUrl = canvas.toDataURL('image/jpeg', 1.0);
+          // High-Resolution 1080p Image (0.85 quality: pristine visual clarity, fast network transmission)
+          photoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
 
           setCapturedResolution(`${canvas.width} × ${canvas.height} piksel`);
 
@@ -937,8 +937,27 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                   </div>
 
                   {privacyMode === 'private' ? (
-                    <div className="p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-900/40 text-[11px] text-emerald-300 leading-relaxed font-mono">
-                      ✓ <strong>Status Privat Aktif:</strong> Foto ini 100% aman tersimpan di Brankas Pribadi Anda. Foto <u>TIDAK AKAN</u> muncul di Live Vault umum dan tidak bisa dilihat oleh orang lain.
+                    <div className="p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-900/40 space-y-2 text-[11px] text-emerald-300 leading-relaxed font-mono">
+                      <p>
+                        ✓ <strong>Status Privat Aktif:</strong> Foto ini 100% tersimpan di Brankas Pribadi Anda. Foto ini privat dan belum dipublikasikan ke Live Vault publik.
+                      </p>
+                      <div className="flex gap-2 pt-1">
+                        {onNavigateToPrivateVault && (
+                          <button
+                            onClick={onNavigateToPrivateVault}
+                            className="flex-1 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-bold transition flex items-center justify-center gap-1 text-[11px] cursor-pointer"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>Buka di Brankas Pribadi →</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setPrivacyMode('public')}
+                          className="flex-1 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center justify-center gap-1 text-[11px] cursor-pointer"
+                        >
+                          <span>Terbitkan ke Live Vault</span>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="p-2.5 rounded-lg bg-cyan-950/30 border border-cyan-900/40 space-y-2 text-[11px] font-mono">

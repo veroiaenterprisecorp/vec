@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { getPrivateVaultItems, PrivateVaultItem } from '../lib/userVaultStorage';
+import { getPrivateVaultItems, initVaultAsync, PrivateVaultItem } from '../lib/userVaultStorage';
 import { 
   ShieldCheck, 
   Award, 
@@ -289,13 +289,22 @@ export const VecVault: React.FC<VecVaultProps> = ({
     loadPublishedArtworks();
     fetchLiveInteractions();
 
-    // Listen to localStorage changes in case user published from another component
+    // Hydrate from IndexedDB for high-res images
+    initVaultAsync().then(() => {
+      loadPublishedArtworks();
+    });
+
+    // Listen to localStorage & vault events when items change in Studio or Private Vault
     const handleStorageChange = () => {
       loadPublishedArtworks();
       checkSupabaseConnection().then(setConnectionStatus);
     };
+    window.addEventListener('vec-vault-updated', handleStorageChange);
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('vec-vault-updated', handleStorageChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   const activeArtwork = artworks.find((a) => a.id === selectedArtworkId) || artworks[0] || DEFAULT_FEATURED;

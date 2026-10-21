@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabase';
 import { 
   Database, 
   Key, 
@@ -65,12 +66,8 @@ export const LiveSupabaseExplorer: React.FC = () => {
   const defaultEnvKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydWlqbmh5bGNkb2piaWx6Z3dkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0ODE2NzIsImV4cCI6MjEwODA1NzY3Mn0.QQL0hq4Kzp01Hf7xfWDEDlCY9f-vyreYvze6tVD582k';
 
   // Credentials (Saved in localStorage or default project env)
-  const [supabaseUrl, setSupabaseUrl] = useState<string>(() => {
-    return localStorage.getItem('vec_supabase_url') || defaultEnvUrl;
-  });
-  const [supabaseAnonKey, setSupabaseAnonKey] = useState<string>(() => {
-    return localStorage.getItem('vec_supabase_anon_key') || defaultEnvKey;
-  });
+  const [supabaseUrl, setSupabaseUrl] = useState<string>(() => getSupabaseUrl());
+  const [supabaseAnonKey, setSupabaseAnonKey] = useState<string>(() => getSupabaseAnonKey());
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);

@@ -1,3 +1,5 @@
+import { getIdbAllItems, putIdbItem, deleteIdbItem } from './idbStorage';
+
 export interface PrivateVaultItem {
   id: string;
   title: string;
@@ -76,37 +78,104 @@ const DEFAULT_ITEMS: PrivateVaultItem[] = [
   }
 ];
 
-export const getPrivateVaultItems = (): PrivateVaultItem[] => {
+// In-memory cache to guarantee synchronous access without dropouts
+let memoryCache: PrivateVaultItem[] | null = null;
+
+// Safe localStorage saver that handles browser quota limits gracefully
+const safeSaveToLocalStorage = (items: PrivateVaultItem[]) => {
+  if (typeof window === 'undefined') return;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  } catch (e: any) {
+    console.warn('LocalStorage quota warning, creating compressed quota-safe cache:', e?.message);
+    try {
+      // If quota exceeded, preserve the metadata and recent 10 items, truncation if needed
+      const safeItems = items.slice(0, 15).map((item, idx) => {
+        // If dataUrl is too huge for localStorage, keep it in IndexedDB and keep first 3 intact
+        if (idx > 2 && item.photoUrl.length > 200000 && !item.photoUrl.startsWith('http')) {
+          return {
+            ...item,
+            photoUrl: item.cloudStorageUrl || '/assets/images/vec_vault_artwork_1792494925679.jpg'
+          };
+        }
+        return item;
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(safeItems));
+    } catch {
+      // IndexedDB has the full copy anyway
+    }
+  }
+};
+
+const notifyVaultChanged = (items: PrivateVaultItem[]) => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vec-vault-updated', { detail: items }));
+    window.dispatchEvent(new Event('storage'));
+  }
+};
+
+export const getPrivateVaultItems = (): PrivateVaultItem[] => {
+  if (memoryCache && memoryCache.length > 0) {
+    return memoryCache;
+  }
+
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_ITEMS));
+      memoryCache = DEFAULT_ITEMS;
+      safeSaveToLocalStorage(DEFAULT_ITEMS);
       return DEFAULT_ITEMS;
     }
     const items: PrivateVaultItem[] = JSON.parse(raw);
-    // Sanitize any outdated /src/assets paths in user's saved items
-    let hasFix = false;
     const sanitized = items.map((i) => {
       if (i.photoUrl && i.photoUrl.startsWith('/src/assets/')) {
-        hasFix = true;
         return { ...i, photoUrl: i.photoUrl.replace('/src/assets/', '/assets/') };
       }
       return i;
     });
-    if (hasFix) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
-      return sanitized;
-    }
-    return items;
+    memoryCache = sanitized;
+    return sanitized;
   } catch (e) {
     console.error('Failed to parse private vault items from storage:', e);
+    memoryCache = DEFAULT_ITEMS;
     return DEFAULT_ITEMS;
   }
 };
 
 /**
+ * Initializes and hydrates vault from IndexedDB asynchronously.
+ * Guarantees that high-resolution captures stored in IndexedDB are synced into memory.
+ */
+export const initVaultAsync = async (onLoaded?: (items: PrivateVaultItem[]) => void): Promise<PrivateVaultItem[]> => {
+  const localItems = getPrivateVaultItems();
+  try {
+    const idbItems = await getIdbAllItems();
+    if (idbItems && idbItems.length > 0) {
+      // Merge idb items with local items (idb has higher resolution photo data)
+      const mergedMap = new Map<string, PrivateVaultItem>();
+      localItems.forEach((item) => mergedMap.set(item.id, item));
+      idbItems.forEach((item) => mergedMap.set(item.id, item));
+      
+      const merged = Array.from(mergedMap.values()).sort((a, b) => {
+        // Keep newest at top
+        return (b.id > a.id ? 1 : -1);
+      });
+      
+      memoryCache = merged;
+      safeSaveToLocalStorage(merged);
+      if (onLoaded) onLoaded(merged);
+      notifyVaultChanged(merged);
+      return merged;
+    }
+  } catch (e) {
+    console.warn('IDB hydration note:', e);
+  }
+  if (onLoaded) onLoaded(localItems);
+  return localItems;
+};
+
+/**
  * Merges items fetched from Supabase cloud into the local vault
- * Useful for cross-device synchronization (e.g. phone to laptop)
  */
 export const mergeRemoteItemsIntoVault = (remoteItems: PrivateVaultItem[]): PrivateVaultItem[] => {
   const current = getPrivateVaultItems();
@@ -122,11 +191,10 @@ export const mergeRemoteItemsIntoVault = (remoteItems: PrivateVaultItem[]): Priv
 
   if (newItems.length > 0) {
     const merged = [...newItems, ...current];
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-    } catch (e) {
-      console.warn('Failed to save merged items:', e);
-    }
+    memoryCache = merged;
+    safeSaveToLocalStorage(merged);
+    newItems.forEach((item) => putIdbItem(item));
+    notifyVaultChanged(merged);
     return merged;
   }
   return current;
@@ -134,12 +202,19 @@ export const mergeRemoteItemsIntoVault = (remoteItems: PrivateVaultItem[]): Priv
 
 export const savePrivateVaultItem = (item: PrivateVaultItem): PrivateVaultItem[] => {
   const current = getPrivateVaultItems();
-  const updated = [item, ...current];
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.warn('Failed to save to localStorage:', e);
-  }
+  // Avoid duplicate if same ID already exists
+  const filtered = current.filter((i) => i.id !== item.id);
+  const updated = [item, ...filtered];
+  memoryCache = updated;
+
+  // 1. Save to high-capacity IndexedDB
+  putIdbItem(item);
+
+  // 2. Safe save to localStorage
+  safeSaveToLocalStorage(updated);
+
+  // 3. Notify listeners
+  notifyVaultChanged(updated);
   return updated;
 };
 
@@ -152,31 +227,30 @@ export const updateVaultItemPrivacy = (
   const current = getPrivateVaultItems();
   const updated = current.map((item) => {
     if (item.id === id) {
-      return {
+      const changed = {
         ...item,
         isPrivate,
         isPublished,
         title: newTitle !== undefined ? newTitle : item.title
       };
+      putIdbItem(changed);
+      return changed;
     }
     return item;
   });
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.warn('Failed to update storage item:', e);
-  }
+  memoryCache = updated;
+  safeSaveToLocalStorage(updated);
+  notifyVaultChanged(updated);
   return updated;
 };
 
 export const deletePrivateVaultItem = (id: string): PrivateVaultItem[] => {
   const current = getPrivateVaultItems();
   const updated = current.filter((item) => item.id !== id);
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.warn('Failed to delete item from storage:', e);
-  }
+  memoryCache = updated;
+  deleteIdbItem(id);
+  safeSaveToLocalStorage(updated);
+  notifyVaultChanged(updated);
   return updated;
 };
 
@@ -187,18 +261,18 @@ export const updateVaultItemCloudStatus = (
   const current = getPrivateVaultItems();
   const updated = current.map((item) => {
     if (item.id === id) {
-      return {
+      const changed = {
         ...item,
         ...cloudData
       };
+      putIdbItem(changed);
+      return changed;
     }
     return item;
   });
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.warn('Failed to update storage item cloud status:', e);
-  }
+  memoryCache = updated;
+  safeSaveToLocalStorage(updated);
+  notifyVaultChanged(updated);
   return updated;
 };
 
@@ -210,8 +284,8 @@ export const getUserVaultProfile = (): UserVaultProfile => {
     authenticityScore: 99.40,
     hardwareEnclaveId: 'TEE-KNOX-TITAN-0x8892FA1B',
     encryptionMode: 'AES-256-GCM + Supabase Storage Vault',
-    storageUsedBytes: 8.0 * 1024 * 1024, // 8.0 MB
-    maxStorageBytes: 5 * 1024 * 1024 * 1024, // 5 GB
+    storageUsedBytes: 8.0 * 1024 * 1024,
+    maxStorageBytes: 5 * 1024 * 1024 * 1024,
     cloudStorageEnabled: true
   };
 };
