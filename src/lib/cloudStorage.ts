@@ -37,6 +37,43 @@ const extractStoragePathFromUrl = (value?: string): string | null => {
   return decodeURIComponent(path).replace(/^\/+/, '');
 };
 
+const isPostDestroyMarkerPresent = (row?: any): boolean => {
+  if (!row) return false;
+  if (row.is_destroyed === true) return true;
+  if (row.destroyed_at) return true;
+  return false;
+};
+
+const buildPermanentDestroyUpdate = () => ({
+  is_destroyed: true,
+  destroyed_at: new Date().toISOString(),
+  destroyed_reason: 'ZERO_TRACE_PERMANENT_DESTROY'
+});
+
+const trySoftDestroyPosts = async (client: any, predicates: Array<{ key: string; value: string }>) => {
+  if (!client || !predicates.length) return false;
+
+  let anyUpdated = false;
+  for (const predicate of predicates) {
+    try {
+      const { error } = await client
+        .from('posts')
+        .update(buildPermanentDestroyUpdate())
+        .eq(predicate.key, predicate.value);
+
+      if (!error) {
+        anyUpdated = true;
+      } else if (!/column .*is_destroyed|destroyed_at|destroyed_reason/i.test(error.message || '')) {
+        console.warn('Permanent destroy soft-delete note:', error.message);
+      }
+    } catch (e) {
+      console.warn('Permanent destroy soft-delete catch:', e);
+    }
+  }
+
+  return anyUpdated;
+};
+
 /**
  * Get user's storage mode. Default is 'cloud_supabase'.
  */
@@ -220,12 +257,23 @@ export const publishArtworkToSupabasePosts = async (params: {
       camera_make: 'Sony/VEC Hardware Enclave',
       camera_model: deviceInfo || 'Android CMOS C2PA',
       sensor_telemetry: sensorMetadata || { resolution: resolution || '1920 × 1080' },
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      is_destroyed: false,
+      destroyed_at: null
     };
 
     const { error } = await client.from('posts').insert([payload]);
 
-    if (error) {
+    if (error && /column .*is_destroyed|destroyed_at/i.test(error.message || '')) {
+      const fallbackPayload = { ...payload };
+      delete fallbackPayload.is_destroyed;
+      delete fallbackPayload.destroyed_at;
+      const retry = await client.from('posts').insert([fallbackPayload]);
+      if (retry.error) {
+        console.warn('Posts insert attempt fallback notice:', retry.error.message);
+        return { success: false, error: retry.error.message };
+      }
+    } else if (error) {
       console.warn('Posts insert attempt 1 notice:', error.message);
       // Attempt fallback with plain POINT representation
       const fallbackPayload = {
@@ -642,11 +690,16 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
       try {
         const { data: matchedPosts } = await supabase
           .from('posts')
-          .select('id, raw_capture_digest, c2pa_manifest_hash, title, media_url')
+          .select('id, raw_capture_digest, c2pa_manifest_hash, title, media_url, is_destroyed, destroyed_at')
           .or(orFilters.join(','));
 
         if (matchedPosts && matchedPosts.length > 0) {
           for (const mp of matchedPosts) {
+            // Soft-delete first so public queries will hide the record even before hard-delete completes
+            if (!isPostDestroyMarkerPresent(mp)) {
+              await trySoftDestroyPosts(supabase, [{ key: 'id', value: mp.id }]);
+            }
+
             // Delete interactions first to satisfy foreign key constraints
             await supabase.from('vault_interactions').delete().eq('artwork_id', mp.id);
             // Delete post directly by exact UUID
@@ -670,23 +723,31 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
 
     // Direct deletion attempts across all identifying fields
     if (id) {
+      await trySoftDestroyPosts(supabase, [{ key: 'id', value: id }]);
       const res = await supabase.from('posts').delete().eq('id', id);
       if (!res.error) dbRecordsDeleted++;
     }
     if (digest && digest.trim().length > 8) {
       const cleanDigest = digest.trim();
+      await trySoftDestroyPosts(supabase, [
+        { key: 'raw_capture_digest', value: cleanDigest },
+        { key: 'c2pa_manifest_hash', value: cleanDigest }
+      ]);
       await supabase.from('posts').delete().eq('raw_capture_digest', cleanDigest);
       await supabase.from('posts').delete().eq('c2pa_manifest_hash', cleanDigest);
       dbRecordsDeleted++;
     }
     if (title && title.trim().length > 0) {
+      await trySoftDestroyPosts(supabase, [{ key: 'title', value: title.trim() }]);
       await supabase.from('posts').delete().eq('title', title.trim());
       dbRecordsDeleted++;
     }
     if (cloudStorageUrl && cloudStorageUrl.startsWith('http')) {
+      await trySoftDestroyPosts(supabase, [{ key: 'media_url', value: cloudStorageUrl }]);
       await supabase.from('posts').delete().eq('media_url', cloudStorageUrl);
     }
     if (photoUrl && photoUrl.startsWith('http')) {
+      await trySoftDestroyPosts(supabase, [{ key: 'media_url', value: photoUrl }]);
       await supabase.from('posts').delete().eq('media_url', photoUrl);
     }
   } catch (dbErr) {
