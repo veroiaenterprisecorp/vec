@@ -21,6 +21,7 @@ export interface PrivateVaultItem {
   cloudPath?: string;
   uploadStatus?: 'uploaded' | 'uploading' | 'failed' | 'local_only';
   uploadError?: string;
+  createdAt?: number;
 }
 
 export interface UserVaultProfile {
@@ -81,28 +82,47 @@ const DEFAULT_ITEMS: PrivateVaultItem[] = [
 // In-memory cache to guarantee synchronous access without dropouts
 let memoryCache: PrivateVaultItem[] | null = null;
 
-// Safe localStorage saver that handles browser quota limits gracefully
+export const getItemTimestamp = (item: PrivateVaultItem): number => {
+  if (item.createdAt && item.createdAt > 0) return item.createdAt;
+  // If id is like 'cap-1729...' or 'cap-upload-1729...'
+  const match = item.id.match(/\d{10,14}/);
+  if (match) {
+    const parsedIdTime = parseInt(match[0], 10);
+    if (!isNaN(parsedIdTime) && parsedIdTime > 1600000000000) return parsedIdTime;
+  }
+  if (item.captureDate) {
+    const parsed = Date.parse(item.captureDate);
+    if (!isNaN(parsed)) return parsed;
+  }
+  // Default fallback for legacy demo items
+  if (item.id === 'vault-item-001') return 1729400000000;
+  if (item.id === 'vault-item-002') return 1729300000000;
+  return 0;
+};
+
+// Safe localStorage saver that handles browser quota limits gracefully without corrupting user images
 const safeSaveToLocalStorage = (items: PrivateVaultItem[]) => {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   } catch (e: any) {
-    console.warn('LocalStorage quota warning, creating compressed quota-safe cache:', e?.message);
+    console.warn('LocalStorage quota limit reached, saving metadata cache with IDB backing:', e?.message);
     try {
-      // If quota exceeded, preserve the metadata and recent 10 items, truncation if needed
-      const safeItems = items.slice(0, 15).map((item, idx) => {
-        // If dataUrl is too huge for localStorage, keep it in IndexedDB and keep first 3 intact
-        if (idx > 2 && item.photoUrl.length > 200000 && !item.photoUrl.startsWith('http')) {
+      // If quota exceeded, preserve the metadata and full item references
+      // IndexedDB already stores the complete high-resolution captures safely
+      const lightweightItems = items.slice(0, 30).map((item) => {
+        // If dataUrl is extraordinarily large, retain it in IndexedDB and keep memoryCache intact
+        if (item.photoUrl && item.photoUrl.length > 500000 && !item.photoUrl.startsWith('http')) {
           return {
             ...item,
-            photoUrl: item.cloudStorageUrl || '/assets/images/vec_vault_artwork_1792494925679.jpg'
+            photoUrl: item.cloudStorageUrl || item.photoUrl
           };
         }
         return item;
       });
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(safeItems));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(lightweightItems));
     } catch {
-      // IndexedDB has the full copy anyway
+      // Memory cache and IndexedDB hold the items safely
     }
   }
 };
@@ -133,6 +153,8 @@ export const getPrivateVaultItems = (): PrivateVaultItem[] => {
       }
       return i;
     });
+    // Sort so newest user captures are always on top
+    sanitized.sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
     memoryCache = sanitized;
     return sanitized;
   } catch (e) {
@@ -151,14 +173,19 @@ export const initVaultAsync = async (onLoaded?: (items: PrivateVaultItem[]) => v
   try {
     const idbItems = await getIdbAllItems();
     if (idbItems && idbItems.length > 0) {
-      // Merge idb items with local items (idb has higher resolution photo data)
+      // Merge idb items with local items (idb has full resolution photo data)
       const mergedMap = new Map<string, PrivateVaultItem>();
       localItems.forEach((item) => mergedMap.set(item.id, item));
-      idbItems.forEach((item) => mergedMap.set(item.id, item));
+      idbItems.forEach((item) => {
+        // IDB item takes precedence for full photoUrl data
+        mergedMap.set(item.id, {
+          ...mergedMap.get(item.id),
+          ...item
+        });
+      });
       
       const merged = Array.from(mergedMap.values()).sort((a, b) => {
-        // Keep newest at top
-        return (b.id > a.id ? 1 : -1);
+        return getItemTimestamp(b) - getItemTimestamp(a);
       });
       
       memoryCache = merged;
@@ -190,7 +217,10 @@ export const mergeRemoteItemsIntoVault = (remoteItems: PrivateVaultItem[]): Priv
   }
 
   if (newItems.length > 0) {
-    const merged = [...newItems, ...current];
+    // Merge remote items, then sort so user captures stay at the top if newest
+    const merged = [...current, ...newItems].sort((a, b) => {
+      return getItemTimestamp(b) - getItemTimestamp(a);
+    });
     memoryCache = merged;
     safeSaveToLocalStorage(merged);
     newItems.forEach((item) => putIdbItem(item));
@@ -202,13 +232,19 @@ export const mergeRemoteItemsIntoVault = (remoteItems: PrivateVaultItem[]): Priv
 
 export const savePrivateVaultItem = (item: PrivateVaultItem): PrivateVaultItem[] => {
   const current = getPrivateVaultItems();
+  const enrichedItem: PrivateVaultItem = {
+    ...item,
+    createdAt: item.createdAt || Date.now()
+  };
   // Avoid duplicate if same ID already exists
-  const filtered = current.filter((i) => i.id !== item.id);
-  const updated = [item, ...filtered];
+  const filtered = current.filter((i) => i.id !== enrichedItem.id);
+  const updated = [enrichedItem, ...filtered].sort((a, b) => {
+    return getItemTimestamp(b) - getItemTimestamp(a);
+  });
   memoryCache = updated;
 
-  // 1. Save to high-capacity IndexedDB
-  putIdbItem(item);
+  // 1. Save to high-capacity IndexedDB (stores full resolution without size limits)
+  putIdbItem(enrichedItem);
 
   // 2. Safe save to localStorage
   safeSaveToLocalStorage(updated);
@@ -232,6 +268,52 @@ export const updateVaultItemPrivacy = (
         isPrivate,
         isPublished,
         title: newTitle !== undefined ? newTitle : item.title
+      };
+      putIdbItem(changed);
+      return changed;
+    }
+    return item;
+  });
+  memoryCache = updated;
+  safeSaveToLocalStorage(updated);
+  notifyVaultChanged(updated);
+  return updated;
+};
+
+export const updateVaultItemTitle = (
+  id: string,
+  newTitle: string
+): PrivateVaultItem[] => {
+  const current = getPrivateVaultItems();
+  const updated = current.map((item) => {
+    if (item.id === id) {
+      const changed = {
+        ...item,
+        title: newTitle.trim() || item.title
+      };
+      putIdbItem(changed);
+      return changed;
+    }
+    return item;
+  });
+  memoryCache = updated;
+  safeSaveToLocalStorage(updated);
+  notifyVaultChanged(updated);
+  return updated;
+};
+
+export const updateVaultItemPhoto = (
+  id: string,
+  newPhotoUrl: string,
+  newDigest?: string
+): PrivateVaultItem[] => {
+  const current = getPrivateVaultItems();
+  const updated = current.map((item) => {
+    if (item.id === id) {
+      const changed = {
+        ...item,
+        photoUrl: newPhotoUrl,
+        digest: newDigest || item.digest
       };
       putIdbItem(changed);
       return changed;

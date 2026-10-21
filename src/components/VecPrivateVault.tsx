@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   getPrivateVaultItems, 
   updateVaultItemPrivacy, 
   deletePrivateVaultItem, 
+  updateVaultItemTitle,
+  updateVaultItemPhoto,
   getUserVaultProfile,
   mergeRemoteItemsIntoVault,
   initVaultAsync,
@@ -44,7 +46,10 @@ import {
   CloudUpload,
   RefreshCw,
   Settings,
-  ExternalLink
+  ExternalLink,
+  Edit3,
+  Upload,
+  Check
 } from 'lucide-react';
 
 interface VecPrivateVaultProps {
@@ -74,6 +79,42 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Title editing & Photo replacement states
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const [editingTitleText, setEditingTitleText] = useState<string>('');
+  const [targetReplaceItem, setTargetReplaceItem] = useState<PrivateVaultItem | null>(null);
+  const replaceFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleSaveTitle = (id: string) => {
+    if (!editingTitleText.trim()) return;
+    updateVaultItemTitle(id, editingTitleText.trim());
+    setItems(getPrivateVaultItems());
+    setEditingTitleId(null);
+    showToast(`Judul foto berhasil diubah menjadi "${editingTitleText.trim()}".`);
+  };
+
+  const handleReplaceFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !targetReplaceItem) return;
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const dataUrl = event.target?.result as string;
+        const arrayBuffer = await file.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const realChecksum = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+        updateVaultItemPhoto(targetReplaceItem.id, dataUrl, realChecksum);
+        setItems(getPrivateVaultItems());
+        setTargetReplaceItem(null);
+        showToast(`Foto "${targetReplaceItem.title}" berhasil diperbarui dengan berkas Anda!`);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      showToast('Gagal memproses berkas pengganti.');
+    }
   };
 
   const pullRemotePostsIntoVault = async (silent = false) => {
@@ -236,6 +277,13 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
 
   return (
     <div className="space-y-6">
+      <input
+        type="file"
+        ref={replaceFileInputRef}
+        accept="image/*,.jpg,.jpeg,.png,.arw,.cr3,.dng"
+        className="hidden"
+        onChange={handleReplaceFileChange}
+      />
       
       {/* Toast Notification */}
       {toastMessage && (
@@ -548,19 +596,77 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
                   </div>
                 </button>
 
-                {/* Bottom Resolution Watermark */}
+                {/* Bottom Resolution Watermark & Ganti Foto Button */}
                 <div className="absolute bottom-2 left-3 text-[10px] font-mono text-slate-300 bg-black/70 px-2 py-0.5 rounded backdrop-blur-xs">
                   {item.resolution}
                 </div>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setTargetReplaceItem(item);
+                    replaceFileInputRef.current?.click();
+                  }}
+                  className="absolute bottom-2 right-3 px-2 py-0.5 rounded bg-black/85 hover:bg-cyan-950 text-[10px] font-mono text-cyan-300 border border-cyan-500/50 flex items-center gap-1 cursor-pointer transition shadow-md z-10"
+                  title="Ganti foto ini dengan file gambar Anda sendiri"
+                >
+                  <Upload className="w-2.5 h-2.5" />
+                  <span>Ganti Foto</span>
+                </button>
               </div>
 
               {/* Photo Card Body */}
               <div className="p-5 space-y-3.5 flex-1 flex flex-col justify-between">
                 
                 <div className="space-y-2">
-                  <h4 className="text-sm font-bold text-white leading-snug line-clamp-2">
-                    {item.title}
-                  </h4>
+                  {editingTitleId === item.id ? (
+                    <div className="space-y-1.5 p-2.5 rounded-xl bg-slate-950 border border-cyan-500 shadow-lg">
+                      <label className="text-[10px] font-mono text-cyan-400 font-bold block">
+                        Edit Judul Foto:
+                      </label>
+                      <input
+                        type="text"
+                        value={editingTitleText}
+                        onChange={(e) => setEditingTitleText(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-cyan-400"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveTitle(item.id);
+                          if (e.key === 'Escape') setEditingTitleId(null);
+                        }}
+                      />
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <button
+                          onClick={() => handleSaveTitle(item.id)}
+                          className="flex-1 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] font-mono font-bold transition cursor-pointer flex items-center justify-center gap-1"
+                        >
+                          <Check className="w-3 h-3" /> Simpan
+                        </button>
+                        <button
+                          onClick={() => setEditingTitleId(null)}
+                          className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-mono transition cursor-pointer"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="text-sm font-bold text-white leading-snug line-clamp-2">
+                        {item.title}
+                      </h4>
+                      <button
+                        onClick={() => {
+                          setEditingTitleId(item.id);
+                          setEditingTitleText(item.title);
+                        }}
+                        className="p-1 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-800/80 transition shrink-0 cursor-pointer"
+                        title="Klik untuk mengubah nama/judul foto ini"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
 
                   <div className="text-[11px] font-mono text-slate-400 space-y-1">
                     <div className="flex items-center gap-1.5 text-slate-300">

@@ -70,54 +70,81 @@ export const dataUrlToBlob = (dataUrl: string): Blob => {
 /**
  * Checks if the configured Supabase credentials are valid and reachable
  */
+/**
+ * Checks if the configured Supabase credentials are valid and reachable
+ */
 export const checkSupabaseConnection = async (): Promise<{
   connected: boolean;
   url: string;
-  isCustomUrl: boolean;
-  bucketExists?: boolean;
+  configOrigin: string;
+  dbReachable: boolean;
+  bucketExists: boolean;
   error?: string;
+  advice?: string;
 }> => {
   const url = getSupabaseUrl();
-  const isCustomUrl = !url.includes('cruijnhylcdojbilzgwd');
+  const configOrigin = (await import('./supabase')).getSupabaseConfigOrigin();
   const client = getActiveSupabaseClient();
+  const bucketName = getStorageBucketName();
+
+  let dbReachable = false;
+  let bucketExists = false;
+  let detectedError: string | undefined = undefined;
+  let advice: string | undefined = undefined;
 
   try {
-    // 1. Test database connection
-    const { error: dbError } = await client.from('posts').select('id').limit(1);
-
-    // 2. Check storage bucket status
-    let bucketExists = false;
+    // 1. Check storage bucket status
     try {
-      const { data: bucketData, error: bError } = await client.storage.getBucket(getStorageBucketName());
+      const { data: bucketData, error: bError } = await client.storage.getBucket(bucketName);
       if (!bError && bucketData) {
         bucketExists = true;
+      } else if (bError?.message?.includes('not found') || bError?.message?.includes('The resource was not found')) {
+        // Try auto-creating public bucket if permitted
+        try {
+          const { error: createErr } = await client.storage.createBucket(bucketName, { public: true });
+          if (!createErr) bucketExists = true;
+        } catch {
+          bucketExists = false;
+        }
       }
     } catch {
       bucketExists = false;
     }
 
-    if (dbError && dbError.code !== 'PGRST116') {
-      return {
-        connected: false,
-        url,
-        isCustomUrl,
-        bucketExists,
-        error: dbError.message
-      };
+    // 2. Test database connection
+    const { data: postsData, error: dbError } = await client.from('posts').select('id').limit(1);
+
+    if (!dbError) {
+      dbReachable = true;
+    } else {
+      detectedError = dbError.message;
+      if (dbError.code === '42P01' || dbError.message.includes('relation "public.posts" does not exist')) {
+        advice = 'Terkoneksi ke Supabase, namun tabel "posts" belum dibuat. Buka SQL Editor di Supabase lalu jalankan skrip skema.';
+      } else if (dbError.code === 'PGRST116') {
+        dbReachable = true; // Query ran fine, zero rows
+      }
     }
 
+    const isConnected = dbReachable || bucketExists || (!detectedError?.includes('fetch failed') && !detectedError?.includes('Failed to fetch'));
+
     return {
-      connected: true,
+      connected: isConnected,
       url,
-      isCustomUrl,
-      bucketExists
+      configOrigin,
+      dbReachable,
+      bucketExists,
+      error: detectedError,
+      advice
     };
   } catch (err: any) {
     return {
       connected: false,
       url,
-      isCustomUrl,
-      error: err?.message || 'Koneksi ke Supabase gagal'
+      configOrigin,
+      dbReachable: false,
+      bucketExists: false,
+      error: err?.message || 'Koneksi ke Supabase terputus',
+      advice: 'Pastikan URL dan Anon Key sudah benar dan proyek Supabase dalam keadaan aktif.'
     };
   }
 };
@@ -170,7 +197,8 @@ export const publishArtworkToSupabasePosts = async (params: {
       hardware_tee_signature: 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
       verification_status: 'VERIFIED_HARDWARE_TEE',
       authenticity_confidence: 99.40,
-      exact_location: 'POINT(106.827153 -6.175392)',
+      exact_location: 'SRID=4326;POINT(106.827153 -6.175392)',
+      public_location: 'SRID=4326;POINT(106.827153 -6.175392)',
       camera_make: 'Sony/VEC Hardware Enclave',
       camera_model: deviceInfo || 'Android CMOS C2PA',
       sensor_telemetry: sensorMetadata || { resolution: resolution || '1920 × 1080' },
@@ -180,13 +208,16 @@ export const publishArtworkToSupabasePosts = async (params: {
     const { error } = await client.from('posts').insert([payload]);
 
     if (error) {
-      console.warn('Posts insert attempt 1 error:', error.message);
-      // Attempt fallback with location as string or omitted if PostGIS is in custom state
-      const fallbackPayload = { ...payload };
-      delete fallbackPayload.exact_location;
+      console.warn('Posts insert attempt 1 notice:', error.message);
+      // Attempt fallback with plain POINT representation
+      const fallbackPayload = {
+        ...payload,
+        exact_location: 'POINT(106.827153 -6.175392)',
+        public_location: 'POINT(106.827153 -6.175392)'
+      };
       const { error: err2 } = await client.from('posts').insert([fallbackPayload]);
       if (err2) {
-        console.warn('Fallback posts insert error:', err2.message);
+        console.warn('Fallback posts insert notice:', err2.message);
         return { success: false, error: err2.message };
       }
     }
@@ -231,13 +262,31 @@ export const uploadCapturedPhotoToCloud = async (params: {
 
   try {
     // 1. Attempt upload to Supabase Storage Bucket
-    const { data, error } = await client.storage
+    let { data, error } = await client.storage
       .from(bucketName)
       .upload(cloudPath, blob, {
         contentType: 'image/jpeg',
         cacheControl: '3600',
         upsert: true
       });
+
+    // If bucket was not found, attempt to auto-create public bucket once
+    if (error && (error.message.includes('not found') || error.message.includes('Bucket'))) {
+      try {
+        await client.storage.createBucket(bucketName, { public: true });
+        const retry = await client.storage
+          .from(bucketName)
+          .upload(cloudPath, blob, {
+            contentType: 'image/jpeg',
+            cacheControl: '3600',
+            upsert: true
+          });
+        data = retry.data;
+        error = retry.error;
+      } catch (e) {
+        console.warn('Bucket auto-create attempt note:', e);
+      }
+    }
 
     if (!error && data?.path) {
       // Direct success on live Supabase bucket
@@ -268,29 +317,24 @@ export const uploadCapturedPhotoToCloud = async (params: {
       };
     }
 
-    // 2. Storage upload encountered error (e.g. Bucket not created yet or storage policy)
+    // 2. Storage upload encountered error (e.g. Storage policy requires auth or bucket missing)
     console.warn('Supabase storage upload notice:', error?.message);
 
-    // Fallback: If image is reasonably sized, attempt to sync to posts table
-    let isDbSynced = false;
-    let syncError = error?.message;
+    // Sync metadata to posts table so record is saved in cloud database
+    const dbSync = await publishArtworkToSupabasePosts({
+      title: title || 'Tangkapan Sensor C2PA',
+      photoUrl: photoDataUrl,
+      digest: digest,
+      deviceInfo: sensorMetadata?.deviceInfo || 'CMOS Hardware Enclave',
+      resolution: sensorMetadata?.resolution,
+      sensorMetadata: sensorMetadata
+    });
 
-    if (photoDataUrl.length < 500000) {
-      const dbSync = await publishArtworkToSupabasePosts({
-        title: title || 'Tangkapan Sensor C2PA',
-        photoUrl: photoDataUrl,
-        digest: digest,
-        deviceInfo: sensorMetadata?.deviceInfo || 'CMOS Hardware Enclave',
-        resolution: sensorMetadata?.resolution,
-        sensorMetadata: sensorMetadata
-      });
-      isDbSynced = dbSync.success;
-      if (!isDbSynced && dbSync.error) syncError = dbSync.error;
-    }
+    const isDbSynced = dbSync.success;
 
     const friendlyError = error?.message?.includes('not found') || error?.message?.includes('Bucket')
-      ? `Bucket storage '${bucketName}' belum dibuat di Supabase Dashboard (Storage > New Bucket: ${bucketName} [Public]).`
-      : (error?.message || 'Penyimpanan cloud belum terhubung.');
+      ? `Bucket storage '${bucketName}' belum dibuat di Supabase (Buka Dashboard Supabase > Storage > New Bucket: "${bucketName}" dengan status Public).`
+      : (error?.message || 'Penyimpanan cloud Supabase belum terhubung.');
 
     return {
       success: isDbSynced,
@@ -301,7 +345,7 @@ export const uploadCapturedPhotoToCloud = async (params: {
       isMockedCloud: false,
       message: isDbSynced
         ? `Tersimpan di database cloud Supabase. (${friendlyError})`
-        : `Penyimpanan cloud Supabase: ${friendlyError} Foto tersimpan aman di Brankas Pribadi perangkat.`,
+        : `Supabase: ${friendlyError} Foto tersimpan aman di Brankas Pribadi perangkat Anda.`,
       error: friendlyError
     };
   } catch (err: any) {

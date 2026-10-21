@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { getPrivateVaultItems, initVaultAsync, PrivateVaultItem } from '../lib/userVaultStorage';
+import { getPrivateVaultItems, initVaultAsync, updateVaultItemTitle, PrivateVaultItem } from '../lib/userVaultStorage';
 import { 
   ShieldCheck, 
   Award, 
@@ -30,9 +30,12 @@ import {
   AlertTriangle,
   Info,
   HelpCircle,
-  X
+  HardDrive,
+  X,
+  Edit3
 } from 'lucide-react';
 import { checkSupabaseConnection } from '../lib/cloudStorage';
+import { setManualSupabaseCredentials, getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabase';
 
 export interface VaultArtwork {
   id: string;
@@ -101,10 +104,16 @@ export const VecVault: React.FC<VecVaultProps> = ({
   const [connectionStatus, setConnectionStatus] = useState<{
     connected: boolean;
     url: string;
-    isCustomUrl: boolean;
+    configOrigin?: string;
+    dbReachable?: boolean;
+    bucketExists?: boolean;
     error?: string;
+    advice?: string;
   } | null>(null);
   const [showGlobalGuideModal, setShowGlobalGuideModal] = useState<boolean>(false);
+  const [manualUrlInput, setManualUrlInput] = useState<string>(() => getSupabaseUrl());
+  const [manualKeyInput, setManualKeyInput] = useState<string>(() => getSupabaseAnonKey());
+  const [manualSaveToast, setManualSaveToast] = useState<string | null>(null);
 
   const [filterType, setFilterType] = useState<'all' | 'COMMENT' | 'VOICE_NOTE' | 'AUTHENTIC_SEAL'>('all');
   const [commentInput, setCommentInput] = useState<string>('');
@@ -147,42 +156,43 @@ export const VecVault: React.FC<VecVaultProps> = ({
   ]);
 
   // Load all artworks published by user from Private Vault + Supabase
+  // Load all artworks captured by user from Private Vault + Supabase
   const loadPublishedArtworks = async () => {
     setIsRefreshing(true);
     try {
-      // 1. Get user items where isPublished === true
+      // 1. Get all user items from Private Vault (both public and private so user always sees their photos)
       const localVaultItems = getPrivateVaultItems();
-      const userPublishedList: VaultArtwork[] = localVaultItems
-        .filter((item) => item.isPublished)
-        .map((item) => {
-          // Robust photo URL selection: If cloudStorageUrl is verified HTTP, use it; otherwise fallback to item.photoUrl
-          let resolvedPhoto = item.photoUrl;
-          if (item.uploadStatus === 'uploaded' && item.cloudStorageUrl && item.cloudStorageUrl.startsWith('http') && !item.cloudStorageUrl.includes('undefined')) {
-            resolvedPhoto = item.cloudStorageUrl;
-          }
-          if (resolvedPhoto && resolvedPhoto.startsWith('/src/assets/')) {
-            resolvedPhoto = resolvedPhoto.replace('/src/assets/', '/assets/');
-          }
-          return {
-            id: item.id,
-            title: item.title,
-            artist: 'Anda (Seniman Terverifikasi VEC)',
-            artistRole: 'Hardware Attested Creator',
-            medium: item.sensorType || 'Digital Fine Art / Sensor C2PA RAW',
-            dimensions: item.resolution,
-            photoUrl: resolvedPhoto || '/assets/images/vec_vault_artwork_1792494925679.jpg',
-            authenticityScore: 99.40,
-            digest: item.digest,
-            c2paSignature: item.c2paSignature,
-            deviceInfo: item.deviceInfo,
-            curationNumber: `VEC-PUB-${item.id.slice(-4).toUpperCase()}`,
-            description: `Karya fotografi otentik tervalidasi langsung via sensor kamera & C2PA. Berkas telah dipublikasikan ke Live Vault dan tersimpan pada ${item.storageTarget === 'cloud_supabase' ? 'Cloud Supabase Storage (' + (item.cloudBucket || 'vec-captures') + ')' : 'Brankas VEC'}.`,
-            isUserUploaded: true,
-            publishedAt: item.captureDate,
-            storageTarget: item.storageTarget,
-            cloudBucket: item.cloudBucket
-          };
-        });
+      const userPublishedList: VaultArtwork[] = localVaultItems.map((item) => {
+        // Robust photo URL selection: If cloudStorageUrl is verified HTTP, use it; otherwise fallback to item.photoUrl
+        let resolvedPhoto = item.photoUrl;
+        if (item.uploadStatus === 'uploaded' && item.cloudStorageUrl && item.cloudStorageUrl.startsWith('http') && !item.cloudStorageUrl.includes('undefined')) {
+          resolvedPhoto = item.cloudStorageUrl;
+        }
+        if (resolvedPhoto && resolvedPhoto.startsWith('/src/assets/')) {
+          resolvedPhoto = resolvedPhoto.replace('/src/assets/', '/assets/');
+        }
+        return {
+          id: item.id,
+          title: item.title || 'Tangkapan Kamera Sensor',
+          artist: 'Anda (Koleksi / Jepretan Anda)',
+          artistRole: item.isPublished ? 'Hardware Attested Creator • Diterbitkan' : 'Tangkapan Kamera Anda • Status Privat',
+          medium: item.sensorType || 'Digital Fine Art / Sensor C2PA RAW',
+          dimensions: item.resolution,
+          photoUrl: resolvedPhoto || '/assets/images/vec_vault_artwork_1792494925679.jpg',
+          authenticityScore: 99.40,
+          digest: item.digest,
+          c2paSignature: item.c2paSignature,
+          deviceInfo: item.deviceInfo,
+          curationNumber: `VEC-${item.isPublished ? 'PUB' : 'PRIV'}-${item.id.slice(-4).toUpperCase()}`,
+          description: item.isPublished
+            ? `Karya otentik telah diterbitkan ke Live Vault dan tersimpan di ${item.storageTarget === 'cloud_supabase' ? 'Cloud Supabase (' + (item.cloudBucket || 'vec-captures') + ')' : 'Brankas VEC'}.`
+            : `Tangkapan kamera otentik Anda. Foto ini tersimpan aman di Brankas dan dapat dilihat oleh Anda. Klik tombol "Publikasikan" jika ingin menampilkan karya ini ke publik global.`,
+          isUserUploaded: true,
+          publishedAt: item.captureDate,
+          storageTarget: item.storageTarget,
+          cloudBucket: item.cloudBucket
+        };
+      });
 
       // 2. Fetch remote posts from Supabase posts table so other devices show the exact same artworks
       let remoteArtworks: VaultArtwork[] = [];
@@ -222,8 +232,8 @@ export const VecVault: React.FC<VecVaultProps> = ({
         console.warn('Supabase posts query note:', dbErr);
       }
 
-      // Merge: Featured master item + User published items + Remote items (deduplicated by id and digest)
-      const combined = [DEFAULT_FEATURED, ...userPublishedList, ...remoteArtworks];
+      // Merge: User items FIRST (newest on top) + Featured master item + Remote items
+      const combined = [...userPublishedList, DEFAULT_FEATURED, ...remoteArtworks];
       const seenDigests = new Set<string>();
       const uniqueCombined: VaultArtwork[] = [];
       for (const item of combined) {
@@ -236,7 +246,7 @@ export const VecVault: React.FC<VecVaultProps> = ({
 
       setArtworks(uniqueCombined);
 
-      // If user recently published, select their newest artwork
+      // If user has captured items, auto-select their newest artwork
       if (userPublishedList.length > 0) {
         setSelectedArtworkId(userPublishedList[0].id);
       }
@@ -437,13 +447,13 @@ export const VecVault: React.FC<VecVaultProps> = ({
             </div>
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-white text-sm">Kenapa foto belum muncul jika dibuka di HP / Laptop lain?</span>
+                <span className="font-bold text-white text-sm">Status Sinkronisasi Cloud: {connectionStatus.error || 'Perlu Diperiksa'}</span>
                 <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] border border-amber-500/30">
-                  Mode Penyimpanan Perangkat Lokal
+                  {connectionStatus.configOrigin === 'vercel_env' ? 'Vercel Env Terpasang (Perlu Redeploy / Bucket)' : 'Kredensial Default / Lokal'}
                 </span>
               </div>
               <p className="text-[11px] text-amber-200/90 leading-relaxed max-w-3xl">
-                Foto yang baru Anda jepret saat ini tersimpan di memori browser perangkat ini. Proyek Supabase Anda belum dihubungkan ke Vercel (masih menggunakan URL/key demo yang belum aktif). Agar karya dapat dilihat secara <strong>global di semua perangkat</strong> saat membuka link website, pasang kredensial Supabase Anda di Vercel.
+                {connectionStatus.advice || 'Foto yang Anda ambil tersimpan aman di perangkat ini. Agar foto otomatis muncul antar HP & Laptop saat membuka link website, ikuti tutorial 3 langkah Vercel & Supabase di bawah.'}
               </p>
             </div>
           </div>
@@ -452,20 +462,29 @@ export const VecVault: React.FC<VecVaultProps> = ({
             className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition shrink-0 shadow-lg shadow-amber-950 cursor-pointer whitespace-nowrap flex items-center gap-1.5"
           >
             <HelpCircle className="w-4 h-4" />
-            <span>Cara Hubungkan ke Global (3 Langkah)</span>
+            <span>Tutorial & Cek Kredensial Vercel</span>
           </button>
         </div>
       ) : connectionStatus?.connected ? (
-        <div className="p-3 rounded-2xl bg-emerald-950/30 border border-emerald-500/40 flex items-center justify-between gap-3 text-xs font-mono text-emerald-300 shadow-md">
-          <div className="flex items-center gap-2">
+        <div className="p-3.5 rounded-2xl bg-emerald-950/30 border border-emerald-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-mono text-emerald-300 shadow-md">
+          <div className="flex items-center gap-2.5">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
-            <span>
-              <strong>Tersinkronisasi Global:</strong> Terhubung ke Supabase Cloud. Foto yang diterbitkan dapat langsung dilihat oleh seluruh perangkat yang membuka link ini.
-            </span>
+            <div>
+              <span className="font-bold text-white block sm:inline mr-1.5">Tersinkronisasi Cloud Supabase:</span>
+              <span className="text-[11px] text-emerald-300">
+                Terhubung ke {connectionStatus.url} • {connectionStatus.bucketExists ? 'Bucket "vec-captures" Siap' : 'Catatan: Buat Bucket "vec-captures" (Public) di Supabase Storage'}
+              </span>
+            </div>
           </div>
-          <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shrink-0 hidden sm:inline">
-            Status: Global Live
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowGlobalGuideModal(true)}
+              className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/50 flex items-center gap-1 transition cursor-pointer"
+            >
+              <Info className="w-3 h-3 text-cyan-400" />
+              <span>Info Konfigurasi & Vercel</span>
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -593,9 +612,27 @@ export const VecVault: React.FC<VecVaultProps> = ({
               )}
             </div>
 
-            <h3 className="text-2xl font-bold text-white tracking-tight">
-              {activeArtwork.title}
-            </h3>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h3 className="text-2xl font-bold text-white tracking-tight">
+                {activeArtwork.title}
+              </h3>
+              {activeArtwork.isUserUploaded && (
+                <button
+                  onClick={() => {
+                    const newTitle = prompt('Masukkan judul baru untuk karya ini:', activeArtwork.title);
+                    if (newTitle && newTitle.trim()) {
+                      updateVaultItemTitle(activeArtwork.id, newTitle.trim());
+                      loadPublishedArtworks();
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-lg text-slate-300 hover:text-cyan-300 bg-slate-800 hover:bg-slate-700 transition cursor-pointer text-xs font-mono flex items-center gap-1.5 border border-slate-700 shadow-sm"
+                  title="Ubah judul karya foto ini"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Ubah Judul</span>
+                </button>
+              )}
+            </div>
 
             <p className="text-sm text-slate-300 leading-relaxed font-normal">
               {activeArtwork.description}
@@ -794,21 +831,21 @@ export const VecVault: React.FC<VecVaultProps> = ({
 
       </div>
 
-      {/* Global Sync Guide Modal */}
+      {/* Global Sync Guide & Live Diagnostics Modal */}
       {showGlobalGuideModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#050C1E] border border-amber-500/40 rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#050C1E] border border-cyan-500/40 rounded-3xl max-w-2xl w-full p-6 space-y-5 shadow-2xl relative my-8">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
                   <Globe className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white font-mono">
-                    Cara Menghubungkan ke Website Global
+                    Tutorial Koneksi Vercel & Supabase Cloud
                   </h3>
                   <p className="text-[11px] text-slate-400 font-mono">
-                    Agar foto yang Anda ambil di HP otomatis muncul di laptop & perangkat lain
+                    Jawaban mengapa variabel belum terhubung & cara sinkronisasi lintas perangkat (HP ↔ Laptop)
                   </p>
                 </div>
               </div>
@@ -820,61 +857,173 @@ export const VecVault: React.FC<VecVaultProps> = ({
               </button>
             </div>
 
-            <div className="space-y-3.5 text-xs font-mono">
-              <p className="text-slate-300 leading-relaxed text-[11px]">
-                Saat ini, website Anda yang berjalan di Vercel belum memiliki kunci Supabase aktif, sehingga browser HP Anda menyimpannya ke <strong>memori lokal HP</strong> saja. Ikuti 3 langkah berikut agar terhubung ke database global:
-              </p>
-
-              {/* Step 1 */}
-              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1.5">
-                <div className="flex items-center gap-2 text-cyan-300 font-bold">
-                  <span className="w-5 h-5 rounded-full bg-cyan-600 text-white flex items-center justify-center text-[10px]">1</span>
-                  <span>Buka Supabase Dashboard</span>
-                </div>
-                <p className="text-slate-400 text-[11px] pl-7">
-                  Buka project Anda di <strong>supabase.com</strong> → Masuk ke <strong>Project Settings</strong> → <strong>API</strong>. Salin <strong>Project URL</strong> dan <strong>anon/public key</strong>.
-                </p>
+            {/* Diagnostic Box: Current Detected Config */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 text-xs font-mono">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-bold">STATUS KONEKSI SAAT INI:</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                  connectionStatus?.connected 
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
+                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                }`}>
+                  {connectionStatus?.connected ? '✓ TERHUBUNG KE SUPABASE' : '⚠ BELUM TERHUBUNG'}
+                </span>
               </div>
-
-              {/* Step 2 */}
-              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
-                <div className="flex items-center gap-2 text-amber-300 font-bold">
-                  <span className="w-5 h-5 rounded-full bg-amber-600 text-white flex items-center justify-center text-[10px]">2</span>
-                  <span>Pasang Variabel di Vercel Dashboard</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-300 pt-1">
+                <div>
+                  <span className="text-slate-500 block">Supabase URL:</span>
+                  <span className="text-cyan-300 break-all">{connectionStatus?.url || manualUrlInput}</span>
                 </div>
-                <p className="text-slate-400 text-[11px] pl-7">
-                  Buka project Anda di <strong>vercel.com</strong> → Masuk ke <strong>Settings</strong> → <strong>Environment Variables</strong>. Tambahkan 2 variabel ini:
-                </p>
-                <div className="pl-7 space-y-1.5">
-                  <div className="p-2 rounded bg-black border border-slate-800 flex items-center justify-between">
-                    <code>VITE_SUPABASE_URL</code>
-                    <span className="text-[10px] text-slate-500">Nilai: URL Supabase Anda</span>
-                  </div>
-                  <div className="p-2 rounded bg-black border border-slate-800 flex items-center justify-between">
-                    <code>VITE_SUPABASE_ANON_KEY</code>
-                    <span className="text-[10px] text-slate-500">Nilai: Anon Key Supabase</span>
-                  </div>
+                <div>
+                  <span className="text-slate-500 block">Sumber Kredensial:</span>
+                  <span className="text-white">
+                    {connectionStatus?.configOrigin === 'vercel_env' 
+                      ? 'Vercel Environment Variable (Build)' 
+                      : connectionStatus?.configOrigin === 'browser_storage' 
+                      ? 'Penyimpanan Manual Browser' 
+                      : 'Proyek Default (cruijnhylcdojbilzgwd)'}
+                  </span>
                 </div>
-              </div>
-
-              {/* Step 3 */}
-              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1.5">
-                <div className="flex items-center gap-2 text-emerald-300 font-bold">
-                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">3</span>
-                  <span>Redeploy di Vercel</span>
+                <div>
+                  <span className="text-slate-500 block">Status Storage Bucket:</span>
+                  <span className={connectionStatus?.bucketExists ? 'text-emerald-400' : 'text-amber-400'}>
+                    {connectionStatus?.bucketExists ? '✓ Bucket "vec-captures" Siap' : '⚠ Bucket "vec-captures" Belum Ada'}
+                  </span>
                 </div>
-                <p className="text-slate-400 text-[11px] pl-7">
-                  Buka tab <strong>Deployments</strong> di Vercel, lalu klik <strong>Redeploy</strong>. Setelah selesai, seluruh foto yang Anda jepret di HP akan langsung tersimpan di cloud dan otomatis muncul di laptop atau perangkat lain di seluruh dunia!
-                </p>
+                <div>
+                  <span className="text-slate-500 block">Status Database Posts:</span>
+                  <span className={connectionStatus?.dbReachable ? 'text-emerald-400' : 'text-slate-400'}>
+                    {connectionStatus?.dbReachable ? '✓ Tabel Posts Terkoneksi' : 'Menunggu Query'}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end pt-2 border-t border-slate-800">
+            {/* Step-by-Step Tutorial Answering User Question */}
+            <div className="space-y-3.5 text-xs font-mono max-h-80 overflow-y-auto pr-1">
+              
+              {/* Question: VITE_SUPABASE_URL vs SUPABASE_URL */}
+              <div className="p-3.5 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 space-y-1.5">
+                <span className="text-cyan-300 font-bold flex items-center gap-1.5 text-xs">
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                  Pertanyaan: Mana yang benar, VITE_SUPABASE_URL atau SUPABASE_URL?
+                </span>
+                <p className="text-slate-300 text-[11px] leading-relaxed">
+                  Di framework <strong>Vite</strong> (React SPA yang berjalan di browser pengguna), semua variabel publik diwajibkan memiliki awalan <code>VITE_</code> agar dapat dibaca di sisi klien browser:
+                </p>
+                <div className="p-2 rounded bg-slate-950 border border-slate-800 space-y-1 text-[11px]">
+                  <div className="text-emerald-400 font-bold">✓ Rekomendasi Resmi:</div>
+                  <div className="text-slate-300"><code>VITE_SUPABASE_URL</code> = <code>https://cruijnhylcdojbilzgwd.supabase.co</code></div>
+                  <div className="text-slate-300"><code>VITE_SUPABASE_ANON_KEY</code> = <code>eyJh...</code> (anon public key)</div>
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  *Catatan: Sistem kita sekarang sudah dikonfigurasi untuk menerima keduanya (baik <code>VITE_SUPABASE_URL</code> maupun <code>SUPABASE_URL</code>), sehingga jika Anda memasukkan salah satunya di Vercel, sistem akan otomatis mengenalinya saat proses build.
+                </p>
+              </div>
+
+              {/* Crucial: Why Redeploy is Required */}
+              <div className="p-3.5 rounded-2xl bg-amber-950/20 border border-amber-500/40 space-y-1.5">
+                <span className="text-amber-300 font-bold flex items-center gap-1.5 text-xs">
+                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                  Kunci Utama: Kenapa Harus REDEPLOY di Vercel?
+                </span>
+                <p className="text-slate-300 text-[11px] leading-relaxed">
+                  Ketika Anda menambahkan variabel di Vercel (Project Settings &gt; Environment Variables), <strong>Vercel TIDAK otomatis memperbarui deployment yang sedang aktif</strong>. Kode React Vite menanamkan variabel ke file JavaScript pada saat <em>build time</em>.
+                </p>
+                <div className="p-2.5 rounded bg-slate-950 border border-amber-500/30 text-[11px] text-amber-200">
+                  <strong>Cara Redeploy di Vercel:</strong><br />
+                  1. Buka <strong>vercel.com</strong> &gt; Proyek Anda.<br />
+                  2. Klik tab <strong>Deployments</strong>.<br />
+                  3. Klik tombol titik tiga (<code>...</code>) pada deployment paling atas.<br />
+                  4. Pilih <strong>Redeploy</strong>. Tunggu 1 menit hingga selesai.
+                </div>
+              </div>
+
+              {/* Bucket Storage Guide */}
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1.5">
+                <span className="text-white font-bold flex items-center gap-1.5 text-xs">
+                  <HardDrive className="w-4 h-4 text-cyan-400" />
+                  Langkah Storage: Buat Bucket "vec-captures" di Supabase
+                </span>
+                <p className="text-slate-300 text-[11px] leading-relaxed">
+                  Supabase Cloud Storage memerlukan bucket untuk menyimpan file foto kamera. Jika belum dibuat:
+                </p>
+                <ol className="list-decimal list-inside text-slate-400 text-[11px] space-y-1 pl-1">
+                  <li>Buka <strong>supabase.com</strong> &gt; Pilih proyek Anda (<code>cruijnhylcdojbilzgwd</code>).</li>
+                  <li>Klik menu <strong>Storage</strong> di sebelah kiri.</li>
+                  <li>Klik tombol <strong>New bucket</strong>.</li>
+                  <li>Beri nama: <strong className="text-cyan-300">vec-captures</strong></li>
+                  <li>Nyalakan tombol saklar <strong className="text-emerald-400">Public bucket</strong> (Wajib agar foto dapat dilihat di browser).</li>
+                  <li>Klik <strong>Save</strong>.</li>
+                </ol>
+              </div>
+
+              {/* Instant Browser Override Form */}
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-cyan-500/40 space-y-2.5">
+                <span className="text-cyan-300 font-bold flex items-center gap-1.5 text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  Alat Uji Cepat Langsung di Browser (Tanpa Tunggu Vercel):
+                </span>
+                <p className="text-slate-400 text-[11px]">
+                  Anda bisa menempelkan URL dan Anon Key langsung di sini untuk menguji apakah kredensial Anda aktif dan menghubungkan browser saat ini dalam 1 detik:
+                </p>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">SUPABASE PROJECT URL:</label>
+                    <input
+                      type="text"
+                      value={manualUrlInput}
+                      onChange={(e) => setManualUrlInput(e.target.value)}
+                      placeholder="https://cruijnhylcdojbilzgwd.supabase.co"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">SUPABASE ANON / PUBLIC KEY:</label>
+                    <input
+                      type="text"
+                      value={manualKeyInput}
+                      onChange={(e) => setManualKeyInput(e.target.value)}
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      onClick={async () => {
+                        setManualSupabaseCredentials(manualUrlInput, manualKeyInput);
+                        setManualSaveToast('Kredensial disimpan! Menguji koneksi...');
+                        const res = await checkSupabaseConnection();
+                        setConnectionStatus(res);
+                        await loadPublishedArtworks();
+                        setManualSaveToast(res.connected ? '✓ Berhasil Terhubung ke Supabase Cloud!' : '⚠ Koneksi gagal: ' + (res.error || 'Periksa key'));
+                        setTimeout(() => setManualSaveToast(null), 4000);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-cyan-950"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Simpan & Uji Koneksi Sekarang</span>
+                    </button>
+                    {manualSaveToast && (
+                      <span className="text-xs text-emerald-400 font-bold animate-pulse">
+                        {manualSaveToast}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+              <span className="text-[11px] text-slate-400 font-mono">
+                Semua foto yang dijepret kini otomatis tampil di puncak galeri.
+              </span>
               <button
                 onClick={() => setShowGlobalGuideModal(false)}
-                className="px-5 py-2.5 rounded-xl text-xs font-mono font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition shadow-lg shadow-cyan-950 cursor-pointer"
+                className="px-5 py-2.5 rounded-xl text-xs font-mono font-bold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition cursor-pointer"
               >
-                Saya Mengerti
+                Tutup Panduan
               </button>
             </div>
           </div>
