@@ -1,6 +1,6 @@
 import React from 'react';
 import { VecOfficialLogo } from './VecOfficialLogo';
-import { ShieldCheck, Camera, LockKeyhole } from 'lucide-react';
+import { ShieldCheck, Camera, LockKeyhole, ArrowRight } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: string;
@@ -14,131 +14,115 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
-  onOpenSyncHub
+  onOpenSyncHub,
 }) => {
+  const publicNav = [
+    { key: 'overview', label: 'Home' },
+    { key: 'vault', label: 'Vault' },
+    { key: 'studio', label: 'Studio' },
+    { key: 'architecture', label: 'Architecture' },
+  ] as const;
+
   return (
-    <header className="border-b border-slate-800/80 bg-[#030712]/95 backdrop-blur-md sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-8">
+    <header className="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-xl">
+      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-8">
         <button
           onClick={() => setActiveTab('overview')}
-          className="flex items-center gap-3 text-left whitespace-nowrap shrink-0 group focus:outline-none"
+          className="group flex shrink-0 items-center gap-3 text-left focus:outline-none"
+          aria-label="Go to overview"
         >
-          <div className="w-9 h-9 rounded-xl overflow-hidden shadow-md shadow-cyan-500/20 border border-cyan-500/30 bg-[#02040A] p-0.5 flex items-center justify-center transition group-hover:border-cyan-400/60">
-            <VecOfficialLogo className="w-full h-full" />
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-cyan-500/30 bg-slate-950 p-1 shadow-lg shadow-cyan-950/30 transition group-hover:border-cyan-400/60">
+            <VecOfficialLogo className="h-full w-full" />
           </div>
-          <span className="text-base font-bold tracking-tight text-white font-sans group-hover:text-cyan-300 transition-colors">
-            VEROIA <span className="font-light text-slate-400">ENTERPRISE</span>
-          </span>
+          <div className="leading-none">
+            <div className="text-[11px] font-medium uppercase tracking-[0.28em] text-slate-400">
+              Veroia
+            </div>
+            <div className="mt-1 text-sm font-semibold tracking-[0.18em] text-white">
+              ENTERPRISE
+            </div>
+          </div>
         </button>
 
-        <nav className="hidden xl:flex items-center gap-6 text-sm font-medium text-slate-300">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`whitespace-nowrap shrink-0 transition-colors py-1 ${
-              activeTab === 'overview'
-                ? 'text-cyan-400 border-b-2 border-cyan-400 font-semibold'
-                : 'hover:text-white'
-            }`}
-          >
-            Ikhtisar Platform
-          </button>
+        <nav className="hidden items-center gap-2 xl:flex">
+          {publicNav.map((item) => {
+            const isActive = activeTab === item.key;
 
-          <button
-            onClick={() => setActiveTab('private-vault')}
-            className={`whitespace-nowrap shrink-0 transition-colors py-1 flex items-center gap-1.5 ${
-              activeTab === 'private-vault'
-                ? 'text-emerald-400 border-b-2 border-emerald-400 font-semibold'
-                : 'hover:text-white'
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Brankas Pribadi</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('vault')}
-            className={`whitespace-nowrap shrink-0 transition-colors py-1 ${
-              activeTab === 'vault'
-                ? 'text-cyan-400 border-b-2 border-cyan-400 font-semibold'
-                : 'hover:text-white'
-            }`}
-          >
-            Live Vault
-          </button>
-
-          <button
-            onClick={() => setActiveTab('studio')}
-            className={`whitespace-nowrap shrink-0 transition-colors py-1 ${
-              activeTab === 'studio'
-                ? 'text-cyan-400 border-b-2 border-cyan-400 font-semibold'
-                : 'hover:text-white'
-            }`}
-          >
-            Studio Sensor C2PA
-          </button>
+            return (
+              <button
+                key={item.key}
+                onClick={() => setActiveTab(item.key)}
+                className={[
+                  'rounded-full border px-3.5 py-2 text-sm font-medium transition-all duration-200',
+                  isActive
+                    ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300 shadow-lg shadow-cyan-950/20'
+                    : 'border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-900/80 hover:text-white',
+                ].join(' ')}
+              >
+                {item.label}
+              </button>
+            );
+          })}
         </nav>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onOpenSyncHub}
+            className="hidden items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-3 py-2 text-[11px] font-medium text-slate-300 transition hover:border-slate-600 hover:text-white md:inline-flex"
+            title="Open sync hub"
+          >
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+            <span>Sync</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('admin-portal')}
-            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-slate-400 hover:text-emerald-300 bg-slate-900/80 hover:bg-slate-800 border border-slate-800 transition-colors"
+            className="hidden items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[11px] font-medium text-emerald-300 transition hover:border-emerald-400 hover:bg-emerald-500/15 sm:inline-flex"
             title="Akses portal admin tersembunyi"
           >
-            <LockKeyhole className="w-3.5 h-3.5" />
+            <LockKeyhole className="h-3.5 w-3.5" />
             <span>Root Gate</span>
           </button>
 
           <button
             onClick={() => setActiveTab('studio')}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-lg shadow-lg shadow-cyan-950/40 transition-colors"
+            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-cyan-950/40 transition hover:from-cyan-400 hover:to-blue-500"
           >
-            <Camera className="w-3.5 h-3.5" />
-            <span>Uji Sensor C2PA</span>
+            <Camera className="h-3.5 w-3.5" />
+            <span>Test Sensor</span>
+            <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
 
-      <div className="xl:hidden flex items-center gap-2 overflow-x-auto px-4 py-2 border-t border-slate-900 bg-slate-950 text-xs">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`px-2.5 py-1 rounded-md whitespace-nowrap ${
-            activeTab === 'overview' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-400'
-          }`}
-        >
-          Ikhtisar
-        </button>
-        <button
-          onClick={() => setActiveTab('private-vault')}
-          className={`px-2.5 py-1 rounded-md whitespace-nowrap flex items-center gap-1 ${
-            activeTab === 'private-vault' ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'text-slate-400'
-          }`}
-        >
-          <span>🔒 Brankas</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('vault')}
-          className={`px-2.5 py-1 rounded-md whitespace-nowrap ${
-            activeTab === 'vault' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-400'
-          }`}
-        >
-          Live Vault
-        </button>
-        <button
-          onClick={() => setActiveTab('studio')}
-          className={`px-2.5 py-1 rounded-md whitespace-nowrap ${
-            activeTab === 'studio' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-400'
-          }`}
-        >
-          Sensor C2PA
-        </button>
-        <button
-          onClick={() => setActiveTab('admin-portal')}
-          className={`px-2.5 py-1 rounded-md whitespace-nowrap ${
-            activeTab === 'admin-portal' ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'text-slate-400'
-          }`}
-        >
-          Root Gate
-        </button>
+      <div className="border-t border-slate-900 bg-slate-950/90 px-4 py-2 xl:hidden">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {publicNav.map((item) => {
+            const isActive = activeTab === item.key;
+
+            return (
+              <button
+                key={item.key}
+                onClick={() => setActiveTab(item.key)}
+                className={[
+                  'whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition',
+                  isActive
+                    ? 'bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-500/30'
+                    : 'bg-slate-900 text-slate-400',
+                ].join(' ')}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+
+          <button
+            onClick={() => setActiveTab('admin-portal')}
+            className="whitespace-nowrap rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300"
+          >
+            Root Gate
+          </button>
+        </div>
       </div>
     </header>
   );
