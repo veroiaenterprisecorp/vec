@@ -19,6 +19,24 @@ export interface CloudUploadResult {
   error?: string;
 }
 
+const extractStoragePathFromUrl = (value?: string): string | null => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const withPublicPrefix = trimmed.replace(/^https?:\/\/[^/]+\/storage\/v1\/object\/(?:public|private)\//i, '');
+  if (withPublicPrefix === trimmed) {
+    return null;
+  }
+
+  const segments = withPublicPrefix.split('/');
+  if (segments.length < 2) return null;
+  segments.shift();
+  const path = segments.join('/');
+  if (!path || path.startsWith('http')) return null;
+  return decodeURIComponent(path).replace(/^\/+/, '');
+};
+
 /**
  * Get user's storage mode. Default is 'cloud_supabase'.
  */
@@ -566,14 +584,9 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
   // Extract relative storage path from full URLs if applicable
   const candidateUrls = [cloudStorageUrl, photoUrl].filter(Boolean) as string[];
   for (const url of candidateUrls) {
-    if (url.includes('/storage/v1/object/public/')) {
-      const parts = url.split('/storage/v1/object/public/');
-      if (parts[1]) {
-        const sub = parts[1].split('/');
-        sub.shift(); // remove bucket
-        const extractedPath = sub.join('/');
-        if (extractedPath) pathsToRemove.push(extractedPath);
-      }
+    const extracted = extractStoragePathFromUrl(url);
+    if (extracted) {
+      pathsToRemove.push(extracted);
     }
   }
 
@@ -581,18 +594,22 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
   pathsToRemove.push(`captures/${id}.jpg`);
   pathsToRemove.push(`${id}.jpg`);
 
-  const uniquePaths = Array.from(new Set(pathsToRemove.filter((p) => p.length > 2)));
+  const uniquePaths = Array.from(new Set(pathsToRemove
+    .map((p) => p.trim())
+    .filter((p) => p.length > 2 && !p.startsWith('http://') && !p.startsWith('https://'))));
 
   try {
     const bucketsToTry = Array.from(new Set([targetBucket, DEFAULT_BUCKET_NAME, 'photos', 'captures']));
-    for (const b of bucketsToTry) {
-      try {
-        const { data, error } = await supabase.storage.from(b).remove(uniquePaths);
-        if (!error && data && data.length > 0) {
-          cloudFilesDeleted += data.length;
+    if (uniquePaths.length > 0) {
+      for (const b of bucketsToTry) {
+        try {
+          const { data, error } = await supabase.storage.from(b).remove(uniquePaths);
+          if (!error && data && data.length > 0) {
+            cloudFilesDeleted += data.length;
+          }
+        } catch {
+          // bucket might not exist, proceed
         }
-      } catch {
-        // bucket might not exist, proceed
       }
     }
   } catch (storageErr) {
@@ -710,4 +727,3 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
     message: 'Karya berhasil dimusnahkan secara permanen dari Cloud & Perangkat tanpa menyisakan sedikitpun jejak.'
   };
 };
-
