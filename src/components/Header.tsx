@@ -1,6 +1,6 @@
 import React from 'react';
 import { VecOfficialLogo } from './VecOfficialLogo';
-import { GitBranch, Database, ShieldCheck, ChevronRight, Camera } from 'lucide-react';
+import { GitBranch, Database, ShieldCheck, ChevronRight, Camera, LockKeyhole } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: string;
@@ -25,7 +25,7 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => setActiveTab('overview')}
           className="flex items-center gap-3 text-left whitespace-nowrap shrink-0 group focus:outline-none"
         >
-          <div className="w-9 h-9 rounded-xl overflow-hidden shadow-md shadow-cyan-500/20 border border-cyan-500/30 bg-[#02040A] p-0.5 flex items-center justify-center transition group-hover:border-cyan-400">
+          <div className="w-9 h-9 rounded-xl overflow-hidden shadow-md shadow-cyan-500/20 border border-cyan-500/30 bg-[#02040A] p-0.5 flex items-center justify-center transition group-hover:border-cyan-400/60">
             <VecOfficialLogo className="w-full h-full" />
           </div>
           <span className="text-base font-bold tracking-tight text-white font-sans group-hover:text-cyan-300 transition-colors">
@@ -33,8 +33,8 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
         </button>
 
-        {/* Zone 2: 4-5 Concise Single-Line Text Nav Links */}
-        <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-slate-300">
+        {/* Zone 2: Top navigation menu */}
+        <nav className="hidden xl:flex items-center gap-6 text-sm font-medium text-slate-300">
           <button
             onClick={() => setActiveTab('overview')}
             className={`whitespace-nowrap shrink-0 transition-colors py-1 ${
@@ -66,7 +66,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'hover:text-white'
             }`}
           >
-            Live Vault & Kurasi
+            Live Vault
           </button>
 
           <button
@@ -92,6 +92,18 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
+            onClick={onOpenSyncHub}
+            className={`whitespace-nowrap shrink-0 transition-colors py-1 flex items-center gap-1.5 ${
+              activeTab === 'sync'
+                ? 'text-violet-400 border-b-2 border-violet-400 font-semibold'
+                : 'hover:text-white'
+            }`}
+          >
+            <GitBranch className="w-3.5 h-3.5 text-violet-400" />
+            <span>Sync Hub</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('architecture')}
             className={`whitespace-nowrap shrink-0 transition-colors py-1 ${
               activeTab === 'architecture'
@@ -99,17 +111,26 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'hover:text-white'
             }`}
           >
-            Spesifikasi Arsitektur
+            Arsitektur
           </button>
         </nav>
 
-        {/* Zone 3: 1 Primary Action + Clean Links */}
+        {/* Zone 3: CTA & hidden admin gate */}
         <div className="flex items-center gap-3 shrink-0">
+          <button
+            onClick={() => setActiveTab('admin-portal')}
+            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-slate-400 hover:text-emerald-300 bg-slate-900/80 hover:bg-slate-800 border border-slate-800 transition-colors"
+            title="Akses portal admin tersembunyi"
+          >
+            <LockKeyhole className="w-3.5 h-3.5" />
+            <span>Root Gate</span>
+          </button>
+
           <a
             href="https://github.com/veroiaenterprisecorp/vec"
             target="_blank"
             rel="noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 transition whitespace-nowrap shrink-0"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-colors"
           >
             <GitBranch className="w-3.5 h-3.5 text-slate-400" />
             <span>GitHub Repo</span>
@@ -117,7 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => setActiveTab('studio')}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-lg shadow-sm shadow-cyan-950 transition whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-lg shadow-lg shadow-cyan-950/40 transition-colors"
           >
             <Camera className="w-3.5 h-3.5" />
             <span>Uji Sensor C2PA</span>
@@ -126,8 +147,8 @@ export const Header: React.FC<HeaderProps> = ({
 
       </div>
 
-      {/* Mobile Navigation Strip (Visible on mobile only) */}
-      <div className="md:hidden flex items-center gap-2 overflow-x-auto px-4 py-2 border-t border-slate-900 bg-slate-950 text-xs">
+      {/* Mobile Navigation Strip */}
+      <div className="xl:hidden flex items-center gap-2 overflow-x-auto px-4 py-2 border-t border-slate-900 bg-slate-950 text-xs">
         <button
           onClick={() => setActiveTab('overview')}
           className={`px-2.5 py-1 rounded-md whitespace-nowrap ${
@@ -142,7 +163,7 @@ export const Header: React.FC<HeaderProps> = ({
             activeTab === 'private-vault' ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'text-slate-400'
           }`}
         >
-          <span>🔒 Brankas Pribadi</span>
+          <span>🔒 Brankas</span>
         </button>
         <button
           onClick={() => setActiveTab('vault')}
@@ -169,12 +190,28 @@ export const Header: React.FC<HeaderProps> = ({
           PostGIS
         </button>
         <button
+          onClick={onOpenSyncHub}
+          className={`px-2.5 py-1 rounded-md whitespace-nowrap ${
+            activeTab === 'sync' ? 'bg-violet-500/20 text-violet-300 font-bold' : 'text-slate-400'
+          }`}
+        >
+          Sync Hub
+        </button>
+        <button
           onClick={() => setActiveTab('architecture')}
           className={`px-2.5 py-1 rounded-md whitespace-nowrap ${
             activeTab === 'architecture' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-400'
           }`}
         >
           Arsitektur
+        </button>
+        <button
+          onClick={() => setActiveTab('admin-portal')}
+          className={`px-2.5 py-1 rounded-md whitespace-nowrap ${
+            activeTab === 'admin-portal' ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'text-slate-400'
+          }`}
+        >
+          Root Gate
         </button>
       </div>
     </header>
