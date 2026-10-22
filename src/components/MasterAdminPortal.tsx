@@ -115,6 +115,12 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
   const [copiedSupabaseKey, setCopiedSupabaseKey] = useState<boolean>(false);
   const [notificationMsg, setNotificationMsg] = useState<string>('');
 
+  // Password / Secret key masking states (hidden by default unless clicked)
+  const [showDefaultKeyHint, setShowDefaultKeyHint] = useState<boolean>(false);
+  const [showSecretUrl, setShowSecretUrl] = useState<boolean>(false);
+  const [showSupabaseKey, setShowSupabaseKey] = useState<boolean>(false);
+  const [revealedHardwareIds, setRevealedHardwareIds] = useState<Record<string, boolean>>({});
+
   // Current secret URL
   const secretUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}${window.location.pathname}?portal=master-admin`
@@ -256,15 +262,15 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
           </div>
 
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-800 text-emerald-300 font-mono text-xs mb-2">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>TERISOLASI 100% · BEBAS PELACAKAN PUBLIK</span>
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs mb-3">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>AKSES KHUSUS PEMILIK · TERLINDUNGI PENUH</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Gerbang Master Admin & Sinkronisasi
+              Gerbang Pengelola Master
             </h1>
             <p className="text-sm text-slate-400 max-w-xl mx-auto mt-2 leading-relaxed">
-              Halaman ini <span className="text-emerald-300 font-medium">sengaja disembunyikan dari menu publik</span> website untuk menjamin keamanan mutlak data pendaftar dan kontrol basis data Supabase Anda.
+              Halaman ini <span className="text-emerald-300 font-medium">sengaja tidak ditampilkan di menu publik</span> website untuk menjaga kerahasiaan data pengguna dan kendali sistem.
             </p>
           </div>
         </div>
@@ -275,31 +281,32 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
           <div className="flex items-start gap-4 p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-xs text-slate-300">
             <Key className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <div className="font-semibold text-white">Autentikasi Tingkat Enkripsi Militer (AES-256)</div>
+              <div className="font-semibold text-white">Autentikasi Aman Pemilik Sistem</div>
               <p className="text-slate-400 leading-relaxed">
-                Hanya pemilik yang memiliki <strong>Kunci Master Rahasia</strong> yang dapat mengakses direktori lengkap pendaftar dan fungsi sinkronisasi cloud.
+                Hanya pemilik yang memiliki <strong>Kunci Akses Khusus</strong> yang dapat membuka direktori pengguna dan pengelolaan sistem.
               </p>
             </div>
           </div>
 
           <form onSubmit={handleAuthenticate} className="space-y-4">
             <div>
-              <label className="block text-xs font-mono text-slate-300 mb-2 uppercase tracking-wider">
-                Kunci Akses Master Pemilik (Master Passcode)
+              <label className="block text-xs text-slate-300 mb-2 uppercase tracking-wider font-semibold">
+                Kunci Akses Master Pemilik
               </label>
               <div className="relative">
                 <input
                   type={showPasscode ? 'text' : 'password'}
                   value={inputPasscode}
                   onChange={(e) => setInputPasscode(e.target.value)}
-                  placeholder="Masukkan Kunci Master (cth: VEC-ADMIN-882991)"
+                  placeholder="Masukkan Kunci Akses..."
                   disabled={isLockedOut}
                   className="w-full px-4 py-3.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-white font-mono text-sm tracking-widest placeholder:text-slate-600 placeholder:tracking-normal outline-none transition"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPasscode(!showPasscode)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition p-1"
+                  title={showPasscode ? 'Sembunyikan sandi' : 'Tampilkan sandi'}
                 >
                   {showPasscode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -308,17 +315,17 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
 
             {/* Error or Lockout notification */}
             {loginError && (
-              <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
+              <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
                 <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
                 <span>{loginError}</span>
               </div>
             )}
 
             {isLockedOut && (
-              <div className="p-3 rounded-xl bg-amber-950/60 border border-amber-800 text-amber-300 text-xs flex items-center justify-between">
+              <div className="p-3.5 rounded-xl bg-amber-950/60 border border-amber-800 text-amber-300 text-xs flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-amber-400" />
-                  <span>Sistem dikunci sementara untuk mencegah brute-force.</span>
+                  <span>Sistem dikunci sementara untuk mencegah percobaan berulang.</span>
                 </div>
                 <span className="font-mono font-bold text-amber-400">{lockoutTimer}s</span>
               </div>
@@ -330,21 +337,29 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
               className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm tracking-wide shadow-lg shadow-emerald-950/50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <Unlock className="w-4 h-4" />
-              <span>Buka Kunci Gerbang Master Admin</span>
+              <span>Buka Akses Pengelola Master</span>
             </button>
           </form>
 
-          {/* Quick Helper for Owner convenience */}
+          {/* Quick Helper for Owner convenience - Protected with click to reveal */}
           <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
             <div className="flex items-center gap-2">
-              <span className="text-slate-500 font-mono">Kunci Master Default:</span>
-              <code className="text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-800/60 font-mono font-bold">
-                {MASTER_ACCESS_KEY}
-              </code>
+              <span className="text-slate-400 font-medium">Kunci Bawaan:</span>
+              <span className="text-emerald-400 bg-emerald-950/50 px-2.5 py-1 rounded-md border border-emerald-800/60 font-mono font-bold">
+                {showDefaultKeyHint ? MASTER_ACCESS_KEY : '••••••••••••••'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowDefaultKeyHint(!showDefaultKeyHint)}
+                className="text-slate-400 hover:text-white transition p-1"
+                title={showDefaultKeyHint ? 'Sembunyikan' : 'Lihat Kunci'}
+              >
+                {showDefaultKeyHint ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
             </div>
             <button
               onClick={handleQuickFillKey}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition text-[11px] font-medium cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition text-[11px] font-medium cursor-pointer"
             >
               {copiedKey ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copiedKey ? 'Kunci Terisi!' : 'Gunakan Kunci Ini'}</span>
@@ -357,32 +372,44 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
               onClick={onBackToPublicSite}
               className="text-xs text-slate-500 hover:text-slate-300 transition underline underline-offset-4 cursor-pointer"
             >
-              ← Kembali ke Beranda Publik Website
+              ← Kembali ke Beranda Utama
             </button>
           </div>
 
         </div>
 
-        {/* Secret URL Explainer Card */}
+        {/* Secret URL Explainer Card - URL protected by default */}
         <div className="mt-8 p-5 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
               <Fingerprint className="w-4 h-4 text-cyan-400" />
-              <span>Cara Mengakses Halaman Ini di Masa Depan:</span>
+              <span>Tautan Khusus Akses Langsung:</span>
             </div>
-            <button
-              onClick={handleCopySecretUrl}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900 border border-slate-700 hover:bg-slate-800 text-[11px] text-cyan-400 transition cursor-pointer"
-            >
-              {copiedSecretUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copiedSecretUrl ? 'Tersalin!' : 'Salin URL Rahasia'}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowSecretUrl(!showSecretUrl)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-900 border border-slate-700 hover:bg-slate-800 text-[11px] text-slate-300 transition cursor-pointer"
+              >
+                {showSecretUrl ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                <span>{showSecretUrl ? 'Sembunyikan' : 'Lihat Tautan'}</span>
+              </button>
+              <button
+                onClick={handleCopySecretUrl}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900 border border-slate-700 hover:bg-slate-800 text-[11px] text-cyan-400 transition cursor-pointer"
+              >
+                {copiedSecretUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedSecretUrl ? 'Tersalin!' : 'Salin Tautan'}</span>
+              </button>
+            </div>
           </div>
-          <div className="p-2.5 rounded-lg bg-black/60 border border-slate-800 font-mono text-[11px] text-slate-400 break-all select-all">
-            {secretUrl}
+          <div className="p-3 rounded-xl bg-black/60 border border-slate-800 font-mono text-[11px] text-slate-400 break-all select-all flex items-center justify-between">
+            <span>
+              {showSecretUrl ? secretUrl : `${secretUrl.substring(0, 28)}••••••••••••••••••••••••`}
+            </span>
           </div>
           <p className="text-[11px] text-slate-500 leading-relaxed">
-            💡 Simpan tautan di atas di bookmark peramban pribadi Anda. Menu ini <strong>tidak dipasang di bilah navigasi publik</strong> agar pengunjung biasa atau peretas tidak mengetahui lokasi portal kontrol Anda.
+            💡 Simpan tautan di atas pada bookmark peramban pribadi Anda. Menu ini sengaja tidak ditampilkan di navigasi umum demi keamanan.
           </p>
         </div>
 
@@ -405,13 +432,13 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-white">Konsol Master Admin & Sinkronisasi</h1>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-bold uppercase">
-                Akses Terkunci (Root Level 5)
+              <h1 className="text-lg font-bold text-white">Konsol Pengelola Master VEC</h1>
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-semibold uppercase">
+                Akses Terverifikasi
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Terkunci Rapat · Bebas Pelacakan Publik · Sesi Aman Berenkripsi SHA-256
+              Panel Pengelolaan Resmi · Sistem Terlindungi · Data Terenkripsi Mandiri
             </p>
           </div>
         </div>
@@ -420,11 +447,11 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={handleCopySecretUrl}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-mono text-cyan-300 transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-cyan-300 transition cursor-pointer"
             title="Salin tautan rahasia halaman ini"
           >
             {copiedSecretUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copiedSecretUrl ? 'URL Rahasia Disalin!' : 'Salin URL Rahasia'}</span>
+            <span>{copiedSecretUrl ? 'Tautan Tersalin!' : 'Salin Tautan Akses'}</span>
           </button>
 
           <button
@@ -432,7 +459,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-xs font-semibold text-rose-200 transition cursor-pointer shadow-sm"
           >
             <Lock className="w-3.5 h-3.5" />
-            <span>Kunci & Keluar ke Web Publik</span>
+            <span>Kunci & Keluar ke Web Utama</span>
           </button>
         </div>
 
@@ -473,7 +500,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
           }`}
         >
           <Database className="w-4 h-4 text-cyan-400" />
-          <span>Arsitektur & SQL</span>
+          <span>Pemantauan Sistem</span>
         </button>
 
         <button
@@ -485,7 +512,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
           }`}
         >
           <Radio className="w-4 h-4 text-amber-400" />
-          <span>PostGIS Geospasial</span>
+          <span>Verifikasi Lokasi</span>
         </button>
 
         <button
@@ -497,7 +524,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
           }`}
         >
           <Workflow className="w-4 h-4 text-blue-400" />
-          <span>Sinkronisasi GitHub</span>
+          <span>Penyimpanan Cadangan</span>
         </button>
 
         <button
@@ -509,7 +536,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
           }`}
         >
           <Rocket className="w-4 h-4 text-purple-400" />
-          <span>Deploy Vercel</span>
+          <span>Penerbitan Web</span>
         </button>
 
         <button
@@ -542,30 +569,30 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
           {/* Metric Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">Total Pengguna Terdaftar</div>
+              <div className="text-xs text-slate-400">Total Pengguna Terdaftar</div>
               <div className="text-2xl font-extrabold text-white flex items-center gap-2">
                 <span>{totalUsers}</span>
-                <span className="text-xs font-normal text-emerald-400 font-mono">Akun Aktif</span>
+                <span className="text-xs font-normal text-emerald-400">Akun Aktif</span>
               </div>
-              <div className="text-[11px] text-slate-500">Terdaftar di PostgreSQL Supabase Auth</div>
+              <div className="text-[11px] text-slate-500">Basis data cloud tersinkronisasi aman</div>
             </div>
 
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">Terverifikasi Hardware C2PA</div>
+              <div className="text-xs text-slate-400">Perangkat Terverifikasi Resmi</div>
               <div className="text-2xl font-extrabold text-emerald-400 flex items-center gap-2">
                 <span>{verifiedUsers}</span>
-                <span className="text-xs font-normal text-slate-400 font-mono">/ {totalUsers} akun</span>
+                <span className="text-xs font-normal text-slate-400">/ {totalUsers} akun</span>
               </div>
-              <div className="text-[11px] text-slate-500">Memiliki Kunci Enclave Perangkat Fisik</div>
+              <div className="text-[11px] text-slate-500">Sensor kamera terverifikasi keasliannya</div>
             </div>
 
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">Total Penyimpanan Brankas Terpakai</div>
+              <div className="text-xs text-slate-400">Total Ruang Brankas Digunakan</div>
               <div className="text-2xl font-extrabold text-cyan-300 flex items-center gap-2">
                 <span>{formatBytes(totalStorageBytes)}</span>
-                <span className="text-xs font-normal text-slate-400 font-mono">Terenkripsi</span>
+                <span className="text-xs font-normal text-slate-400">Terenkripsi</span>
               </div>
-              <div className="text-[11px] text-slate-500">Terisolasi penuh via Row Level Security (RLS)</div>
+              <div className="text-[11px] text-slate-500">Isolasi data privat aktif antar akun</div>
             </div>
           </div>
 
@@ -578,7 +605,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari nama pendaftar, email, atau UUID..."
+                  placeholder="Cari nama pendaftar, email, atau ID..."
                   className="w-full pl-9 pr-4 py-2 rounded-lg bg-slate-950 border border-slate-800 focus:border-emerald-500 text-xs text-white placeholder:text-slate-600 outline-none transition"
                 />
               </div>
@@ -611,7 +638,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
                 title="Unduh seluruh data direktori sebagai file JSON"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Ekspor JSON</span>
+                <span className="hidden sm:inline">Ekspor Data</span>
               </button>
             </div>
           </div>
@@ -620,13 +647,13 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
           <div className="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/60 shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-900/90 text-slate-400 font-mono uppercase tracking-wider text-[11px] border-b border-slate-800">
+                <thead className="bg-slate-900/90 text-slate-400 uppercase tracking-wider text-[11px] border-b border-slate-800">
                   <tr>
                     <th className="py-3 px-4">Pengguna / Pendaftar</th>
-                    <th className="py-3 px-4">Peran (Role)</th>
-                    <th className="py-3 px-4">Status C2PA Hardware</th>
-                    <th className="py-3 px-4">Brankas Pribadi</th>
-                    <th className="py-3 px-4">Waktu Terdaftar</th>
+                    <th className="py-3 px-4">Peran Akun</th>
+                    <th className="py-3 px-4">Verifikasi Sensor Perangkat</th>
+                    <th className="py-3 px-4">Ruang Brankas</th>
+                    <th className="py-3 px-4">Waktu Bergabung</th>
                     <th className="py-3 px-4 text-center">Status</th>
                     <th className="py-3 px-4 text-right">Tindakan</th>
                   </tr>
@@ -647,22 +674,31 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
                           <div className="font-semibold text-white flex items-center gap-1.5">
                             <span>{user.name}</span>
                             {user.role.includes('Owner') && (
-                              <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-mono">
-                                Owner
+                              <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px]">
+                                Pemilik
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] text-slate-400 font-mono truncate max-w-[200px]">
+                          <div className="text-[11px] text-slate-400 truncate max-w-[200px]">
                             {user.email}
                           </div>
-                          <div className="text-[10px] text-slate-600 font-mono">
-                            ID: {user.id}
+                          <div className="text-[10px] text-slate-600 flex items-center gap-1 mt-0.5">
+                            <span>ID:</span>
+                            <span>{revealedHardwareIds[`id-${user.id}`] ? user.id : `••••${user.id.slice(-6)}`}</span>
+                            <button
+                              type="button"
+                              onClick={() => setRevealedHardwareIds(prev => ({ ...prev, [`id-${user.id}`]: !prev[`id-${user.id}`] }))}
+                              className="text-slate-500 hover:text-slate-300"
+                              title="Tampilkan / Sembunyikan ID"
+                            >
+                              {revealedHardwareIds[`id-${user.id}`] ? <EyeOff className="w-2.5 h-2.5" /> : <Eye className="w-2.5 h-2.5" />}
+                            </button>
                           </div>
                         </td>
 
                         {/* Role */}
                         <td className="py-3.5 px-4">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full font-mono text-[10px] border ${
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium border ${
                             user.role === 'Super Admin (Owner)' 
                               ? 'bg-amber-950/60 text-amber-300 border-amber-700' 
                               : user.role === 'Verified Creator'
@@ -675,42 +711,51 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
                           </span>
                         </td>
 
-                        {/* C2PA Enclave Attestation */}
-                        <td className="py-3.5 px-4 font-mono">
+                        {/* Hardware Attestation */}
+                        <td className="py-3.5 px-4">
                           {user.c2paVerified ? (
                             <div>
                               <div className="flex items-center gap-1 text-emerald-400 font-medium text-[11px]">
                                 <ShieldCheck className="w-3.5 h-3.5" />
-                                <span>Hardware Attested</span>
+                                <span>Terverifikasi Resmi</span>
                               </div>
-                              <div className="text-[10px] text-slate-500 truncate max-w-[150px]">
-                                {user.hardwareEnclaveId}
+                              <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                                <span>Sensor:</span>
+                                <span>{revealedHardwareIds[`hw-${user.id}`] ? user.hardwareEnclaveId : '••••••••••••'}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setRevealedHardwareIds(prev => ({ ...prev, [`hw-${user.id}`]: !prev[`hw-${user.id}`] }))}
+                                  className="text-slate-500 hover:text-slate-300"
+                                  title="Tampilkan nomor sensor"
+                                >
+                                  {revealedHardwareIds[`hw-${user.id}`] ? <EyeOff className="w-2.5 h-2.5" /> : <Eye className="w-2.5 h-2.5" />}
+                                </button>
                               </div>
                             </div>
                           ) : (
-                            <span className="text-slate-500 text-[11px]">Belum tertaut sensor fisik</span>
+                            <span className="text-slate-500 text-[11px]">Belum terhubung</span>
                           )}
                         </td>
 
                         {/* Storage Quota */}
-                        <td className="py-3.5 px-4 font-mono text-[11px]">
+                        <td className="py-3.5 px-4 text-[11px]">
                           <div className="text-white font-medium">
                             {formatBytes(user.storageUsedBytes)} / {formatBytes(user.storageQuotaBytes)}
                           </div>
                           <div className="text-slate-500 text-[10px]">
-                            {user.privatePhotoCount} foto privat
+                            {user.privatePhotoCount} foto tersimpan
                           </div>
                         </td>
 
                         {/* Registration Time */}
                         <td className="py-3.5 px-4 text-slate-400 text-[11px]">
                           <div>{user.registeredAt}</div>
-                          <div className="text-slate-600 text-[10px]">Login: {user.lastLoginAt}</div>
+                          <div className="text-slate-600 text-[10px]">Terakhir: {user.lastLoginAt}</div>
                         </td>
 
                         {/* Status */}
                         <td className="py-3.5 px-4 text-center">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-mono uppercase font-bold ${
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
                             user.status === 'active'
                               ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                               : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
@@ -724,7 +769,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
                           <button
                             onClick={() => handleToggleStatus(user.id)}
                             disabled={user.role === 'Super Admin (Owner)'}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-mono transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+                            className={`px-2.5 py-1 rounded-lg text-[11px] transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
                               user.status === 'active'
                                 ? 'bg-slate-800 hover:bg-rose-950/60 hover:text-rose-300 text-slate-400'
                                 : 'bg-emerald-950/60 text-emerald-300 border border-emerald-700'
@@ -747,36 +792,36 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* SUB-VIEW 2: GUEST USERS (PENGGUNA TAMU - HANYA ANGKA SAJA)     */}
+      {/* SUB-VIEW 2: GUEST USERS (PENGGUNA TAMU - STATISTIK NUMERIK)   */}
       {/* ------------------------------------------------------------- */}
       {adminTab === 'guests' && (
         <div className="space-y-6">
 
-          {/* Big Clarification Banner (Answers user's prompt directly) */}
+          {/* Big Clarification Banner */}
           <div className="p-6 rounded-2xl bg-gradient-to-r from-cyan-950/60 via-slate-900 to-slate-950 border border-cyan-500/40 shadow-xl space-y-3">
             <div className="flex items-center gap-2.5">
               <span className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center font-bold text-sm">
                 #
               </span>
               <h2 className="text-lg font-bold text-white">
-                Prinsip Zero-PII: Pengguna Tamu Murni Hanya Berupa Angka Numerik
+                Privasi Total: Statistik Pengunjung Murni Angka Agregat Tanpa Pelacakan
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
-              Sesuai dengan pertanyaan Anda: <strong>Ya, pengguna tamu (pengunjung publik tanpa login) sama sekali tidak dicatat identitasnya dan HANYA DIHITUNG SEBAGAI ANGKA AGREGAT SAJA.</strong> Platform VEC tidak pernah menyimpan nama, email, nomor HP, atau alamat IP pengunjung publik.
+              Platform VEC menganut prinsip privasi ketat: <strong>pengunjung publik tanpa login sama sekali tidak dicatat identitasnya dan HANYA DIHITUNG SEBAGAI ANGKA AGREGAT SAJA.</strong> Sistem tidak pernah menyimpan nama, email, nomor telepon, maupun alamat jaringan pengunjung publik.
             </p>
-            <div className="flex flex-wrap items-center gap-3 pt-2 text-xs font-mono text-cyan-300">
-              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 border border-cyan-800/60">
+            <div className="flex flex-wrap items-center gap-3 pt-2 text-xs text-cyan-300">
+              <span className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-900 border border-cyan-800/60">
                 <Check className="w-3.5 h-3.5 text-emerald-400" />
-                Zero PII (No Personal Identifiers)
+                Bebas Pengumpulan Data Pribadi
               </span>
-              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 border border-cyan-800/60">
+              <span className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-900 border border-cyan-800/60">
                 <Check className="w-3.5 h-3.5 text-emerald-400" />
-                No 3rd-Party Tracking Cookies
+                Bebas Pelacak & Bebas Iklan
               </span>
-              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 border border-cyan-800/60">
+              <span className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-900 border border-cyan-800/60">
                 <Check className="w-3.5 h-3.5 text-emerald-400" />
-                PostGIS Coordinate Fuzzing (50km Blur)
+                Perlindungan Privasi Lokasi Pengunjung
               </span>
             </div>
           </div>
@@ -785,36 +830,36 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             
             <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">Total Tamu Unik Hari Ini</div>
-              <div className="text-3xl font-extrabold text-white font-mono">
+              <div className="text-xs text-slate-400">Total Tamu Unik Hari Ini</div>
+              <div className="text-3xl font-extrabold text-white">
                 {GUEST_STATISTICS_DATA.totalVisitorsToday.toLocaleString()}
               </div>
-              <div className="text-[11px] text-emerald-400 font-mono">↑ +14.2% dari kemarin</div>
+              <div className="text-[11px] text-emerald-400">↑ +14.2% dari kemarin</div>
             </div>
 
             <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">Tamu Sedang Online</div>
-              <div className="text-3xl font-extrabold text-cyan-400 font-mono flex items-center gap-2">
+              <div className="text-xs text-slate-400">Tamu Sedang Online</div>
+              <div className="text-3xl font-extrabold text-cyan-400 flex items-center gap-2">
                 <span>{GUEST_STATISTICS_DATA.currentActiveGuests}</span>
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
               </div>
-              <div className="text-[11px] text-slate-500 font-mono">Real-time pulse</div>
+              <div className="text-[11px] text-slate-500">Pengunjung aktif</div>
             </div>
 
             <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">Total Uji Jepret oleh Tamu</div>
-              <div className="text-3xl font-extrabold text-amber-300 font-mono">
+              <div className="text-xs text-slate-400">Uji Jepret Kamera Pengunjung</div>
+              <div className="text-3xl font-extrabold text-amber-300">
                 {GUEST_STATISTICS_DATA.anonymousCaptureTests.toLocaleString()}
               </div>
-              <div className="text-[11px] text-slate-500 font-mono">Tanpa upload ke public vault</div>
+              <div className="text-[11px] text-slate-500">Tanpa publikasi ke galeri publik</div>
             </div>
 
             <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">Tamu Simpan ke Cache Lokal</div>
-              <div className="text-3xl font-extrabold text-purple-300 font-mono">
+              <div className="text-xs text-slate-400">Penyimpanan Lokal Mandiri</div>
+              <div className="text-3xl font-extrabold text-purple-300">
                 {GUEST_STATISTICS_DATA.localVaultSaves.toLocaleString()}
               </div>
-              <div className="text-[11px] text-slate-500 font-mono">Privat di browser masing-masing</div>
+              <div className="text-[11px] text-slate-500">Privat di perangkat masing-masing</div>
             </div>
 
           </div>
@@ -831,7 +876,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
                   Setiap bar mewakili volume angka pengunjung anonim tanpa data pribadi apapun.
                 </p>
               </div>
-              <span className="text-xs font-mono text-slate-400 bg-slate-800 px-2.5 py-1 rounded">
+              <span className="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded">
                 Rata-rata Sesi: 4m 32s
               </span>
             </div>
@@ -839,7 +884,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
             <div className="grid grid-cols-3 sm:grid-cols-9 gap-2 pt-4">
               {GUEST_STATISTICS_DATA.hourlyGuestTraffic.map((item, idx) => (
                 <div key={idx} className="flex flex-col items-center gap-2">
-                  <div className="text-[11px] font-mono font-bold text-cyan-300">
+                  <div className="text-[11px] font-bold text-cyan-300">
                     {item.guestCount}
                   </div>
                   <div className="w-full bg-slate-950 rounded-t-lg h-28 flex items-end p-1 border border-slate-800">
@@ -848,7 +893,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
                       style={{ height: `${Math.max(15, (item.guestCount / 4210) * 100)}%` }}
                     ></div>
                   </div>
-                  <div className="text-[10px] font-mono text-slate-400">
+                  <div className="text-[10px] text-slate-400">
                     {item.hour}
                   </div>
                 </div>
@@ -860,7 +905,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
           <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Jaminan Kepatuhan Privasi Pengguna Tamu (Zero-Knowledge Architecture)</span>
+              <span>Jaminan Kepatuhan Privasi Pengguna Tamu (Sistem Tanpa Pelacakan)</span>
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -868,7 +913,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
                 <div key={idx} className="p-4 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-white">{rule.rule}</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                       {rule.status}
                     </span>
                   </div>
@@ -884,14 +929,14 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* SUB-VIEW: ARSITEKTUR BASIS DATA & SKEMA SQL                   */}
+      {/* SUB-VIEW: PEMANTAUAN SISTEM                                   */}
       {/* ------------------------------------------------------------- */}
       {adminTab === 'architecture' && (
         <div className="space-y-4">
           <div className="p-4 rounded-xl bg-cyan-950/40 border border-cyan-850/60 text-xs text-cyan-200 flex items-center gap-3">
             <Lock className="w-4 h-4 text-cyan-400 shrink-0" />
             <p>
-              Konsol Arsitektur Database, Skema SQL, ERD Visualizer, dan Seed Generator ini <strong>terisolasi aman di dalam Root Gate</strong> dan tidak terekspos ke publik demi menjaga keamanan dan estetika website.
+              Modul <strong>Pemantauan Sistem</strong> ini menyajikan kesehatan koneksi basis data, peta relasi informasi, serta panduan operasional terpusat bagi pengelola.
             </p>
           </div>
 
@@ -904,14 +949,14 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* SUB-VIEW: SIMULATOR SPASIAL POSTGIS & GEOPRIVACY               */}
+      {/* SUB-VIEW: VERIFIKASI LOKASI                                   */}
       {/* ------------------------------------------------------------- */}
       {adminTab === 'spatial' && (
         <div className="space-y-4">
           <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-850/60 text-xs text-amber-200 flex items-center gap-3">
             <Lock className="w-4 h-4 text-amber-400 shrink-0" />
             <p>
-              Simulator Spasial PostGIS & Differential Geoprivacy Fuzzing ini <strong>dilindungi di dalam Root Gate</strong> untuk simulasi telemetri GPS dan verifikasi koordinat terenkripsi.
+              Modul <strong>Verifikasi Lokasi</strong> ini memvalidasi keabsahan letak studio pembuatan karya, dengan proteksi otomatis pengaburan koordinat publik demi menjaga privasi seniman.
             </p>
           </div>
 
@@ -920,14 +965,14 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* SUB-VIEW 3: GITHUB & SUPABASE SYNC HUB (TERKUNCI AMAN DI SINI)  */}
+      {/* SUB-VIEW 3: PENYIMPANAN CADANGAN                              */}
       {/* ------------------------------------------------------------- */}
       {adminTab === 'sync' && (
         <div className="space-y-4">
           <div className="p-4 rounded-xl bg-blue-950/40 border border-blue-800/60 text-xs text-blue-200 flex items-center gap-3">
             <Lock className="w-4 h-4 text-blue-400 shrink-0" />
             <p>
-              Modul Sinkronisasi GitHub & Cloud Supabase ini <strong>kini sepenuhnya dilindungi di dalam portal master rahasia ini</strong> dan tidak dapat diakses atau dilihat oleh pengunjung umum website.
+              Modul <strong>Penyimpanan Cadangan</strong> ini mengelola sinkronisasi data cloud, pencadangan struktur sistem, dan memastikan seluruh arsip tersimpan aman.
             </p>
           </div>
 
@@ -939,35 +984,35 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* SUB-VIEW 4: AUDIT LOGS & ANTI-HACKER RESILIENCE                */}
+      {/* SUB-VIEW 4: AUDIT KEAMANAN                                    */}
       {/* ------------------------------------------------------------- */}
       {adminTab === 'audit' && (
         <div className="space-y-6">
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">Status Proteksi Hacker</div>
+              <div className="text-xs text-slate-400">Status Proteksi Sistem</div>
               <div className="text-lg font-bold text-emerald-400 flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4" />
-                <span>100% Terenkripsi & Aktif</span>
+                <span>100% Aktif & Terlindungi</span>
               </div>
-              <div className="text-[11px] text-slate-500">Anti-Brute Force · IP Rate Limiting</div>
+              <div className="text-[11px] text-slate-500">Pencegahan Percobaan Berulang & Batas Akses</div>
             </div>
 
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">Protokol Keamanan Data</div>
-              <div className="text-lg font-bold text-cyan-300 font-mono">
-                TLS 1.3 / AES-256-GCM
+              <div className="text-xs text-slate-400">Standar Keamanan Data</div>
+              <div className="text-lg font-bold text-cyan-300">
+                Enkripsi Jalur & Data Berlapis
               </div>
-              <div className="text-[11px] text-slate-500">Zero-Plaintext Transmit</div>
+              <div className="text-[11px] text-slate-500">Transmisi Aman Tanpa Teks Terbuka</div>
             </div>
 
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">PostgreSQL Row-Level Security</div>
-              <div className="text-lg font-bold text-purple-300 font-mono">
-                auth.uid() = user_id
+              <div className="text-xs text-slate-400">Perlindungan Hak Akses Mandiri</div>
+              <div className="text-lg font-bold text-purple-300">
+                Akses Khusus Pemilik Karya
               </div>
-              <div className="text-[11px] text-slate-500">Isolasi mutlak antar pengguna</div>
+              <div className="text-[11px] text-slate-500">Tiap pengguna hanya dapat membuka brankas miliknya</div>
             </div>
           </div>
 
@@ -1168,42 +1213,66 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
                   <div className="space-y-2 pt-1">
                     {/* Var 1 */}
                     <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
-                      <div className="font-mono text-[11px] truncate">
-                        <span className="text-slate-400">Key: </span>
+                      <div className="font-mono text-[11px] truncate flex items-center gap-2">
+                        <span className="text-slate-400">Variabel: </span>
                         <strong className="text-purple-300">VITE_SUPABASE_URL</strong>
-                        <span className="mx-2 text-slate-600">=</span>
-                        <span className="text-slate-400 truncate">{getSupabaseUrl()}</span>
+                        <span className="text-slate-600">=</span>
+                        <span className="text-slate-300 truncate">
+                          {showSupabaseKey ? getSupabaseUrl() : '••••••••••••••••••••••••'}
+                        </span>
                       </div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(getSupabaseUrl());
-                          setCopiedSupabaseUrl(true);
-                          setTimeout(() => setCopiedSupabaseUrl(false), 2000);
-                        }}
-                        className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[10px] font-mono text-purple-300 transition cursor-pointer shrink-0"
-                      >
-                        {copiedSupabaseUrl ? 'Tersalin!' : 'Salin Nilai'}
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setShowSupabaseKey(!showSupabaseKey)}
+                          className="p-1 rounded text-slate-400 hover:text-white transition"
+                          title={showSupabaseKey ? 'Sembunyikan Nilai' : 'Lihat Nilai'}
+                        >
+                          {showSupabaseKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5 text-purple-400" />}
+                        </button>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(getSupabaseUrl());
+                            setCopiedSupabaseUrl(true);
+                            setTimeout(() => setCopiedSupabaseUrl(false), 2000);
+                          }}
+                          className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[10px] font-mono text-purple-300 transition cursor-pointer"
+                        >
+                          {copiedSupabaseUrl ? 'Tersalin!' : 'Salin Nilai'}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Var 2 */}
                     <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
-                      <div className="font-mono text-[11px] truncate">
-                        <span className="text-slate-400">Key: </span>
+                      <div className="font-mono text-[11px] truncate flex items-center gap-2">
+                        <span className="text-slate-400">Variabel: </span>
                         <strong className="text-purple-300">VITE_SUPABASE_ANON_KEY</strong>
-                        <span className="mx-2 text-slate-600">=</span>
-                        <span className="text-slate-400 truncate">{getSupabaseAnonKey().substring(0, 24)}...</span>
+                        <span className="text-slate-600">=</span>
+                        <span className="text-slate-300 truncate">
+                          {showSupabaseKey ? `${getSupabaseAnonKey().substring(0, 24)}...` : '••••••••••••••••••••••••••••••••'}
+                        </span>
                       </div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(getSupabaseAnonKey());
-                          setCopiedSupabaseKey(true);
-                          setTimeout(() => setCopiedSupabaseKey(false), 2000);
-                        }}
-                        className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[10px] font-mono text-purple-300 transition cursor-pointer shrink-0"
-                      >
-                        {copiedSupabaseKey ? 'Tersalin!' : 'Salin Nilai'}
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setShowSupabaseKey(!showSupabaseKey)}
+                          className="p-1 rounded text-slate-400 hover:text-white transition"
+                          title={showSupabaseKey ? 'Sembunyikan Nilai' : 'Lihat Nilai'}
+                        >
+                          {showSupabaseKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5 text-purple-400" />}
+                        </button>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(getSupabaseAnonKey());
+                            setCopiedSupabaseKey(true);
+                            setTimeout(() => setCopiedSupabaseKey(false), 2000);
+                          }}
+                          className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[10px] font-mono text-purple-300 transition cursor-pointer"
+                        >
+                          {copiedSupabaseKey ? 'Tersalin!' : 'Salin Nilai'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -79,7 +79,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </nav>
 
-        {/* Zone 3: Primary Action & Discreet Root Gate */}
+        {/* Zone 3: Primary Action */}
         <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={() => setActiveTab('studio')}
@@ -88,25 +88,12 @@ export const Header: React.FC<HeaderProps> = ({
             <Camera className="w-3.5 h-3.5 text-cyan-400" />
             <span className="whitespace-nowrap">Buka Studio Foto</span>
           </button>
-
-          <button
-            onClick={() => setActiveTab('admin-portal')}
-            className={`p-2 rounded-lg border text-xs transition duration-200 cursor-pointer ${
-              activeTab === 'admin-portal'
-                ? 'bg-emerald-950/60 border-emerald-500/60 text-emerald-300'
-                : 'bg-neutral-950/60 border-neutral-800 text-neutral-500 hover:text-neutral-300 hover:border-neutral-700'
-            }`}
-            title="Akses Pengelola Sistem"
-            aria-label="Pengelola Sistem"
-          >
-            <KeyRound className="w-3.5 h-3.5" />
-          </button>
         </div>
 
       </div>
 
       {/* Mobile Responsive Navigation Strip */}
-      <div className="md:hidden flex items-center justify-between gap-1 overflow-x-auto px-4 py-2 border-t border-neutral-900 bg-neutral-950 text-xs">
+      <div className="md:hidden flex items-center justify-around gap-1 px-4 py-2 border-t border-neutral-900 bg-neutral-950 text-xs">
         <button
           onClick={() => setActiveTab('overview')}
           className={`px-3 py-1.5 rounded-md whitespace-nowrap transition-colors ${
@@ -138,15 +125,6 @@ export const Header: React.FC<HeaderProps> = ({
           }`}
         >
           Studio
-        </button>
-        <button
-          onClick={() => setActiveTab('admin-portal')}
-          className={`p-1.5 rounded-md whitespace-nowrap transition-colors ${
-            activeTab === 'admin-portal' ? 'text-emerald-300 bg-emerald-950/60' : 'text-neutral-500'
-          }`}
-          title="Root Gate"
-        >
-          <Lock className="w-3.5 h-3.5" />
         </button>
       </div>
 

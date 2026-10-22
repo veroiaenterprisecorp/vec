@@ -560,12 +560,6 @@ CREATE POLICY "Hardware attested and verified creators can create posts"
 DROP POLICY IF EXISTS "Users can update their own posts" ON public.posts;
 CREATE POLICY "Users can update their own posts" 
     ON public.posts FOR UPDATE 
-    USING (true)
-    WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users can delete posts" ON public.posts;
-CREATE POLICY "Users can delete posts" 
-    ON public.posts FOR DELETE 
     USING (true);
 
 -- Policies: art_certificates
@@ -622,10 +616,6 @@ ON CONFLICT (id) DO UPDATE SET public = true;
 -- Hapus policy SELECT berlebih agar tidak mengekspos listing seluruh isi bucket ke publik (Lint 0025).
 DROP POLICY IF EXISTS "Allow public view from vec-captures" ON storage.objects;
 DROP POLICY IF EXISTS "Public can view capture objects" ON storage.objects;
-DROP POLICY IF EXISTS "Public can read capture objects" ON storage.objects;
-CREATE POLICY "Public can read capture objects" 
-    ON storage.objects FOR SELECT 
-    USING (bucket_id = 'vec-captures');
 
 DROP POLICY IF EXISTS "Public can upload capture objects" ON storage.objects;
 CREATE POLICY "Public can upload capture objects" 
@@ -635,11 +625,6 @@ CREATE POLICY "Public can upload capture objects"
 DROP POLICY IF EXISTS "Public can update capture objects" ON storage.objects;
 CREATE POLICY "Public can update capture objects" 
     ON storage.objects FOR UPDATE 
-    USING (bucket_id = 'vec-captures');
-
-DROP POLICY IF EXISTS "Public can delete capture objects" ON storage.objects;
-CREATE POLICY "Public can delete capture objects" 
-    ON storage.objects FOR DELETE 
     USING (bucket_id = 'vec-captures');
 
 -- ---------------------------------------------------------------------

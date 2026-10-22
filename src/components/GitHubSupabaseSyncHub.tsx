@@ -235,60 +235,60 @@ git push -u origin main`;
             </div>
           </div>
 
-          {/* Card 2: Supabase Database */}
+          {/* Card 2: Cloud Database */}
           <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-mono text-slate-400 flex items-center gap-1.5">
+              <span className="text-xs text-slate-400 flex items-center gap-1.5 font-medium">
                 <Database className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Supabase PostgreSQL 16</span>
+                <span>Pusat Basis Data Cloud</span>
               </span>
-              <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
+              <span className="text-[11px] text-emerald-400 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" /> Online
               </span>
             </div>
             <div className="text-sm font-bold text-white font-mono truncate" title={currentSupabaseUrl}>
               cruijnhylcdojbilzgwd
             </div>
-            <div className="text-[11px] text-slate-400 font-mono">
-              Latency: <span className="text-emerald-400 tabular-nums">{connectionStatus.latencyMs}ms</span> • SSL: <span className="text-emerald-300">TLS 1.3</span>
+            <div className="text-[11px] text-slate-400">
+              Respons: <span className="text-emerald-400 font-mono tabular-nums">{connectionStatus.latencyMs}ms</span> • Jalur: <span className="text-emerald-300">Terenkripsi</span>
             </div>
           </div>
 
-          {/* Card 3: PostGIS Extension */}
+          {/* Card 3: Location Protection */}
           <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-mono text-slate-400 flex items-center gap-1.5">
+              <span className="text-xs text-slate-400 flex items-center gap-1.5 font-medium">
                 <Server className="w-3.5 h-3.5 text-amber-400" />
-                <span>PostGIS Spatial Engine</span>
+                <span>Proteksi Lokasi Otomatis</span>
               </span>
-              <span className="text-[11px] font-mono text-amber-400 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> PostGIS 3.4
+              <span className="text-[11px] text-amber-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Aktif
               </span>
             </div>
-            <div className="text-sm font-bold text-white font-mono">
-              ST_Project & ST_DWithin
+            <div className="text-sm font-bold text-white">
+              Pengaburan Koordinat Publik
             </div>
-            <div className="text-[11px] text-slate-400 font-mono">
-              SRID 4326 (WGS84) Geoprivacy
+            <div className="text-[11px] text-slate-400">
+              Privasi lokasi seniman terjaga
             </div>
           </div>
 
-          {/* Card 4: RLS Security Policies */}
+          {/* Card 4: Access Control */}
           <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-mono text-slate-400 flex items-center gap-1.5">
+              <span className="text-xs text-slate-400 flex items-center gap-1.5 font-medium">
                 <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Row-Level Security</span>
+                <span>Isolasi Hak Akses Privat</span>
               </span>
-              <span className="text-[11px] font-mono text-cyan-400 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Enforced
+              <span className="text-[11px] text-cyan-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Aktif
               </span>
             </div>
-            <div className="text-sm font-bold text-white font-mono">
-              Hardware TEE Attested
+            <div className="text-sm font-bold text-white">
+              Sensor Terverifikasi
             </div>
-            <div className="text-[11px] text-slate-400 font-mono">
-              Exact coords: <span className="text-rose-400">Restricted</span>
+            <div className="text-[11px] text-slate-400">
+              Koordinat presisi: <span className="text-emerald-400">Terlindungi</span>
             </div>
           </div>
 
@@ -296,22 +296,22 @@ git push -u origin main`;
       </div>
 
       {/* Navigation Sub-Tabs for Sync Console */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto text-xs font-mono">
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto text-xs">
         <button
           onClick={() => setActiveTab('matrix')}
-          className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+          className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition font-medium ${
             activeTab === 'matrix'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-bold'
               : 'text-slate-400 hover:text-white'
           }`}
         >
           <Workflow className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Alur Integrasi GitHub ⟷ Supabase</span>
+          <span>Alur Pencadangan & Sinkronisasi</span>
         </button>
 
         <button
           onClick={() => setActiveTab('cli')}
-          className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+          className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition font-medium ${
             activeTab === 'cli'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-bold'
               : 'text-slate-400 hover:text-white'
