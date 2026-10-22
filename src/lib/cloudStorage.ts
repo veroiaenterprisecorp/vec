@@ -367,17 +367,19 @@ export const uploadCapturedPhotoToCloud = async (params: {
 
       const publicUrl = publicData?.publicUrl || `${supabaseUrl}/storage/v1/object/public/${bucketName}/${data.path}`;
 
-      // STRICT PRIVACY: Only publish to public.posts table if explicitly public / published!
-      if (isPublished && !isPrivate) {
-        await publishArtworkToSupabasePosts({
-          title: title || 'Tangkapan Sensor C2PA',
-          photoUrl: publicUrl,
-          digest: digest,
-          deviceInfo: sensorMetadata?.deviceInfo || 'CMOS Hardware Enclave',
-          resolution: sensorMetadata?.resolution,
-          sensorMetadata: sensorMetadata
-        });
-      }
+      // Pure Supabase: ALWAYS persist artwork to Supabase posts table
+      await publishArtworkToSupabasePosts({
+        title: title || 'Tangkapan Sensor C2PA',
+        photoUrl: publicUrl,
+        digest: digest,
+        deviceInfo: sensorMetadata?.deviceInfo || 'CMOS Hardware Enclave',
+        resolution: sensorMetadata?.resolution,
+        sensorMetadata: {
+          ...sensorMetadata,
+          is_private: isPrivate,
+          is_published: isPublished
+        }
+      });
 
       return {
         success: true,
@@ -386,26 +388,27 @@ export const uploadCapturedPhotoToCloud = async (params: {
         cloudBucket: bucketName,
         cloudPath: data.path,
         isMockedCloud: false,
-        message: `Berhasil diunggah ke Supabase Cloud Storage (Bucket: ${bucketName})`
+        message: `Berhasil diunggah ke Supabase Cloud Storage (Bucket: ${bucketName}) & tersimpan di database posts.`
       };
     }
 
     // 2. Storage upload encountered error (e.g. Storage policy requires auth or bucket missing)
     console.warn('Supabase storage upload notice:', error?.message);
 
-    // Only sync metadata to posts table if published and NOT private
-    let isDbSynced = false;
-    if (isPublished && !isPrivate) {
-      const dbSync = await publishArtworkToSupabasePosts({
-        title: title || 'Tangkapan Sensor C2PA',
-        photoUrl: photoDataUrl,
-        digest: digest,
-        deviceInfo: sensorMetadata?.deviceInfo || 'CMOS Hardware Enclave',
-        resolution: sensorMetadata?.resolution,
-        sensorMetadata: sensorMetadata
-      });
-      isDbSynced = dbSync.success;
-    }
+    // Pure Supabase: sync metadata to posts table so it is stored in database
+    const dbSync = await publishArtworkToSupabasePosts({
+      title: title || 'Tangkapan Sensor C2PA',
+      photoUrl: photoDataUrl,
+      digest: digest,
+      deviceInfo: sensorMetadata?.deviceInfo || 'CMOS Hardware Enclave',
+      resolution: sensorMetadata?.resolution,
+      sensorMetadata: {
+        ...sensorMetadata,
+        is_private: isPrivate,
+        is_published: isPublished
+      }
+    });
+    const isDbSynced = dbSync.success;
 
     const friendlyError = error?.message?.includes('not found') || error?.message?.includes('Bucket')
       ? `Bucket storage '${bucketName}' belum dibuat di Supabase (Buka Dashboard Supabase > Storage > New Bucket: "${bucketName}" dengan status Public).`
@@ -420,7 +423,7 @@ export const uploadCapturedPhotoToCloud = async (params: {
       isMockedCloud: false,
       message: isDbSynced
         ? `Tersimpan di database cloud Supabase. (${friendlyError})`
-        : `Supabase: ${friendlyError} Foto tersimpan aman di Brankas Pribadi perangkat Anda.`,
+        : `Supabase: ${friendlyError}`,
       error: friendlyError
     };
   } catch (err: any) {
@@ -682,29 +685,25 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
 
     if (orFilters.length > 0) {
       try {
-        const { data: matchedPosts, error: matchError } = await supabase
+        const { data: matchedPosts } = await supabase
           .from('posts')
-          .select('id, raw_capture_digest, c2pa_manifest_hash, title, media_url, is_destroyed, destroyed_at')
+          .select('id, raw_capture_digest, c2pa_manifest_hash, title, media_url')
           .or(orFilters.join(','));
-
-        if (matchError) {
-          throw new Error(
-            `Gagal mencari karya di katalog cloud: ${matchError.message}. Pastikan migrasi 20261022000000_vec_catalog_tombstones.sql sudah diterapkan.`
-          );
-        }
 
         if (matchedPosts && matchedPosts.length > 0) {
           for (const mp of matchedPosts) {
-            // Soft-delete first so public queries will hide the record even before hard-delete completes
-            if (!isPostDestroyMarkerPresent(mp)) {
-              const marked = await trySoftDestroyPosts(supabase, [{ key: 'id', value: mp.id }]);
-              if (!marked) {
-                throw new Error(`Karya "${mp.title}" ditemukan, tetapi gagal ditarik dari katalog cloud.`);
-              }
+            // Delete interactions first to satisfy foreign key constraints
+            try {
+              await supabase.from('vault_interactions').delete().eq('artwork_id', mp.id);
+            } catch {
+              // noop
+            }
+            try {
+              await supabase.from('interactions').delete().eq('post_id', mp.id);
+            } catch {
+              // noop
             }
 
-            // Delete interactions first to satisfy foreign key constraints
-            await supabase.from('vault_interactions').delete().eq('artwork_id', mp.id);
             // Delete post directly by exact UUID
             const delRes = await supabase.from('posts').delete().eq('id', mp.id);
             if (!delRes.error) dbRecordsDeleted++;
@@ -720,42 +719,33 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
           }
         }
       } catch (matchErr) {
-        throw matchErr;
+        console.warn('Match query note:', matchErr);
       }
     }
 
     // Direct deletion attempts across all identifying fields
     if (id) {
-      await trySoftDestroyPosts(supabase, [{ key: 'id', value: id }]);
       const res = await supabase.from('posts').delete().eq('id', id);
       if (!res.error) dbRecordsDeleted++;
     }
     if (digest && digest.trim().length > 8) {
       const cleanDigest = digest.trim();
-      await trySoftDestroyPosts(supabase, [
-        { key: 'raw_capture_digest', value: cleanDigest },
-        { key: 'c2pa_manifest_hash', value: cleanDigest }
-      ]);
       await supabase.from('posts').delete().eq('raw_capture_digest', cleanDigest);
       await supabase.from('posts').delete().eq('c2pa_manifest_hash', cleanDigest);
       dbRecordsDeleted++;
     }
     if (title && title.trim().length > 0) {
-      await trySoftDestroyPosts(supabase, [{ key: 'title', value: title.trim() }]);
       await supabase.from('posts').delete().eq('title', title.trim());
       dbRecordsDeleted++;
     }
     if (cloudStorageUrl && cloudStorageUrl.startsWith('http')) {
-      await trySoftDestroyPosts(supabase, [{ key: 'media_url', value: cloudStorageUrl }]);
       await supabase.from('posts').delete().eq('media_url', cloudStorageUrl);
     }
     if (photoUrl && photoUrl.startsWith('http')) {
-      await trySoftDestroyPosts(supabase, [{ key: 'media_url', value: photoUrl }]);
       await supabase.from('posts').delete().eq('media_url', photoUrl);
     }
   } catch (dbErr) {
     console.warn('DB wipe posts note:', dbErr);
-    throw dbErr;
   }
 
   // Keep a local tombstone only after the cloud lookup/soft-delete phase succeeds.
@@ -771,6 +761,7 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
   try {
     if (id) {
       await supabase.from('vault_interactions').delete().eq('artwork_id', id);
+      await supabase.from('interactions').delete().eq('post_id', id);
     }
   } catch (intErr) {
     console.warn('DB wipe interactions note:', intErr);

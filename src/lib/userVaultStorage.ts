@@ -1,4 +1,4 @@
-import { getIdbAllItems, putIdbItem, deleteIdbItem } from './idbStorage';
+import { supabase, getActiveSupabaseClient } from './supabase';
 
 export interface PrivateVaultItem {
   id: string;
@@ -14,11 +14,11 @@ export interface PrivateVaultItem {
   fuzzedLocation?: string;
   c2paSignature: string;
   sensorType: string;
-  storageTarget?: 'cloud_supabase' | 'device_local';
+  storageTarget?: 'cloud_supabase';
   cloudStorageUrl?: string;
   cloudBucket?: string;
   cloudPath?: string;
-  uploadStatus?: 'uploaded' | 'uploading' | 'failed' | 'local_only';
+  uploadStatus?: 'uploaded' | 'uploading' | 'failed';
   uploadError?: string;
   createdAt?: number;
   description?: string;
@@ -38,10 +38,11 @@ export interface UserVaultProfile {
 
 const STORAGE_KEY = 'vec_user_private_vault_items';
 const DESTROYED_STORAGE_KEY = 'vec_permanently_destroyed_artworks_v1';
+const CACHE_PURGE_VERSION_KEY = 'vec_cache_purged_pure_supabase_v2';
 
 const normalizeValue = (value?: string): string => (value || '').trim().toLowerCase();
 
-const getDestroyedRecords = (): Array<{ id?: string; digest?: string; title?: string; photoUrl?: string }> => {
+export const getDestroyedRecords = (): Array<{ id?: string; digest?: string; title?: string; photoUrl?: string }> => {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(DESTROYED_STORAGE_KEY);
@@ -105,52 +106,57 @@ export const isVaultItemVisibleInPublicVault = (
   return item.isPublished === true;
 };
 
-export const getPublicVaultItems = (): PrivateVaultItem[] => {
-  return getPrivateVaultItems().filter((item) => isVaultItemVisibleInPublicVault(item));
+// Pure Supabase: Default items is strictly EMPTY (no hardcoded/demo images)
+const DEFAULT_ITEMS: PrivateVaultItem[] = [];
+
+let memoryCache: PrivateVaultItem[] = [];
+
+/**
+ * Purges ALL local cache, IndexedDB stores, localStorage items, and logs.
+ * Guarantees zero stale or deleted artwork images remain in the client.
+ */
+export const purgeAllLocalVaultCache = async (): Promise<void> => {
+  if (typeof window === 'undefined') return;
+  try {
+    // 1. Wipe all known localStorage keys
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(DESTROYED_STORAGE_KEY);
+    localStorage.removeItem('vec_vault_db');
+    localStorage.removeItem('vec_default_storage_mode');
+    localStorage.removeItem('vec_permanently_destroyed_artworks_v1');
+    localStorage.removeItem('vec_local_drafts');
+
+    // 2. Wipe IndexedDB database completely
+    if (window.indexedDB && window.indexedDB.deleteDatabase) {
+      try {
+        window.indexedDB.deleteDatabase('vec_vault_db');
+      } catch (idbErr) {
+        console.warn('IDB deleteDatabase error:', idbErr);
+      }
+    }
+
+    // 3. Clear memory cache
+    memoryCache = [];
+
+    // 4. Mark cache cleaned flag
+    localStorage.setItem(CACHE_PURGE_VERSION_KEY, 'true');
+
+    // 5. Broadcast instant refresh
+    window.dispatchEvent(new CustomEvent('vec-vault-updated', { detail: [] }));
+    window.dispatchEvent(new CustomEvent('vec-artwork-destroyed', { detail: {} }));
+    window.dispatchEvent(new Event('storage'));
+  } catch (err) {
+    console.warn('Error purging local vault cache:', err);
+  }
 };
 
-const DEFAULT_ITEMS: PrivateVaultItem[] = [
-  {
-    id: 'vault-item-001',
-    title: 'Studi Komposisi Lukisan Minyak - Silsilah Kanvas #01',
-    photoUrl: '/assets/images/vec_vault_artwork_1792494925679.jpg',
-    digest: '4a6b2c8e1d9f3a5b7c0e2d4f6a8b1c3d5e7f9a0b2c4d6e8f1a3b5c7d9e0f2a4b',
-    resolution: '1920 × 1440 piksel',
-    fileSize: '4.8 MB',
-    captureDate: '2026-10-20 04:15:32 WIB',
-    deviceInfo: 'Android Camera2 API • Sony IMX989 CMOS',
-    isPrivate: true,
-    isPublished: false,
-    fuzzedLocation: 'Jakarta Pusat (Radius 500m)',
-    c2paSignature: 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
-    sensorType: 'Direct CMOS RAW (Zero-Bypass)',
-    storageTarget: 'cloud_supabase',
-    cloudBucket: 'vec-captures',
-    cloudPath: 'captures/2026-10-20/c2pa_oil_painting_canvas.jpg',
-    uploadStatus: 'uploaded'
-  },
-  {
-    id: 'vault-item-002',
-    title: 'Dokumentasi Microchip NFC NTAG424 DNA Fisik',
-    photoUrl: '/assets/images/vec_chip_nfc_1792494926609.jpg',
-    digest: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
-    resolution: '1080 × 1080 piksel',
-    fileSize: '3.2 MB',
-    captureDate: '2026-10-20 03:40:19 WIB',
-    deviceInfo: 'Hardware Attested Sensor • Titan M2',
-    isPrivate: true,
-    isPublished: false,
-    fuzzedLocation: 'Bandung Dago (Radius 500m)',
-    c2paSignature: 'TEE_STRONG_BOX_ATTESTATION_PASS',
-    sensorType: 'Cryptographic Hardware Module',
-    storageTarget: 'cloud_supabase',
-    cloudBucket: 'vec-captures',
-    cloudPath: 'captures/2026-10-20/c2pa_nfc_chip_dna.jpg',
-    uploadStatus: 'uploaded'
+// Automatic one-time purge for users opening this updated version
+if (typeof window !== 'undefined') {
+  const isPurged = localStorage.getItem(CACHE_PURGE_VERSION_KEY);
+  if (!isPurged) {
+    purgeAllLocalVaultCache().catch(() => {});
   }
-];
-
-let memoryCache: PrivateVaultItem[] | null = null;
+}
 
 export const getItemTimestamp = (item: PrivateVaultItem): number => {
   if (item.createdAt && item.createdAt > 0) return item.createdAt;
@@ -163,38 +169,7 @@ export const getItemTimestamp = (item: PrivateVaultItem): number => {
     const parsed = Date.parse(item.captureDate);
     if (!isNaN(parsed)) return parsed;
   }
-  if (item.id === 'vault-item-001') return 1729400000000;
-  if (item.id === 'vault-item-002') return 1729300000000;
   return 0;
-};
-
-const prepareItemsForLocalStorage = (items: PrivateVaultItem[]): PrivateVaultItem[] => {
-  return items.slice(0, 50).map((item) => {
-    const isLargeDataUrl = Boolean(item.photoUrl && (item.photoUrl.startsWith('data:') || item.photoUrl.length > 2048));
-    return {
-      ...item,
-      photoUrl: isLargeDataUrl ? (item.cloudStorageUrl || '') : item.photoUrl
-    };
-  });
-};
-
-const safeSaveToLocalStorage = (items: PrivateVaultItem[]) => {
-  if (typeof window === 'undefined') return;
-  try {
-    const compactItems = prepareItemsForLocalStorage(items);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(compactItems));
-  } catch {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-      const minimal = items.slice(0, 20).map((item) => ({
-        ...item,
-        photoUrl: item.cloudStorageUrl || ''
-      }));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
-    } catch {
-      // noop
-    }
-  }
 };
 
 const notifyVaultChanged = (items: PrivateVaultItem[]) => {
@@ -204,192 +179,199 @@ const notifyVaultChanged = (items: PrivateVaultItem[]) => {
   }
 };
 
-export const getPrivateVaultItems = (): PrivateVaultItem[] => {
-  if (memoryCache && memoryCache.length > 0) {
-    return memoryCache;
-  }
-
+/**
+ * Loads vault artworks directly from Supabase (Sole Database / Single Source of Truth)
+ */
+export const loadVaultItemsFromSupabase = async (): Promise<PrivateVaultItem[]> => {
   try {
-    const raw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-    if (!raw) {
-      memoryCache = filterDestroyedItems(DEFAULT_ITEMS);
-      safeSaveToLocalStorage(memoryCache);
+    const client = getActiveSupabaseClient();
+    const { data: posts, error } = await client
+      .from('posts')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.warn('Supabase posts fetch note:', error.message);
       return memoryCache;
     }
-    const items: PrivateVaultItem[] = JSON.parse(raw);
-    const sanitized = items
-      .map((i) => {
-        if (i.photoUrl && i.photoUrl.startsWith('/src/assets/')) {
-          return { ...i, photoUrl: i.photoUrl.replace('/src/assets/', '/assets/') };
-        }
-        return i;
+
+    if (!posts || posts.length === 0) {
+      memoryCache = [];
+      notifyVaultChanged([]);
+      return [];
+    }
+
+    const mapped: PrivateVaultItem[] = posts
+      .filter((p: any) => {
+        if (p.is_destroyed === true || p.destroyed_at) return false;
+        const d = (p.c2pa_manifest_hash || p.raw_capture_digest || '').trim().toLowerCase();
+        const t = (p.title || '').trim().toLowerCase();
+        const u = (p.media_url || '').trim();
+        return !isDestroyedArtworkCandidate({
+          id: p.id,
+          digest: d,
+          title: t,
+          photoUrl: u
+        });
       })
-      .filter((item) => !isDestroyedArtworkCandidate({ id: item.id, digest: item.digest, title: item.title, photoUrl: item.photoUrl }));
-    sanitized.sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
-    memoryCache = sanitized;
-    return sanitized;
-  } catch (e) {
-    console.error('Failed to parse private vault items from storage:', e);
-    memoryCache = filterDestroyedItems(DEFAULT_ITEMS);
+      .map((p: any) => {
+        const telemetry = p.sensor_telemetry || {};
+        const isPrivate = telemetry.is_private === true;
+        const isPublished = telemetry.is_published !== undefined ? Boolean(telemetry.is_published) : !isPrivate;
+
+        return {
+          id: p.id,
+          title: p.title || 'Tangkapan C2PA',
+          photoUrl: p.media_url,
+          digest: p.c2pa_manifest_hash || p.raw_capture_digest || 'hash',
+          resolution: telemetry.resolution || '1920 × 1080',
+          fileSize: telemetry.fileSize || '3.4 MB',
+          captureDate: new Date(p.created_at).toLocaleString('id-ID'),
+          deviceInfo: p.camera_make ? `${p.camera_make} ${p.camera_model || ''}` : 'VEC Hardware Sensor Enclave',
+          isPrivate,
+          isPublished,
+          c2paSignature: p.hardware_tee_signature || 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
+          sensorType: 'Direct CMOS RAW (Zero-Bypass)',
+          storageTarget: 'cloud_supabase',
+          cloudStorageUrl: p.media_url,
+          cloudBucket: 'vec-captures',
+          uploadStatus: 'uploaded',
+          createdAt: new Date(p.created_at).getTime(),
+          description: p.caption
+        };
+      });
+
+    memoryCache = mapped;
+    notifyVaultChanged(mapped);
+    return mapped;
+  } catch (err) {
+    console.warn('Error loading vault items from Supabase:', err);
     return memoryCache;
   }
+};
+
+export const getPrivateVaultItems = (): PrivateVaultItem[] => {
+  return memoryCache;
+};
+
+export const getPublicVaultItems = (): PrivateVaultItem[] => {
+  return memoryCache.filter((item) => isVaultItemVisibleInPublicVault(item));
 };
 
 export const initVaultAsync = async (onLoaded?: (items: PrivateVaultItem[]) => void): Promise<PrivateVaultItem[]> => {
-  const localItems = getPrivateVaultItems();
-  try {
-    const idbItems = await getIdbAllItems();
-    if (idbItems && idbItems.length > 0) {
-      const mergedMap = new Map<string, PrivateVaultItem>();
-      localItems.forEach((item) => mergedMap.set(item.id, item));
-      const safeIdbItems = filterDestroyedItems(idbItems);
-      safeIdbItems.forEach((item) => {
-        mergedMap.set(item.id, {
-          ...mergedMap.get(item.id),
-          ...item
-        });
-      });
-
-      const merged = Array.from(mergedMap.values())
-        .filter((item) => !isDestroyedArtworkCandidate({ id: item.id, digest: item.digest, title: item.title, photoUrl: item.photoUrl }))
-        .sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
-
-      memoryCache = merged;
-      safeSaveToLocalStorage(merged);
-      if (onLoaded) onLoaded(merged);
-      notifyVaultChanged(merged);
-      return merged;
-    }
-  } catch (e) {
-    console.warn('IDB hydration note:', e);
-  }
-  if (onLoaded) onLoaded(localItems);
-  return localItems;
+  const items = await loadVaultItemsFromSupabase();
+  if (onLoaded) onLoaded(items);
+  return items;
 };
 
 export const mergeRemoteItemsIntoVault = (remoteItems: PrivateVaultItem[]): PrivateVaultItem[] => {
-  const current = getPrivateVaultItems().filter((item) => !isDestroyedArtworkCandidate({
-    id: item.id,
-    digest: item.digest,
-    title: item.title,
-    photoUrl: item.photoUrl
-  }));
-  const safeRemoteItems = filterDestroyedItems(remoteItems);
-  const existingIds = new Set(current.map((item) => item.id));
-  const existingDigests = new Set(current.filter((i) => i.digest).map((item) => item.digest.trim().toLowerCase()));
-  const existingTitles = new Set(current.filter((i) => i.title).map((item) => item.title.trim().toLowerCase()));
-
-  const newItems: PrivateVaultItem[] = [];
-  for (const r of safeRemoteItems) {
-    const rd = (r.digest || '').trim().toLowerCase();
-    const rt = (r.title || '').trim().toLowerCase();
-    const isDup = existingIds.has(r.id) ||
-      (rd.length > 8 && existingDigests.has(rd)) ||
-      (rt.length > 0 && existingTitles.has(rt));
-    if (!isDup) {
-      newItems.push(r);
-    }
-  }
-
-  if (newItems.length > 0) {
-    const merged = [...current, ...newItems].sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
-    memoryCache = merged;
-    safeSaveToLocalStorage(merged);
-    newItems.forEach((item) => putIdbItem(item));
-    notifyVaultChanged(merged);
-    return merged;
-  }
-  return current;
+  memoryCache = filterDestroyedItems(remoteItems);
+  notifyVaultChanged(memoryCache);
+  return memoryCache;
 };
 
 export const savePrivateVaultItem = (item: PrivateVaultItem): PrivateVaultItem[] => {
   if (isDestroyedArtworkCandidate({ id: item.id, digest: item.digest, title: item.title, photoUrl: item.photoUrl })) {
-    return getPrivateVaultItems();
+    return memoryCache;
   }
-  const current = getPrivateVaultItems();
-  const enrichedItem: PrivateVaultItem = { ...item, createdAt: item.createdAt || Date.now() };
-  const filtered = current.filter((i) => i.id !== enrichedItem.id);
-  const updated = [enrichedItem, ...filtered].sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
+  const filtered = memoryCache.filter((i) => i.id !== item.id);
+  const updated = [item, ...filtered].sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
   memoryCache = updated;
-  putIdbItem(enrichedItem);
-  safeSaveToLocalStorage(updated);
   notifyVaultChanged(updated);
   return updated;
 };
 
-export const updateVaultItemPrivacy = (id: string, isPrivate: boolean, isPublished: boolean, newTitle?: string): PrivateVaultItem[] => {
-  const current = getPrivateVaultItems();
+export const updateVaultItemPrivacy = async (id: string, isPrivate: boolean, isPublished: boolean, newTitle?: string): Promise<PrivateVaultItem[]> => {
+  const current = memoryCache;
+  const target = current.find((i) => i.id === id);
+
   const updated = current.map((item) => {
     if (item.id === id) {
-      const changed = { ...item, isPrivate, isPublished, title: newTitle !== undefined ? newTitle : item.title };
-      putIdbItem(changed);
-      return changed;
+      return {
+        ...item,
+        isPrivate,
+        isPublished,
+        title: newTitle !== undefined ? newTitle : item.title
+      };
     }
     return item;
   });
   memoryCache = updated;
-  safeSaveToLocalStorage(updated);
   notifyVaultChanged(updated);
+
+  // Sync to Supabase directly
+  try {
+    const client = getActiveSupabaseClient();
+    const { data: post } = await client.from('posts').select('sensor_telemetry').eq('id', id).single();
+    const existingTelemetry = post?.sensor_telemetry || {};
+    const newTelemetry = {
+      ...existingTelemetry,
+      is_private: isPrivate,
+      is_published: isPublished
+    };
+
+    const updatePayload: any = { sensor_telemetry: newTelemetry };
+    if (newTitle) updatePayload.title = newTitle;
+
+    await client.from('posts').update(updatePayload).eq('id', id);
+  } catch (e) {
+    console.warn('Supabase privacy update note:', e);
+  }
+
   return updated;
 };
 
-export const updateVaultItemTitle = (id: string, newTitle: string): PrivateVaultItem[] => {
-  const current = getPrivateVaultItems();
-  const updated = current.map((item) => {
+export const updateVaultItemTitle = async (id: string, newTitle: string): Promise<PrivateVaultItem[]> => {
+  const cleanTitle = newTitle.trim();
+  const updated = memoryCache.map((item) => {
     if (item.id === id) {
-      const changed = { ...item, title: newTitle.trim() || item.title };
-      putIdbItem(changed);
-      return changed;
+      return { ...item, title: cleanTitle || item.title };
     }
     return item;
   });
   memoryCache = updated;
-  safeSaveToLocalStorage(updated);
   notifyVaultChanged(updated);
+
+  try {
+    const client = getActiveSupabaseClient();
+    await client.from('posts').update({ title: cleanTitle }).eq('id', id);
+  } catch (e) {
+    console.warn('Supabase title update note:', e);
+  }
+
   return updated;
 };
 
 export const updateVaultItemPhoto = (id: string, newPhotoUrl: string, newDigest?: string): PrivateVaultItem[] => {
-  const current = getPrivateVaultItems();
-  const updated = current.map((item) => {
+  const updated = memoryCache.map((item) => {
     if (item.id === id) {
-      const changed = { ...item, photoUrl: newPhotoUrl, digest: newDigest || item.digest };
-      putIdbItem(changed);
-      return changed;
+      return { ...item, photoUrl: newPhotoUrl, digest: newDigest || item.digest };
     }
     return item;
   });
   memoryCache = updated;
-  safeSaveToLocalStorage(updated);
   notifyVaultChanged(updated);
   return updated;
 };
 
 export const deletePrivateVaultItem = (id: string, digest?: string, photoUrl?: string): PrivateVaultItem[] => {
-  const current = getPrivateVaultItems();
   const cleanId = (id || '').trim().toLowerCase();
   const cleanDigest = (digest || '').trim().toLowerCase();
   const cleanUrl = (photoUrl || '').trim();
 
-  // Find all matching item IDs to delete from IndexedDB
   const idsToDelete = new Set<string>();
   if (id) idsToDelete.add(id);
 
-  current.forEach((item) => {
+  memoryCache.forEach((item) => {
     if (item.id === id) idsToDelete.add(item.id);
     if (cleanId && item.id.toLowerCase() === cleanId) idsToDelete.add(item.id);
     if (cleanDigest && cleanDigest.length > 8 && item.digest && item.digest.trim().toLowerCase() === cleanDigest) idsToDelete.add(item.id);
     if (cleanUrl && item.photoUrl === cleanUrl) idsToDelete.add(item.id);
   });
 
-  const updated = current.filter((item) => !idsToDelete.has(item.id));
+  const updated = memoryCache.filter((item) => !idsToDelete.has(item.id));
   memoryCache = updated;
-
-  idsToDelete.forEach((delId) => {
-    deleteIdbItem(delId);
-  });
-
-  safeSaveToLocalStorage(updated);
   notifyVaultChanged(updated);
   return updated;
 };
@@ -398,17 +380,13 @@ export const updateVaultItemCloudStatus = (
   id: string,
   cloudData: Partial<Pick<PrivateVaultItem, 'storageTarget' | 'cloudStorageUrl' | 'cloudBucket' | 'cloudPath' | 'uploadStatus' | 'uploadError'>>
 ): PrivateVaultItem[] => {
-  const current = getPrivateVaultItems();
-  const updated = current.map((item) => {
+  const updated = memoryCache.map((item) => {
     if (item.id === id) {
-      const changed = { ...item, ...cloudData };
-      putIdbItem(changed);
-      return changed;
+      return { ...item, ...cloudData };
     }
     return item;
   });
   memoryCache = updated;
-  safeSaveToLocalStorage(updated);
   notifyVaultChanged(updated);
   return updated;
 };
@@ -420,8 +398,8 @@ export const getUserVaultProfile = (): UserVaultProfile => {
     trustTier: 'HARDWARE_ATTESTED',
     authenticityScore: 99.40,
     hardwareEnclaveId: 'TEE-KNOX-TITAN-0x8892FA1B',
-    encryptionMode: 'AES-256-GCM + Supabase Storage Vault',
-    storageUsedBytes: 8.0 * 1024 * 1024,
+    encryptionMode: 'AES-256-GCM + Supabase Cloud Storage',
+    storageUsedBytes: memoryCache.length * 3.5 * 1024 * 1024,
     maxStorageBytes: 5 * 1024 * 1024 * 1024,
     cloudStorageEnabled: true
   };

@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
-  getPrivateVaultItems, 
-  getPublicVaultItems,
   initVaultAsync, 
   PrivateVaultItem,
-  isVaultItemVisibleInPublicVault
+  purgeAllLocalVaultCache
 } from '../lib/userVaultStorage';
 import { 
   ShieldCheck, 
@@ -80,25 +78,6 @@ interface InteractionItem {
   timestamp: string;
 }
 
-const DEFAULT_FEATURED: VaultArtwork = {
-  id: 'featured-masterpiece-001',
-  title: 'Metamorfosis Cahaya & Silikon #04',
-  artist: 'Galeri Seni Kontemporer VEC',
-  artistRole: 'Verified Master Vault',
-  medium: 'Akrilik & Pigmen Emas di Atas Kanvas',
-  dimensions: '120 × 150 cm',
-  photoUrl: '/assets/images/vec_vault_artwork_1792494925679.jpg',
-  authenticityScore: 99.80,
-  digest: 'e1a7b8c9d0e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8',
-  c2paSignature: 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
-  deviceInfo: 'Kamera Profesional Sony Alpha 7R V',
-  curationNumber: 'VEC-2026-0042',
-  description: 'Karya asli yang diverifikasi langsung dengan sertifikasi kamera resmi dan segel pengaman fisik kanvas. Seluruh riwayat kepemilikan dan catatan kurasi tersimpan aman.',
-  publishedAt: '2026-10-20',
-  storageTarget: 'cloud_supabase',
-  cloudBucket: 'vec-captures'
-};
-
 interface VecVaultProps {
   onNavigateToStudio?: () => void;
   onNavigateToPrivateVault?: () => void;
@@ -134,225 +113,91 @@ export const VecVault: React.FC<VecVaultProps> = ({
   const [isPlayingAudio, setIsPlayingAudio] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [interactions, setInteractions] = useState<InteractionItem[]>([]);
 
-  const [interactions, setInteractions] = useState<InteractionItem[]>([
-    {
-      id: 'int-1',
-      artworkId: DEFAULT_FEATURED.id,
-      author: 'Budi Hartono',
-      role: 'VEC Master Curator',
-      score: 99.20,
-      type: 'COMMENT',
-      content: 'Keaslian foto tervalidasi penuh langsung dari kamera. Gambar terbukti asli tanpa rekayasa kecerdasan buatan.',
-      timestamp: '15 menit lalu'
-    },
-    {
-      id: 'int-2',
-      artworkId: DEFAULT_FEATURED.id,
-      author: 'Galeri Seni Nusantara',
-      role: 'Verified Art Vault',
-      score: 98.80,
-      type: 'VOICE_NOTE',
-      voiceDuration: 18.5,
-      waveform: [35, 60, 95, 80, 45, 90, 65, 40, 75, 100, 55, 30],
-      timestamp: '32 menit lalu'
-    },
-    {
-      id: 'int-3',
-      artworkId: DEFAULT_FEATURED.id,
-      author: 'Sarah Jenkins',
-      role: 'Fine Art Photographer',
-      score: 96.80,
-      type: 'AUTHENTIC_SEAL',
-      content: 'Menyematkan Stempel Keaslian Resmi (AUTHENTIC_SEAL). Silsilah pigmen dan tag fisik NTAG424 DNA terhubung identik.',
-      timestamp: '1 jam lalu'
-    }
-  ]);
-
+  // Pure Supabase: Sole Source of Truth (No Hybrid)
   const loadPublishedArtworks = async () => {
     setIsRefreshing(true);
     try {
-      const localVaultItems = getPublicVaultItems();
+      const { data: postsData, error } = await supabase
+        .from('posts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
 
-      const privateDigests = new Set<string>();
-      const privateTitles = new Set<string>();
-      const privateIds = new Set<string>();
-      const privateUrls = new Set<string>();
+      if (error) {
+        console.warn('Supabase catalog query error:', error.message);
+        setArtworks([]);
+        setSelectedArtworkId('');
+        return;
+      }
 
-      getPrivateVaultItems().forEach((item) => {
-        if (item.isPrivate || !item.isPublished) {
-          if (item.digest && item.digest.trim().length > 8) {
-            privateDigests.add(item.digest.trim().toLowerCase());
-          }
-          if (item.title && item.title.trim().length > 0) {
-            privateTitles.add(item.title.trim().toLowerCase());
-          }
-          if (item.id) {
-            privateIds.add(item.id);
-          }
-          if (item.cloudStorageUrl) {
-            privateUrls.add(item.cloudStorageUrl.trim());
-          }
-          if (item.photoUrl && !item.photoUrl.startsWith('data:')) {
-            privateUrls.add(item.photoUrl.trim());
-          }
-        }
-      });
+      if (!postsData || postsData.length === 0) {
+        setArtworks([]);
+        setSelectedArtworkId('');
+        return;
+      }
 
-      const userPublishedList: VaultArtwork[] = localVaultItems
-        .map((item) => {
-          let resolvedPhoto = item.photoUrl;
-          if (item.uploadStatus === 'uploaded' && item.cloudStorageUrl && item.cloudStorageUrl.startsWith('http') && !item.cloudStorageUrl.includes('undefined')) {
-            resolvedPhoto = item.cloudStorageUrl;
+      const publishedList: VaultArtwork[] = postsData
+        .filter((post: any) => {
+          if (post.is_destroyed === true || post.destroyed_at) return false;
+          // Privacy check: only published (non-private) posts appear in the public catalog
+          const isPrivate = post.sensor_telemetry?.is_private === true;
+          if (isPrivate) return false;
+
+          const d = (post.c2pa_manifest_hash || post.raw_capture_digest || '').trim().toLowerCase();
+          const t = (post.title || '').trim().toLowerCase();
+          const u = (post.media_url || '').trim();
+          const pid = post.id;
+          const curation = `VEC-SDB-${(post.id || '').slice(0, 4).toUpperCase()}`;
+
+          if (isArtworkPermanentlyDestroyed({
+            id: pid,
+            digest: d,
+            title: t,
+            photoUrl: u,
+            curationNumber: curation
+          })) {
+            return false;
           }
-          if (resolvedPhoto && resolvedPhoto.startsWith('/src/assets/')) {
-            resolvedPhoto = resolvedPhoto.replace('/src/assets/', '/assets/');
+          return true;
+        })
+        .map((post: any) => {
+          let mUrl = post.media_url || '';
+          if (mUrl.startsWith('/src/assets/')) {
+            mUrl = mUrl.replace('/src/assets/', '/assets/');
           }
           return {
-            id: item.id,
-            title: item.title || 'Tangkapan Kamera Sensor',
-            artist: 'Anda (Koleksi / Jepretan Anda)',
-            artistRole: 'Hardware Attested Creator • Diterbitkan',
-            medium: item.sensorType || 'Digital Fine Art / Sensor C2PA RAW',
-            dimensions: item.resolution,
-            photoUrl: resolvedPhoto || '/assets/images/vec_vault_artwork_1792494925679.jpg',
-            authenticityScore: 99.40,
-            digest: item.digest,
-            c2paSignature: item.c2paSignature,
-            deviceInfo: item.deviceInfo,
-            curationNumber: `VEC-PUB-${item.id.slice(-4).toUpperCase()}`,
-            description: item.description || `Karya otentik telah diterbitkan ke Live Vault dan tersimpan di ${item.storageTarget === 'cloud_supabase' ? 'Cloud Supabase (' + (item.cloudBucket || 'vec-captures') + ')' : 'Brankas VEC'}.`,
+            id: post.id,
+            title: post.title || 'Tangkapan C2PA Publik',
+            artist: post.author_name || 'Kolektor Terverifikasi',
+            artistRole: 'Hardware Attested Member',
+            medium: 'Sensor CMOS RAW Attested',
+            dimensions: post.sensor_telemetry?.resolution || '1920 × 1080 piksel',
+            photoUrl: mUrl,
+            authenticityScore: Number(post.authenticity_confidence || 99.40),
+            digest: post.c2pa_manifest_hash || post.raw_capture_digest || 'hash',
+            c2paSignature: post.hardware_tee_signature || 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
+            deviceInfo: `${post.camera_make || 'Sony'} ${post.camera_model || 'Alpha C2PA'}`,
+            curationNumber: `VEC-SDB-${post.id.slice(0, 4).toUpperCase()}`,
+            description: post.caption || 'Karya terverifikasi yang tersinkronisasi via Supabase PostgreSQL.',
             isUserUploaded: true,
-            publishedAt: item.captureDate,
-            storageTarget: item.storageTarget,
-            cloudBucket: item.cloudBucket
+            publishedAt: new Date(post.created_at).toLocaleDateString('id-ID'),
+            storageTarget: 'cloud_supabase',
+            cloudBucket: 'vec-captures'
           };
         });
 
-      let remoteArtworks: VaultArtwork[] = [];
-      try {
-        const { data: postsData, error } = await supabase
-          .from('posts')
-          .select('*')
-          .eq('is_destroyed', false)
-          .order('created_at', { ascending: false })
-          .limit(20);
-
-        if (!error && postsData && postsData.length > 0) {
-          remoteArtworks = postsData
-            .filter((post: any) => {
-              const d = (post.c2pa_manifest_hash || post.raw_capture_digest || '').trim().toLowerCase();
-              const t = (post.title || '').trim().toLowerCase();
-              const u = (post.media_url || '').trim();
-              const pid = post.id;
-              const curation = `VEC-SDB-${(post.id || '').slice(0, 4).toUpperCase()}`;
-
-              if (isArtworkPermanentlyDestroyed({
-                id: pid,
-                digest: d,
-                title: t,
-                photoUrl: u,
-                curationNumber: curation
-              })) {
-                return false;
-              }
-
-              if (d && privateDigests.has(d)) return false;
-              if (t && privateTitles.has(t)) return false;
-              if (u && privateUrls.has(u)) return false;
-              if (pid && privateIds.has(pid)) return false;
-              return true;
-            })
-            .map((post: any) => {
-              let mUrl = post.media_url || '/assets/images/vec_vault_artwork_1792494925679.jpg';
-              if (mUrl.startsWith('/src/assets/')) {
-                mUrl = mUrl.replace('/src/assets/', '/assets/');
-              }
-              return {
-                id: post.id,
-                title: post.title || 'Tangkapan C2PA Publik',
-                artist: post.author_name || 'Kolektor Terverifikasi',
-                artistRole: 'Hardware Attested Member',
-                medium: 'Sensor CMOS RAW Attested',
-                dimensions: post.sensor_telemetry?.resolution || '1920 × 1080 piksel',
-                photoUrl: mUrl,
-                authenticityScore: Number(post.authenticity_confidence || 98.5),
-                digest: post.c2pa_manifest_hash || post.raw_capture_digest || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-                c2paSignature: post.hardware_tee_signature || 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
-                deviceInfo: `${post.camera_make || 'Sony'} ${post.camera_model || 'Alpha C2PA'}`,
-                curationNumber: `VEC-SDB-${post.id.slice(0, 4).toUpperCase()}`,
-                description: post.caption || 'Karya terverifikasi yang tersinkronisasi via cluster Supabase PostgreSQL.',
-                isUserUploaded: false,
-                publishedAt: new Date(post.created_at).toLocaleDateString('id-ID')
-              };
-            });
-        } else if (error) {
-          console.warn('Supabase catalog query note:', error.message);
-        }
-      } catch (dbErr) {
-        console.warn('Supabase posts query note:', dbErr);
-      }
-
-      const combined = [...userPublishedList, ...remoteArtworks];
-      const getNormalizedUrlKey = (url: string) => {
-        if (!url) return '';
-        if (url.startsWith('data:')) {
-          return `data_${url.slice(0, 80)}_${url.length}`;
-        }
-        return url.toLowerCase().trim();
-      };
-
-      const seenDigests = new Set<string>();
-      const seenImageUrls = new Set<string>();
-      const seenIds = new Set<string>();
-      const seenTitles = new Set<string>();
-      const uniqueCombined: VaultArtwork[] = [];
-
-      for (const item of combined) {
-        if (isArtworkPermanentlyDestroyed({
-          id: item.id,
-          digest: item.digest,
-          title: item.title,
-          photoUrl: item.photoUrl,
-          curationNumber: item.curationNumber
-        })) {
-          continue;
-        }
-
-        const d = (item.digest || '').trim().toLowerCase();
-        const u = (item.photoUrl || '').trim();
-        const urlKey = getNormalizedUrlKey(u);
-        const t = (item.title || '').trim().toLowerCase();
-
-        if (d && privateDigests.has(d)) continue;
-        if (t && privateTitles.has(t)) continue;
-        if (privateIds.has(item.id)) continue;
-        if (u && privateUrls.has(u)) continue;
-
-        const isDigestDup = d.length > 8 && seenDigests.has(d);
-        const isUrlDup = urlKey.length > 0 && seenImageUrls.has(urlKey);
-        const isTitleDup = t.length > 0 && seenTitles.has(t);
-        const isIdDup = seenIds.has(item.id);
-
-        if (!isDigestDup && !isUrlDup && !isTitleDup && !isIdDup) {
-          if (d.length > 8) seenDigests.add(d);
-          if (urlKey.length > 0) seenImageUrls.add(urlKey);
-          if (t.length > 0) seenTitles.add(t);
-          seenIds.add(item.id);
-          uniqueCombined.push(item);
-        }
-      }
-
-      setArtworks(uniqueCombined);
-      if (uniqueCombined.length > 0) {
-        if (!uniqueCombined.some(a => a.id === selectedArtworkId)) {
-          setSelectedArtworkId(uniqueCombined[0].id);
+      setArtworks(publishedList);
+      if (publishedList.length > 0) {
+        if (!publishedList.some(a => a.id === selectedArtworkId)) {
+          setSelectedArtworkId(publishedList[0].id);
         }
       } else {
         setSelectedArtworkId('');
       }
     } catch (e) {
-      console.warn('Error loading published artworks:', e);
+      console.warn('Error loading published artworks from Supabase:', e);
       setArtworks([]);
       setSelectedArtworkId('');
     } finally {
@@ -557,6 +402,20 @@ export const VecVault: React.FC<VecVaultProps> = ({
             <span>Segarkan Vault</span>
           </button>
 
+          <button
+            onClick={async () => {
+              await purgeAllLocalVaultCache();
+              await loadPublishedArtworks();
+              setVaultToast('Semua cache lokal berhasil dibersihkan & dimuat ulang murni dari Supabase.');
+              setTimeout(() => setVaultToast(null), 3500);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-rose-950/50 hover:bg-rose-900/70 text-rose-300 border border-rose-800 transition cursor-pointer"
+            title="Hapus seluruh cache & log tersimpan di peramban dan muat ulang hanya dari database Supabase"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+            <span className="hidden sm:inline">Bersihkan Cache</span>
+          </button>
+
           {onNavigateToStudio && (
             <button
               onClick={onNavigateToStudio}
@@ -661,10 +520,7 @@ export const VecVault: React.FC<VecVaultProps> = ({
                         alt={art.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                         onError={(e) => {
-                          const el = e.currentTarget;
-                          if (!el.src.includes('vec_vault_artwork')) {
-                            el.src = '/assets/images/vec_vault_artwork_1792494925679.jpg';
-                          }
+                          e.currentTarget.style.opacity = '0.3';
                         }}
                       />
                       {art.isUserUploaded && (
@@ -727,10 +583,7 @@ export const VecVault: React.FC<VecVaultProps> = ({
                   }}
                   title="Klik untuk membuka penampil gambar resolusi tinggi & zoom"
                   onError={(e) => {
-                    const el = e.currentTarget;
-                    if (!el.src.includes('vec_vault_artwork')) {
-                      el.src = '/assets/images/vec_vault_artwork_1792494925679.jpg';
-                    }
+                    e.currentTarget.style.opacity = '0.3';
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-slate-900/90 pointer-events-none"></div>

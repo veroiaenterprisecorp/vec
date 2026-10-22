@@ -257,8 +257,8 @@ export const VecStudio: React.FC<VecStudioProps> = ({
           isPublished: privacyMode === 'public',
           c2paSignature: 'SHA256_UPLOAD_INTEGRITY_VERIFIED',
           sensorType: 'Direct File Digest (Cryptographic Attestation)',
-          storageTarget: storageTarget,
-          uploadStatus: isCloudTarget ? 'uploading' : 'local_only',
+          storageTarget: 'cloud_supabase',
+          uploadStatus: 'uploading',
           cloudBucket: targetBucket
         });
         setShowVaultSavedBadge(true);
@@ -425,8 +425,8 @@ export const VecStudio: React.FC<VecStudioProps> = ({
         isPublished: privacyMode === 'public',
         c2paSignature: isCameraActive ? 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID' : 'SIMULATION_TEE_HASH_VALID',
         sensorType: isCameraActive ? 'Direct CMOS RAW (Zero-Bypass)' : 'Simulasi Sensor C2PA Hardware',
-        storageTarget: storageTarget,
-        uploadStatus: isCloudTarget ? 'uploading' : 'local_only',
+        storageTarget: 'cloud_supabase',
+        uploadStatus: 'uploading',
         cloudBucket: targetBucket,
         createdAt: captureTimeMs
       });
@@ -609,64 +609,28 @@ export const VecStudio: React.FC<VecStudioProps> = ({
         </div>
       )}
 
-      {/* STORAGE DESTINATION ARCHITECTURE (Cloud Supabase Storage vs Local Device) */}
+      {/* STORAGE DESTINATION ARCHITECTURE (Pure Supabase - Sole Database) */}
       <div className="p-3.5 bg-gradient-to-r from-[#050C1E] to-[#0A1628] border border-cyan-500/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
-            storageTarget === 'cloud_supabase' 
-              ? 'bg-cyan-950/80 border-cyan-500/50 text-cyan-400' 
-              : 'bg-amber-950/80 border-amber-500/50 text-amber-400'
-          }`}>
-            {storageTarget === 'cloud_supabase' ? <Cloud className="w-5 h-5 animate-pulse" /> : <HardDrive className="w-5 h-5" />}
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border bg-cyan-950/80 border-cyan-500/50 text-cyan-400">
+            <Cloud className="w-5 h-5 animate-pulse" />
           </div>
           <div>
             <div className="flex items-center gap-2 text-xs font-mono font-bold text-white">
-              <span>Target Penyimpanan Pengambilan Gambar:</span>
-              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono border ${
-                storageTarget === 'cloud_supabase'
-                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-              }`}>
-                {storageTarget === 'cloud_supabase' ? '☁️ Cloud Storage (Supabase)' : '💾 Memori Lokal Perangkat'}
+              <span>Target Penyimpanan Tunggal:</span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono border bg-cyan-500/20 text-cyan-300 border-cyan-500/40">
+                ☁️ Basis Data Supabase (Single Source of Truth)
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-              {storageTarget === 'cloud_supabase' 
-                ? `Foto otomatis diunggah ke Supabase Cloud Storage (Bucket: "${targetBucket}") & tersimpan di cloud database.` 
-                : 'Foto hanya disimpan secara offline di browser perangkat Anda.'}
+              Seluruh foto & sertifikasi C2PA disimpan murni ke Supabase Cloud Storage (Bucket: "{targetBucket}") dan tabel posts. Tanpa penyimpanan ganda (non-hybrid).
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 p-1 bg-slate-950/90 rounded-xl border border-slate-800 text-xs shrink-0">
-          <button
-            onClick={() => {
-              setStorageTarget('cloud_supabase');
-              saveStorageModePref('cloud_supabase');
-            }}
-            className={`px-3 py-1.5 rounded-lg font-mono text-[11px] flex items-center gap-1.5 transition cursor-pointer ${
-              storageTarget === 'cloud_supabase'
-                ? 'bg-cyan-600 text-white font-bold shadow-md shadow-cyan-950'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Cloud className="w-3.5 h-3.5" />
-            <span>Cloud Supabase (Default)</span>
-          </button>
-          <button
-            onClick={() => {
-              setStorageTarget('device_local');
-              saveStorageModePref('device_local');
-            }}
-            className={`px-3 py-1.5 rounded-lg font-mono text-[11px] flex items-center gap-1.5 transition cursor-pointer ${
-              storageTarget === 'device_local'
-                ? 'bg-amber-600 text-white font-bold shadow-md shadow-amber-950'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <HardDrive className="w-3.5 h-3.5" />
-            <span>Perangkat Lokal</span>
-          </button>
+        <div className="flex items-center gap-2 p-1.5 bg-slate-950/90 rounded-xl border border-cyan-500/30 text-xs shrink-0 text-cyan-300 font-mono">
+          <Check className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="text-[11px] font-bold">100% Terintegrasi Supabase</span>
         </div>
       </div>
 

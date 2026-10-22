@@ -104,10 +104,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate }) => {
                 className="w-full h-84 sm:h-96 object-cover object-center group-hover:scale-102 transition duration-700"
                 referrerPolicy="no-referrer"
                 onError={(e) => {
-                  const el = e.currentTarget;
-                  if (!el.src.includes('vec_vault_artwork')) {
-                    el.src = '/assets/images/vec_vault_artwork_1792494925679.jpg';
-                  }
+                  e.currentTarget.style.opacity = '0.3';
                 }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent"></div>

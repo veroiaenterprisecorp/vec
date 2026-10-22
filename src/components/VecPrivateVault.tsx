@@ -8,6 +8,7 @@ import {
   getUserVaultProfile,
   mergeRemoteItemsIntoVault,
   initVaultAsync,
+  purgeAllLocalVaultCache,
   PrivateVaultItem,
   UserVaultProfile
 } from '../lib/userVaultStorage';
@@ -189,7 +190,7 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
   const handleTogglePrivacy = async (item: PrivateVaultItem) => {
     const newIsPrivate = !item.isPrivate;
     const newIsPublished = !newIsPrivate;
-    const updated = updateVaultItemPrivacy(item.id, newIsPrivate, newIsPublished);
+    const updated = await updateVaultItemPrivacy(item.id, newIsPrivate, newIsPublished);
     setItems(updated);
     window.dispatchEvent(new Event('storage'));
 
@@ -294,8 +295,8 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
 
   const totalPrivateCount = activeItems.filter((i) => i.isPrivate).length;
   const totalPublishedCount = activeItems.filter((i) => i.isPublished).length;
-  const cloudCount = activeItems.filter((i) => i.storageTarget === 'cloud_supabase' || i.uploadStatus === 'uploaded').length;
-  const localCount = activeItems.filter((i) => i.storageTarget === 'device_local' || (!i.storageTarget && i.uploadStatus !== 'uploaded')).length;
+  const cloudCount = activeItems.length;
+  const localCount = 0;
 
   return (
     <div className="space-y-6">
@@ -332,6 +333,36 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
 
         {/* Quick Action Buttons */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            onClick={async () => {
+              await purgeAllLocalVaultCache();
+              const fresh = await initVaultAsync();
+              setItems(fresh);
+              showToast('Semua cache lokal berhasil dibersihkan! Data sekarang murni dari Supabase.');
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800 transition cursor-pointer"
+            title="Hapus seluruh cache & log tersimpan di peramban dan muat ulang murni dari Supabase"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+            <span className="hidden sm:inline">Bersihkan Cache</span>
+          </button>
+
+          <button
+            onClick={async () => {
+              setIsPullingCloud(true);
+              const fresh = await initVaultAsync();
+              setItems(fresh);
+              setIsPullingCloud(false);
+              showToast(`Berhasil menyegarkan data langsung dari Supabase (${fresh.length} karya).`);
+            }}
+            disabled={isPullingCloud}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition cursor-pointer"
+            title="Muat ulang data dari Supabase"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isPullingCloud ? 'animate-spin text-cyan-400' : ''}`} />
+            <span className="hidden sm:inline">Segarkan</span>
+          </button>
+
           <button
             onClick={() => setShowCloudSettingsModal(true)}
             className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition cursor-pointer"
@@ -522,10 +553,7 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
                   alt={item.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                   onError={(e) => {
-                    const el = e.currentTarget;
-                    if (!el.src.includes('vec_vault_artwork')) {
-                      el.src = '/assets/images/vec_vault_artwork_1792494925679.jpg';
-                    }
+                    e.currentTarget.style.opacity = '0.3';
                   }}
                 />
 
@@ -974,10 +1002,12 @@ CREATE POLICY "Public can upload capture objects" ON storage.objects FOR INSERT 
         artwork={itemPendingDelete}
         isOpen={Boolean(itemPendingDelete)}
         onClose={() => setItemPendingDelete(null)}
-        onDeleted={(deletedId) => {
+        onDeleted={async (deletedId) => {
           setItems((prev) => prev.filter((i) => i.id !== deletedId && !isArtworkPermanentlyDestroyed(i)));
           setItemPendingDelete(null);
-          showToast('Gambar berhasil dihapus secara permanen dari seluruh sistem.');
+          showToast('Gambar berhasil dihapus secara permanen dari seluruh sistem Supabase.');
+          const fresh = await initVaultAsync();
+          setItems(fresh);
         }}
       />
 

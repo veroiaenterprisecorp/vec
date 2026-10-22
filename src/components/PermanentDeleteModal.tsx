@@ -140,10 +140,7 @@ export const PermanentDeleteModal: React.FC<PermanentDeleteModalProps> = ({
               alt={artwork.title}
               className="w-full h-full object-cover"
               onError={(e) => {
-                const el = e.currentTarget;
-                if (!el.src.includes('vec_vault_artwork')) {
-                  el.src = '/assets/images/vec_vault_artwork_1792494925679.jpg';
-                }
+                e.currentTarget.style.opacity = '0.3';
               }}
             />
           </div>
