@@ -151,6 +151,9 @@ CREATE TABLE IF NOT EXISTS public.posts (
     -- Partisi & Timestamps
     created_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW()),
+    is_destroyed BOOLEAN NOT NULL DEFAULT FALSE,
+    destroyed_at TIMESTAMPTZ,
+    destroyed_reason TEXT,
     
     -- Primary Key Komposit untuk Partisi PostgreSQL
     CONSTRAINT pk_posts PRIMARY KEY (id, created_at)

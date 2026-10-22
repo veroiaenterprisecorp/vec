@@ -234,6 +234,7 @@ export const VecVault: React.FC<VecVaultProps> = ({
         const { data: postsData, error } = await supabase
           .from('posts')
           .select('*')
+          .eq('is_destroyed', false)
           .order('created_at', { ascending: false })
           .limit(20);
 
@@ -285,6 +286,8 @@ export const VecVault: React.FC<VecVaultProps> = ({
                 publishedAt: new Date(post.created_at).toLocaleDateString('id-ID')
               };
             });
+        } else if (error) {
+          console.warn('Supabase catalog query note:', error.message);
         }
       } catch (dbErr) {
         console.warn('Supabase posts query note:', dbErr);

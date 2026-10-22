@@ -32,6 +32,7 @@ export const PermanentDeleteModal: React.FC<PermanentDeleteModalProps> = ({
   const [confirmInput, setConfirmInput] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deletionStep, setDeletionStep] = useState<string>('');
+  const [deletionError, setDeletionError] = useState<string | null>(null);
 
   if (!isOpen || !artwork) return null;
 
@@ -42,13 +43,14 @@ export const PermanentDeleteModal: React.FC<PermanentDeleteModalProps> = ({
     if (!isKeywordValid || isDeleting) return;
 
     setIsDeleting(true);
+    setDeletionError(null);
     setDeletionStep('Menghapus berkas gambar dari penyimpanan cloud...');
 
     try {
       await new Promise((r) => setTimeout(r, 350));
       setDeletionStep('Menghapus data karya dari basis data dan galeri publik...');
 
-      const result = await destroyArtworkPermanentlyZeroTrace({
+      await destroyArtworkPermanentlyZeroTrace({
         id: artwork.id,
         title: artwork.title,
         digest: artwork.digest,
@@ -69,8 +71,7 @@ export const PermanentDeleteModal: React.FC<PermanentDeleteModalProps> = ({
       handleClose();
     } catch (err: any) {
       console.error('Destruction error:', err);
-      onDeleted(artwork.id);
-      handleClose();
+      setDeletionError(err?.message || 'Penghapusan gagal. Karya belum dipastikan hilang dari katalog cloud.');
     } finally {
       setIsDeleting(false);
     }
@@ -80,6 +81,7 @@ export const PermanentDeleteModal: React.FC<PermanentDeleteModalProps> = ({
     if (isDeleting) return;
     setConfirmInput('');
     setDeletionStep('');
+    setDeletionError(null);
     onClose();
   };
 
@@ -181,6 +183,11 @@ export const PermanentDeleteModal: React.FC<PermanentDeleteModalProps> = ({
           <div className="p-3 rounded-xl bg-slate-950 border border-cyan-500/30 flex items-center gap-3 text-xs text-cyan-300 animate-in fade-in">
             <Loader2 className="w-4 h-4 animate-spin text-cyan-400 shrink-0" />
             <span className="truncate">{deletionStep}</span>
+          </div>
+        )}
+        {deletionError && (
+          <div role="alert" className="p-3 rounded-xl bg-rose-950/50 border border-rose-500/40 text-xs text-rose-200">
+            {deletionError}
           </div>
         )}
 

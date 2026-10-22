@@ -56,15 +56,18 @@ const trySoftDestroyPosts = async (client: any, predicates: Array<{ key: string;
   let anyUpdated = false;
   for (const predicate of predicates) {
     try {
-      const { error } = await client
+      const { data, error } = await client
         .from('posts')
         .update(buildPermanentDestroyUpdate())
-        .eq(predicate.key, predicate.value);
+        .eq(predicate.key, predicate.value)
+        .select('id');
 
-      if (!error) {
+      if (!error && data && data.length > 0) {
         anyUpdated = true;
-      } else if (!/column .*is_destroyed|destroyed_at|destroyed_reason/i.test(error.message || '')) {
+      } else if (error && !/column .*is_destroyed|destroyed_at|destroyed_reason/i.test(error.message || '')) {
         console.warn('Permanent destroy soft-delete note:', error.message);
+      } else if (!error) {
+        console.warn('Permanent destroy soft-delete note: No matching post was updated.');
       }
     } catch (e) {
       console.warn('Permanent destroy soft-delete catch:', e);
@@ -612,15 +615,6 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
 
   const supabase = getActiveSupabaseClient();
 
-  // 0. Proactively record in permanent tombstone registry so it can never reappear in any query
-  recordArtworkPermanentlyDestroyed({
-    id,
-    digest,
-    title,
-    photoUrl: photoUrl || cloudStorageUrl,
-    curationNumber
-  });
-
   // 1. Supabase Storage files removal
   const targetBucket = (cloudBucket && cloudBucket.trim()) || getStorageBucketName() || DEFAULT_BUCKET_NAME;
   const pathsToRemove: string[] = [];
@@ -688,16 +682,25 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
 
     if (orFilters.length > 0) {
       try {
-        const { data: matchedPosts } = await supabase
+        const { data: matchedPosts, error: matchError } = await supabase
           .from('posts')
           .select('id, raw_capture_digest, c2pa_manifest_hash, title, media_url, is_destroyed, destroyed_at')
           .or(orFilters.join(','));
+
+        if (matchError) {
+          throw new Error(
+            `Gagal mencari karya di katalog cloud: ${matchError.message}. Pastikan migrasi 20261022000000_vec_catalog_tombstones.sql sudah diterapkan.`
+          );
+        }
 
         if (matchedPosts && matchedPosts.length > 0) {
           for (const mp of matchedPosts) {
             // Soft-delete first so public queries will hide the record even before hard-delete completes
             if (!isPostDestroyMarkerPresent(mp)) {
-              await trySoftDestroyPosts(supabase, [{ key: 'id', value: mp.id }]);
+              const marked = await trySoftDestroyPosts(supabase, [{ key: 'id', value: mp.id }]);
+              if (!marked) {
+                throw new Error(`Karya "${mp.title}" ditemukan, tetapi gagal ditarik dari katalog cloud.`);
+              }
             }
 
             // Delete interactions first to satisfy foreign key constraints
@@ -717,7 +720,7 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
           }
         }
       } catch (matchErr) {
-        console.warn('Matching posts lookup note:', matchErr);
+        throw matchErr;
       }
     }
 
@@ -752,7 +755,17 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
     }
   } catch (dbErr) {
     console.warn('DB wipe posts note:', dbErr);
+    throw dbErr;
   }
+
+  // Keep a local tombstone only after the cloud lookup/soft-delete phase succeeds.
+  recordArtworkPermanentlyDestroyed({
+    id,
+    digest,
+    title,
+    photoUrl: photoUrl || cloudStorageUrl,
+    curationNumber
+  });
 
   // 3. Remove interactions / curations
   try {
