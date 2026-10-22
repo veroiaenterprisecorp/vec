@@ -89,6 +89,26 @@ export const filterDestroyedItems = <T extends { id?: string; digest?: string; t
   }));
 };
 
+export const isVaultItemVisibleInPublicVault = (
+  item?: Pick<PrivateVaultItem, 'id' | 'digest' | 'title' | 'photoUrl' | 'isPrivate' | 'isPublished'>
+): boolean => {
+  if (!item) return false;
+  if (isDestroyedArtworkCandidate({
+    id: item.id,
+    digest: item.digest,
+    title: item.title,
+    photoUrl: item.photoUrl
+  })) {
+    return false;
+  }
+  if (item.isPrivate === true) return false;
+  return item.isPublished === true;
+};
+
+export const getPublicVaultItems = (): PrivateVaultItem[] => {
+  return getPrivateVaultItems().filter((item) => isVaultItemVisibleInPublicVault(item));
+};
+
 const DEFAULT_ITEMS: PrivateVaultItem[] = [
   {
     id: 'vault-item-001',
