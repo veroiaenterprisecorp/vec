@@ -222,6 +222,25 @@ export const publishArtworkToSupabasePosts = async (params: {
   const client = getActiveSupabaseClient();
 
   try {
+    // Dynamic Vault Identity
+    let activeVaultId = 'b2222222-2222-4222-8222-222222222222';
+    let vaultName = 'Brankas Mahakarya';
+    let creatorName = 'VEC Verified Creator';
+
+    if (typeof window !== 'undefined') {
+      try {
+        const rawSession = localStorage.getItem('vec_unlocked_vault_session_v1');
+        if (rawSession) {
+          const session = JSON.parse(rawSession);
+          if (session?.vault?.id) {
+            activeVaultId = session.vault.id;
+            vaultName = session.vault.vault_name || vaultName;
+            creatorName = session.vault.creator_name || creatorName;
+          }
+        }
+      } catch {}
+    }
+
     // Ensure a valid user_id exists in public.users to satisfy foreign key constraint
     let userId = 'b2222222-2222-4222-8222-222222222222';
     try {
@@ -244,11 +263,18 @@ export const publishArtworkToSupabasePosts = async (params: {
     }
 
     const postId = crypto.randomUUID();
+    const mergedTelemetry = {
+      ...(sensorMetadata || { resolution: resolution || '1920 × 1080' }),
+      vault_id: activeVaultId,
+      vault_name: vaultName,
+      creator_name: creatorName
+    };
+
     const payload: any = {
       id: postId,
       user_id: userId,
       title: title || 'Tangkapan Kamera C2PA',
-      caption: `Karya seni terverifikasi C2PA (${deviceInfo || 'CMOS Hardware Enclave'}).`,
+      caption: `Karya seni terverifikasi C2PA (${deviceInfo || 'CMOS Hardware Enclave'}). Diterbitkan dari ${vaultName}.`,
       media_url: photoUrl,
       c2pa_manifest_hash: digest,
       raw_capture_digest: digest,
@@ -259,7 +285,7 @@ export const publishArtworkToSupabasePosts = async (params: {
       public_location: 'SRID=4326;POINT(106.827153 -6.175392)',
       camera_make: 'Sony/VEC Hardware Enclave',
       camera_model: deviceInfo || 'Android CMOS C2PA',
-      sensor_telemetry: sensorMetadata || { resolution: resolution || '1920 × 1080' },
+      sensor_telemetry: mergedTelemetry,
       created_at: new Date().toISOString(),
       is_destroyed: false,
       destroyed_at: null

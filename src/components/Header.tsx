@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { VecOfficialLogo } from './VecOfficialLogo';
 import { Camera, Lock, KeyRound } from 'lucide-react';
+import { isVaultUnlocked } from '../lib/vaultKeyAuth';
 
 interface HeaderProps {
   activeTab: string;
@@ -15,6 +16,17 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab
 }) => {
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => isVaultUnlocked());
+
+  useEffect(() => {
+    const sync = () => setIsUnlocked(isVaultUnlocked());
+    window.addEventListener('vec-vault-lock-state-changed', sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener('vec-vault-lock-state-changed', sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
   return (
     <header className="border-b border-neutral-800/80 bg-[#020409]/95 backdrop-blur-xl sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-8">
@@ -58,13 +70,20 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => setActiveTab('private-vault')}
-            className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer ${
+            className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'private-vault'
                 ? 'text-white border-b-2 border-emerald-400 font-semibold'
                 : 'text-neutral-400 hover:text-white'
             }`}
           >
-            Brankas Karya
+            <span>Brankas Karya</span>
+            {isUnlocked ? (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Brankas Terbuka"></span>
+            ) : (
+              <span title="Brankas Terkunci">
+                <Lock className="w-3 h-3 text-neutral-500" />
+              </span>
+            )}
           </button>
 
           <button
@@ -79,7 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </nav>
 
-        {/* Zone 3: Primary Action */}
+        {/* Zone 3: Primary Action & Discreet Root Gate */}
         <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={() => setActiveTab('studio')}
@@ -88,12 +107,25 @@ export const Header: React.FC<HeaderProps> = ({
             <Camera className="w-3.5 h-3.5 text-cyan-400" />
             <span className="whitespace-nowrap">Buka Studio Foto</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('admin-portal')}
+            className={`p-2 rounded-lg border text-xs transition duration-200 cursor-pointer ${
+              activeTab === 'admin-portal'
+                ? 'bg-emerald-950/60 border-emerald-500/60 text-emerald-300'
+                : 'bg-neutral-950/60 border-neutral-800 text-neutral-500 hover:text-neutral-300 hover:border-neutral-700'
+            }`}
+            title="Akses Pengelola Sistem"
+            aria-label="Pengelola Sistem"
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+          </button>
         </div>
 
       </div>
 
       {/* Mobile Responsive Navigation Strip */}
-      <div className="md:hidden flex items-center justify-around gap-1 px-4 py-2 border-t border-neutral-900 bg-neutral-950 text-xs">
+      <div className="md:hidden flex items-center justify-between gap-1 overflow-x-auto px-4 py-2 border-t border-neutral-900 bg-neutral-950 text-xs">
         <button
           onClick={() => setActiveTab('overview')}
           className={`px-3 py-1.5 rounded-md whitespace-nowrap transition-colors ${
@@ -125,6 +157,15 @@ export const Header: React.FC<HeaderProps> = ({
           }`}
         >
           Studio
+        </button>
+        <button
+          onClick={() => setActiveTab('admin-portal')}
+          className={`p-1.5 rounded-md whitespace-nowrap transition-colors ${
+            activeTab === 'admin-portal' ? 'text-emerald-300 bg-emerald-950/60' : 'text-neutral-500'
+          }`}
+          title="Root Gate"
+        >
+          <Lock className="w-3.5 h-3.5" />
         </button>
       </div>
 

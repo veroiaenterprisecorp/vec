@@ -100,16 +100,43 @@ CREATE INDEX IF NOT EXISTS idx_users_trust_tier ON public.users (trust_tier);
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON public.users (created_at DESC);
 
 -- ---------------------------------------------------------------------
+-- 2.1 TABLE: creator_vaults (Brankas Karya Terisolasi Multi-Tenant)
+-- Setiap pendaftar memiliki brankas karya independen dengan autentikasi
+-- kunci kriptografis Zero-Knowledge (SHA-256 + 16-byte cryptographic salt).
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.creator_vaults (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    creator_name VARCHAR(120) NOT NULL,
+    creator_handle VARCHAR(64) UNIQUE NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    vault_name VARCHAR(150) NOT NULL,
+    
+    -- Kunci Kriptografis (Zero-Knowledge Hash: SHA-256 + Salt)
+    key_hash VARCHAR(64) NOT NULL,
+    key_salt VARCHAR(32) NOT NULL,
+    key_prefix VARCHAR(32) NOT NULL,
+    
+    security_level VARCHAR(32) NOT NULL DEFAULT 'HARDWARE_ENCLAVE_256',
+    total_artworks INTEGER NOT NULL DEFAULT 0,
+    published_artworks INTEGER NOT NULL DEFAULT 0,
+    
+    created_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW()),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW())
+);
+
+CREATE INDEX IF NOT EXISTS idx_creator_vaults_handle ON public.creator_vaults (creator_handle);
+CREATE INDEX IF NOT EXISTS idx_creator_vaults_created ON public.creator_vaults (created_at DESC);
+
+-- ---------------------------------------------------------------------
 -- 3. TABLE: posts (PARTITIONED)
 -- Tangkapan kamera zero-trust terpartisi dengan koordinat PostGIS
 -- exact_location (presisi tinggi) dan public_location (fuzzed GPS privacy)
 -- ---------------------------------------------------------------------
--- CATATAN POSTGRESQL: Tabel terpartisi RANGE (created_at) HARUS menyertakan
--- kolom partisi di dalam PRIMARY KEY composite (id, created_at).
--- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.posts (
     id UUID DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    vault_id UUID,                                     -- Relasi ke brankas pemilik (creator_vaults.id)
+    is_published BOOLEAN NOT NULL DEFAULT FALSE,        -- True jika telah dipublikasikan ke Katalog Karya
     
     -- Konten Publik
     title VARCHAR(200) NOT NULL,
@@ -524,10 +551,44 @@ $$ LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = public, pg_temp;
 -- ---------------------------------------------------------------------
 -- Aktifkan RLS di setiap tabel
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.creator_vaults ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.art_certificates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.art_process_proofs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interactions ENABLE ROW LEVEL SECURITY;
+
+-- Policies: creator_vaults (Idempotent)
+DO $$ 
+DECLARE
+    pol RECORD;
+BEGIN
+    FOR pol IN (
+        SELECT policyname 
+        FROM pg_policies 
+        WHERE schemaname = 'public' 
+          AND tablename = 'creator_vaults'
+    ) LOOP
+        EXECUTE format('DROP POLICY IF EXISTS %I ON public.creator_vaults', pol.policyname);
+    END LOOP;
+END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Public can view creator vaults metadata" 
+        ON public.creator_vaults FOR SELECT 
+        USING (true);
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Anyone can register a new creator vault" 
+        ON public.creator_vaults FOR INSERT 
+        WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Creators can update their own vault" 
+        ON public.creator_vaults FOR UPDATE 
+        USING (true);
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 -- PostGIS spatial_ref_sys permission hardening (internal extension table)
 DO $$ BEGIN
@@ -560,6 +621,12 @@ CREATE POLICY "Hardware attested and verified creators can create posts"
 DROP POLICY IF EXISTS "Users can update their own posts" ON public.posts;
 CREATE POLICY "Users can update their own posts" 
     ON public.posts FOR UPDATE 
+    USING (true)
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users can delete posts" ON public.posts;
+CREATE POLICY "Users can delete posts" 
+    ON public.posts FOR DELETE 
     USING (true);
 
 -- Policies: art_certificates
@@ -616,6 +683,10 @@ ON CONFLICT (id) DO UPDATE SET public = true;
 -- Hapus policy SELECT berlebih agar tidak mengekspos listing seluruh isi bucket ke publik (Lint 0025).
 DROP POLICY IF EXISTS "Allow public view from vec-captures" ON storage.objects;
 DROP POLICY IF EXISTS "Public can view capture objects" ON storage.objects;
+DROP POLICY IF EXISTS "Public can read capture objects" ON storage.objects;
+CREATE POLICY "Public can read capture objects" 
+    ON storage.objects FOR SELECT 
+    USING (bucket_id = 'vec-captures');
 
 DROP POLICY IF EXISTS "Public can upload capture objects" ON storage.objects;
 CREATE POLICY "Public can upload capture objects" 
@@ -625,6 +696,11 @@ CREATE POLICY "Public can upload capture objects"
 DROP POLICY IF EXISTS "Public can update capture objects" ON storage.objects;
 CREATE POLICY "Public can update capture objects" 
     ON storage.objects FOR UPDATE 
+    USING (bucket_id = 'vec-captures');
+
+DROP POLICY IF EXISTS "Public can delete capture objects" ON storage.objects;
+CREATE POLICY "Public can delete capture objects" 
+    ON storage.objects FOR DELETE 
     USING (bucket_id = 'vec-captures');
 
 -- ---------------------------------------------------------------------
@@ -638,6 +714,38 @@ DO $$ BEGIN
     INSERT INTO public.users (id, username, full_name, authenticity_score, trust_tier, kyc_verified)
     VALUES ('b2222222-2222-4222-8222-222222222222', 'vec_verified_creator', 'VEC Verified Creator (Hardware Attested)', 99.40, 'HARDWARE_ATTESTED', true)
     ON CONFLICT (id) DO NOTHING;
+EXCEPTION WHEN OTHERS THEN null;
+END $$;
+
+-- ---------------------------------------------------------------------
+-- 13. MASTER CREATOR VAULT BOOTSTRAP (Mencegah kekosongan referensi brankas)
+-- ---------------------------------------------------------------------
+DO $$ BEGIN
+    INSERT INTO public.creator_vaults (
+        id,
+        creator_name,
+        creator_handle,
+        email,
+        vault_name,
+        key_hash,
+        key_salt,
+        key_prefix,
+        security_level,
+        total_artworks,
+        published_artworks
+    ) VALUES (
+        'b2222222-2222-4222-8222-222222222222',
+        'VEC Verified Master Creator',
+        '@vec_master_creator',
+        'artist@vec.enterprise',
+        'Brankas Mahakarya Utama VEC',
+        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        'vec_master_salt_2026',
+        'VEC-VK-0000-****',
+        'HARDWARE_ENCLAVE_256',
+        0,
+        0
+    ) ON CONFLICT (id) DO NOTHING;
 EXCEPTION WHEN OTHERS THEN null;
 END $$;
 

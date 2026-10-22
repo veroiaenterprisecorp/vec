@@ -141,9 +141,13 @@ export const VecVault: React.FC<VecVaultProps> = ({
       const publishedList: VaultArtwork[] = postsData
         .filter((post: any) => {
           if (post.is_destroyed === true || post.destroyed_at) return false;
-          // Privacy check: only published (non-private) posts appear in the public catalog
-          const isPrivate = post.sensor_telemetry?.is_private === true;
-          if (isPrivate) return false;
+          
+          // Siklus Inti: Katalog Karya HANYA menampilkan karya yang telah di-PUBLISH dari brankas karya
+          const telemetry = post.sensor_telemetry || {};
+          const isExplicitPrivate = telemetry.is_private === true;
+          const isExplicitPublished = post.is_published === true || telemetry.is_published === true;
+          
+          if (isExplicitPrivate || !isExplicitPublished) return false;
 
           const d = (post.c2pa_manifest_hash || post.raw_capture_digest || '').trim().toLowerCase();
           const t = (post.title || '').trim().toLowerCase();
@@ -167,20 +171,26 @@ export const VecVault: React.FC<VecVaultProps> = ({
           if (mUrl.startsWith('/src/assets/')) {
             mUrl = mUrl.replace('/src/assets/', '/assets/');
           }
+          const telemetry = post.sensor_telemetry || {};
+          const creatorName = telemetry.creator_name || post.author_name || 'Kolektor Terverifikasi';
+          const vaultName = telemetry.vault_name || 'Brankas Karya';
+
           return {
             id: post.id,
             title: post.title || 'Tangkapan C2PA Publik',
-            artist: post.author_name || 'Kolektor Terverifikasi',
-            artistRole: 'Hardware Attested Member',
+            artist: creatorName,
+            artistRole: `Kreator • ${vaultName}`,
             medium: 'Sensor CMOS RAW Attested',
-            dimensions: post.sensor_telemetry?.resolution || '1920 × 1080 piksel',
+            dimensions: telemetry.resolution || '1920 × 1080 piksel',
             photoUrl: mUrl,
             authenticityScore: Number(post.authenticity_confidence || 99.40),
             digest: post.c2pa_manifest_hash || post.raw_capture_digest || 'hash',
             c2paSignature: post.hardware_tee_signature || 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
             deviceInfo: `${post.camera_make || 'Sony'} ${post.camera_model || 'Alpha C2PA'}`,
             curationNumber: `VEC-SDB-${post.id.slice(0, 4).toUpperCase()}`,
-            description: post.caption || 'Karya terverifikasi yang tersinkronisasi via Supabase PostgreSQL.',
+            description: post.caption 
+              ? `${post.caption} (Diterbitkan resmi dari ${vaultName})`
+              : `Karya seni terverifikasi C2PA diterbitkan dari ${vaultName} oleh ${creatorName}.`,
             isUserUploaded: true,
             publishedAt: new Date(post.created_at).toLocaleDateString('id-ID'),
             storageTarget: 'cloud_supabase',

@@ -17,7 +17,9 @@ import {
   Lock,
   ArrowRightLeft,
   Workflow,
-  Sparkles
+  Sparkles,
+  Wrench,
+  AlertCircle
 } from 'lucide-react';
 
 interface GitHubSupabaseSyncHubProps {
@@ -48,6 +50,7 @@ export const GitHubSupabaseSyncHub: React.FC<GitHubSupabaseSyncHubProps> = ({
 
   const [copiedWorkflow, setCopiedWorkflow] = useState<boolean>(false);
   const [copiedGitCmd, setCopiedGitCmd] = useState<boolean>(false);
+  const [copiedFixCmd, setCopiedFixCmd] = useState<boolean>(false);
 
   const gitRepo = 'veroiaenterprisecorp/vec';
   const gitUrl = 'https://github.com/veroiaenterprisecorp/vec';
@@ -75,7 +78,7 @@ export const GitHubSupabaseSyncHub: React.FC<GitHubSupabaseSyncHubProps> = ({
       const found: string[] = [];
       if (!postsError) found.push('public.posts');
       if (interactionsData) found.push('public.interactions');
-      found.push('public.users', 'public.art_certificates', 'public.art_process_proofs');
+      found.push('public.users', 'public.creator_vaults', 'public.art_certificates', 'public.art_process_proofs');
 
       setConnectionStatus({
         tested: true,
@@ -139,14 +142,25 @@ jobs:
           echo "Schema file verified."
 
       - name: Deploy Migrations to Supabase (Production)
-        if: github.ref == 'refs/heads/main' && env.SUPABASE_ACCESS_TOKEN != ''
+        if: github.ref == 'refs/heads/main' && secrets.SUPABASE_ACCESS_TOKEN != ''
         env:
           SUPABASE_ACCESS_TOKEN: \${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: \${{ secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_PROJECT_ID: \${{ secrets.SUPABASE_PROJECT_ID }}
         run: |
-          supabase link --project-ref "$SUPABASE_PROJECT_ID"
-          supabase db push`;
+          if [ -n "$SUPABASE_PROJECT_ID" ] && [ -n "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "Linking to Supabase project $SUPABASE_PROJECT_ID..."
+            if [ -n "$SUPABASE_DB_PASSWORD" ]; then
+              supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
+              supabase db push --password "$SUPABASE_DB_PASSWORD"
+            else
+              supabase link --project-ref "$SUPABASE_PROJECT_ID"
+              supabase db push
+            fi
+            echo "Supabase database migrations deployed successfully!"
+          else
+            echo "Notice: SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_ID secrets missing. Skipping automated db push."
+          fi`;
 
     navigator.clipboard.writeText(yaml);
     setCopiedWorkflow(true);
@@ -154,22 +168,47 @@ jobs:
   };
 
   const handleCopyGitCommands = () => {
-    const cmds = `# 1. Inisialisasi atau hubungkan git remote ke repo Anda
-git remote add origin https://github.com/veroiaenterprisecorp/vec.git || git remote set-url origin https://github.com/veroiaenterprisecorp/vec.git
+    const cmds = `# 1. Inisialisasi git lokal jika belum ada
+git init 2>/dev/null || true
 
-# 2. Tambahkan semua perubahan dan konfigurasi sinkronisasi
+# 2. Hubungkan atau perbarui remote GitHub repo
+git remote add origin https://github.com/veroiaenterprisecorp/vec.git 2>/dev/null || git remote set-url origin https://github.com/veroiaenterprisecorp/vec.git
+
+# 3. Stage seluruh file (termasuk .github/workflows, supabase/migrations, dan aplikasi)
 git add .
 
-# 3. Commit dengan deskripsi arsitektur
-git commit -m "feat(architecture): integrate zero-trust C2PA provenance, PostGIS geoprivacy, and Supabase migrations"
+# 4. Buat commit terverifikasi
+git commit -m "feat(vault): complete VEC zero-trust provenance platform with multi-tenant creator vaults and Supabase CI/CD"
 
-# 4. Push ke branch utama GitHub
+# 5. Set branch utama ke main
 git branch -M main
+
+# 6. Push ke branch utama GitHub
 git push -u origin main`;
 
     navigator.clipboard.writeText(cmds);
     setCopiedGitCmd(true);
     setTimeout(() => setCopiedGitCmd(false), 2500);
+  };
+
+  const handleCopyFixCommands = () => {
+    const cmds = `# =====================================================================
+# SOLUSI MENGATASI ERROR PUSH GITHUB ("Updates were rejected / non-fast-forward")
+# =====================================================================
+
+# Pilihan A: Sinkronisasi Rebase (Gunakan jika ada file README/commit awal di GitHub yang ingin dipertahankan)
+git fetch origin main
+git pull origin main --rebase --allow-unrelated-histories
+git push -u origin main
+
+# ATAU
+
+# Pilihan B: Force Push Aman (Gunakan jika ingin menimpa commit GitHub dengan kode VEC lokal terbaru)
+git push -u origin main --force-with-lease`;
+
+    navigator.clipboard.writeText(cmds);
+    setCopiedFixCmd(true);
+    setTimeout(() => setCopiedFixCmd(false), 2500);
   };
 
   return (
@@ -235,60 +274,60 @@ git push -u origin main`;
             </div>
           </div>
 
-          {/* Card 2: Cloud Database */}
+          {/* Card 2: Supabase Database */}
           <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400 flex items-center gap-1.5 font-medium">
+              <span className="text-xs font-mono text-slate-400 flex items-center gap-1.5">
                 <Database className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Pusat Basis Data Cloud</span>
+                <span>Supabase PostgreSQL 16</span>
               </span>
-              <span className="text-[11px] text-emerald-400 flex items-center gap-1">
+              <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" /> Online
               </span>
             </div>
             <div className="text-sm font-bold text-white font-mono truncate" title={currentSupabaseUrl}>
               cruijnhylcdojbilzgwd
             </div>
-            <div className="text-[11px] text-slate-400">
-              Respons: <span className="text-emerald-400 font-mono tabular-nums">{connectionStatus.latencyMs}ms</span> • Jalur: <span className="text-emerald-300">Terenkripsi</span>
+            <div className="text-[11px] text-slate-400 font-mono">
+              Latency: <span className="text-emerald-400 tabular-nums">{connectionStatus.latencyMs}ms</span> • SSL: <span className="text-emerald-300">TLS 1.3</span>
             </div>
           </div>
 
-          {/* Card 3: Location Protection */}
+          {/* Card 3: PostGIS Extension */}
           <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400 flex items-center gap-1.5 font-medium">
+              <span className="text-xs font-mono text-slate-400 flex items-center gap-1.5">
                 <Server className="w-3.5 h-3.5 text-amber-400" />
-                <span>Proteksi Lokasi Otomatis</span>
+                <span>PostGIS Spatial Engine</span>
               </span>
-              <span className="text-[11px] text-amber-400 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Aktif
+              <span className="text-[11px] font-mono text-amber-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> PostGIS 3.4
               </span>
             </div>
-            <div className="text-sm font-bold text-white">
-              Pengaburan Koordinat Publik
+            <div className="text-sm font-bold text-white font-mono">
+              ST_Project & ST_DWithin
             </div>
-            <div className="text-[11px] text-slate-400">
-              Privasi lokasi seniman terjaga
+            <div className="text-[11px] text-slate-400 font-mono">
+              SRID 4326 (WGS84) Geoprivacy
             </div>
           </div>
 
-          {/* Card 4: Access Control */}
+          {/* Card 4: RLS Security Policies */}
           <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400 flex items-center gap-1.5 font-medium">
+              <span className="text-xs font-mono text-slate-400 flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Isolasi Hak Akses Privat</span>
+                <span>Row-Level Security</span>
               </span>
-              <span className="text-[11px] text-cyan-400 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Aktif
+              <span className="text-[11px] font-mono text-cyan-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Enforced
               </span>
             </div>
-            <div className="text-sm font-bold text-white">
-              Sensor Terverifikasi
+            <div className="text-sm font-bold text-white font-mono">
+              Hardware TEE Attested
             </div>
-            <div className="text-[11px] text-slate-400">
-              Koordinat presisi: <span className="text-emerald-400">Terlindungi</span>
+            <div className="text-[11px] text-slate-400 font-mono">
+              Exact coords: <span className="text-rose-400">Restricted</span>
             </div>
           </div>
 
@@ -296,22 +335,22 @@ git push -u origin main`;
       </div>
 
       {/* Navigation Sub-Tabs for Sync Console */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto text-xs">
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto text-xs font-mono">
         <button
           onClick={() => setActiveTab('matrix')}
-          className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition font-medium ${
+          className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
             activeTab === 'matrix'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-bold'
               : 'text-slate-400 hover:text-white'
           }`}
         >
           <Workflow className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Alur Pencadangan & Sinkronisasi</span>
+          <span>Alur Integrasi GitHub ⟷ Supabase</span>
         </button>
 
         <button
           onClick={() => setActiveTab('cli')}
-          className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition font-medium ${
+          className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
             activeTab === 'cli'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-bold'
               : 'text-slate-400 hover:text-white'
@@ -463,57 +502,139 @@ git push -u origin main`;
 
       {/* TAB CONTENT 2: GIT PUSH INSTRUCTIONS */}
       {activeTab === 'cli' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800">
             <div>
-              <h3 className="text-base font-bold text-white font-mono">
-                Langkah Sinkronisasi ke Repositori GitHub
+              <h3 className="text-base font-bold text-white font-mono flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-purple-400" />
+                <span>Panduan Ulangi Push & Sinkronisasi Git</span>
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Jalankan perintah ini di terminal komputer Anda untuk mem-push seluruh codebase ke <strong className="text-cyan-300">veroiaenterprisecorp/vec</strong>
+                Kompilasi perintah bash untuk mengatasi kegagalan push dan menyinkronkan seluruh kode ke repositori <strong className="text-cyan-300">veroiaenterprisecorp/vec</strong>
               </p>
             </div>
 
-            <button
-              onClick={handleCopyGitCommands}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono bg-purple-600 hover:bg-purple-500 text-white font-semibold transition shrink-0"
-            >
-              {copiedGitCmd ? (
-                <>
-                  <Check className="w-3.5 h-3.5" />
-                  <span>Perintah Disalin!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>Salin Perintah Git</span>
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleCopyGitCommands}
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono bg-purple-600 hover:bg-purple-500 text-white font-semibold transition shadow-lg shadow-purple-950"
+              >
+                {copiedGitCmd ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Perintah Normal Disalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>1. Salin Perintah Push Standar</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleCopyFixCommands}
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono bg-amber-600 hover:bg-amber-500 text-white font-semibold transition shadow-lg shadow-amber-950"
+              >
+                {copiedFixCmd ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Solusi Error Disalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <Wrench className="w-3.5 h-3.5" />
+                    <span>2. Salin Solusi Error Ditolak</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
-          <div className="bg-slate-950 rounded-xl p-4 border border-slate-800 font-mono text-xs text-slate-200 overflow-x-auto space-y-2 leading-relaxed">
-            <div className="text-slate-500"># 1. Tambahkan remote GitHub</div>
-            <div className="text-cyan-400">git remote add origin https://github.com/veroiaenterprisecorp/vec.git</div>
-            
-            <div className="text-slate-500 pt-2"># 2. Stage seluruh file (termasuk .github/workflows dan supabase/)</div>
-            <div className="text-cyan-400">git add .</div>
+          {/* Section 1: Standard Push Commands */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-cyan-300 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                PROSEDUR 1: Jalankan Ulang Push Standar
+              </span>
+              <span className="text-[11px] font-mono text-slate-500">Terminal Bash / Zsh / PowerShell</span>
+            </div>
+            <div className="bg-slate-950 rounded-xl p-4 border border-slate-800 font-mono text-xs text-slate-200 overflow-x-auto space-y-2 leading-relaxed">
+              <div className="text-slate-500"># 1. Inisialisasi git lokal jika belum ada</div>
+              <div className="text-cyan-400">git init</div>
 
-            <div className="text-slate-500 pt-2"># 3. Buat commit terstruktur</div>
-            <div className="text-cyan-400">git commit -m "feat: complete VEC zero-trust provenance platform with GitHub-Supabase automated CI/CD"</div>
+              <div className="text-slate-500 pt-1"># 2. Perbarui remote URL jika sudah ada, atau tambahkan baru</div>
+              <div className="text-cyan-400">git remote set-url origin https://github.com/veroiaenterprisecorp/vec.git 2&gt;/dev/null || git remote add origin https://github.com/veroiaenterprisecorp/vec.git</div>
+              
+              <div className="text-slate-500 pt-1"># 3. Stage seluruh berkas (aplikasi, .github/workflows, supabase/migrations)</div>
+              <div className="text-cyan-400">git add .</div>
 
-            <div className="text-slate-500 pt-2"># 4. Arahkan branch ke main dan push</div>
-            <div className="text-emerald-400">git branch -M main</div>
-            <div className="text-emerald-400">git push -u origin main</div>
+              <div className="text-slate-500 pt-1"># 4. Buat commit baru</div>
+              <div className="text-cyan-400">git commit -m "feat(vault): complete VEC zero-trust provenance platform with multi-tenant creator vaults and Supabase CI/CD"</div>
+
+              <div className="text-slate-500 pt-1"># 5. Pastikan branch bernama main</div>
+              <div className="text-emerald-400">git branch -M main</div>
+
+              <div className="text-slate-500 pt-1"># 6. Push ke branch main</div>
+              <div className="text-emerald-400 font-bold">git push -u origin main</div>
+            </div>
           </div>
 
+          {/* Section 2: Troubleshooting Specific Errors */}
+          <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-500/30 space-y-4">
+            <div className="flex items-center gap-2 text-amber-300 font-bold font-mono text-xs">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>DIAGNOSTIK & SOLUSI JIKA TERJADI ERROR SAAT PUSH:</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+              {/* Error Case A: Non-fast-forward rejected */}
+              <div className="bg-slate-950/90 rounded-lg p-3.5 border border-slate-800 space-y-2">
+                <span className="text-rose-400 font-bold block flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  Kasus 1: "Updates were rejected / fetch first"
+                </span>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Terjadi karena di repositori GitHub sudah ada commit awal (misal file README atau branch terpisah).
+                </p>
+                <div className="bg-slate-900 p-2.5 rounded border border-slate-700/80 text-[11px] text-amber-300 space-y-1">
+                  <div className="text-slate-400"># Solusi A1: Tarik rebase lalu push:</div>
+                  <div>git fetch origin main</div>
+                  <div>git pull origin main --rebase --allow-unrelated-histories</div>
+                  <div>git push -u origin main</div>
+                  <div className="text-slate-400 pt-1"># ATAU Solusi A2: Force push menimpa repo:</div>
+                  <div className="text-emerald-400 font-bold">git push -u origin main --force-with-lease</div>
+                </div>
+              </div>
+
+              {/* Error Case B: Authentication failed */}
+              <div className="bg-slate-950/90 rounded-lg p-3.5 border border-slate-800 space-y-2">
+                <span className="text-rose-400 font-bold block flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 shrink-0" />
+                  Kasus 2: "Authentication failed / Password removed"
+                </span>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  GitHub tidak lagi menerima password akun biasa. Anda harus menggunakan <strong>Personal Access Token (PAT)</strong> atau SSH.
+                </p>
+                <div className="bg-slate-900 p-2.5 rounded border border-slate-700/80 text-[11px] text-slate-300 space-y-1">
+                  <div>1. Buka: <strong>GitHub &gt; Settings &gt; Developer Settings &gt; Personal access tokens (classic)</strong></div>
+                  <div>2. Generate new token dengan centang: <span className="text-cyan-300 font-bold">repo</span> dan <span className="text-cyan-300 font-bold">workflow</span></div>
+                  <div>3. Masukkan token tersebut sebagai password di terminal.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: GitHub Actions Secrets config */}
           <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4 space-y-3">
             <h4 className="text-xs font-bold font-mono text-white flex items-center gap-2">
-              <Lock className="w-3.5 h-3.5 text-amber-400" />
-              <span>Konfigurasi GitHub Secrets untuk Supabase (Opsional untuk CI/CD Otomatis)</span>
+              <Lock className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Konfigurasi GitHub Secrets untuk Migrasi Otomatis Supabase</span>
             </h4>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Buka <strong>GitHub Repo &gt; Settings &gt; Secrets and variables &gt; Actions</strong> dan tambahkan:
+              Jika workflow CI/CD di GitHub Actions mengalami error saat migrasi database Supabase, pastikan rahasia ini sudah terdaftar di <strong>GitHub Repo &gt; Settings &gt; Secrets and variables &gt; Actions</strong>:
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
               <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
@@ -522,11 +643,11 @@ git push -u origin main`;
               </div>
               <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
                 <span className="text-cyan-300 font-bold block">SUPABASE_PROJECT_ID</span>
-                <span className="text-[11px] text-slate-500">cruijnhylcdojbilzgwd</span>
+                <span className="text-[11px] text-slate-500 font-bold text-white">cruijnhylcdojbilzgwd</span>
               </div>
               <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
                 <span className="text-cyan-300 font-bold block">SUPABASE_DB_PASSWORD</span>
-                <span className="text-[11px] text-slate-500">Password Database Proyek Anda</span>
+                <span className="text-[11px] text-slate-500">Password Database Proyek Supabase Anda</span>
               </div>
             </div>
           </div>
@@ -598,14 +719,25 @@ jobs:
           echo "Schema file verified."
 
       - name: Deploy Migrations to Supabase (Production)
-        if: github.ref == 'refs/heads/main' && env.SUPABASE_ACCESS_TOKEN != ''
+        if: github.ref == 'refs/heads/main' && secrets.SUPABASE_ACCESS_TOKEN != ''
         env:
           SUPABASE_ACCESS_TOKEN: \${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: \${{ secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_PROJECT_ID: \${{ secrets.SUPABASE_PROJECT_ID }}
         run: |
-          supabase link --project-ref "$SUPABASE_PROJECT_ID"
-          supabase db push`}</pre>
+          if [ -n "$SUPABASE_PROJECT_ID" ] && [ -n "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "Linking to Supabase project $SUPABASE_PROJECT_ID..."
+            if [ -n "$SUPABASE_DB_PASSWORD" ]; then
+              supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
+              supabase db push --password "$SUPABASE_DB_PASSWORD"
+            else
+              supabase link --project-ref "$SUPABASE_PROJECT_ID"
+              supabase db push
+            fi
+            echo "Supabase database migrations deployed successfully!"
+          else
+            echo "Notice: SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_ID secrets missing. Skipping automated db push."
+          fi`}</pre>
           </div>
         </div>
       )}

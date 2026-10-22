@@ -1,4 +1,5 @@
 import { supabase, getActiveSupabaseClient } from './supabase';
+import { isVaultUnlocked, getActiveVault, getActiveVaultId, DEFAULT_MASTER_VAULT } from './vaultKeyAuth';
 
 export interface PrivateVaultItem {
   id: string;
@@ -11,6 +12,9 @@ export interface PrivateVaultItem {
   deviceInfo: string;
   isPrivate: boolean;
   isPublished: boolean;
+  vaultId?: string;
+  vaultName?: string;
+  creatorName?: string;
   fuzzedLocation?: string;
   c2paSignature: string;
   sensorType: string;
@@ -181,8 +185,22 @@ const notifyVaultChanged = (items: PrivateVaultItem[]) => {
 
 /**
  * Loads vault artworks directly from Supabase (Sole Database / Single Source of Truth)
+ * Strictly isolated per unlocked Vault Key!
  */
-export const loadVaultItemsFromSupabase = async (): Promise<PrivateVaultItem[]> => {
+export const loadVaultItemsFromSupabase = async (overrideVaultId?: string): Promise<PrivateVaultItem[]> => {
+  // If no vault is currently unlocked, access to private vault is strictly locked
+  const unlocked = isVaultUnlocked();
+  const activeVault = getActiveVault();
+
+  if (!unlocked || !activeVault) {
+    memoryCache = [];
+    notifyVaultChanged([]);
+    return [];
+  }
+
+  const targetVaultId = overrideVaultId || activeVault.id;
+  const isMasterVault = targetVaultId === DEFAULT_MASTER_VAULT.id;
+
   try {
     const client = getActiveSupabaseClient();
     const { data: posts, error } = await client
@@ -205,6 +223,18 @@ export const loadVaultItemsFromSupabase = async (): Promise<PrivateVaultItem[]> 
     const mapped: PrivateVaultItem[] = posts
       .filter((p: any) => {
         if (p.is_destroyed === true || p.destroyed_at) return false;
+        
+        // Multi-tenant vault isolation: Only return artworks belonging to this vault!
+        const telemetry = p.sensor_telemetry || {};
+        const postVaultId = p.vault_id || telemetry.vault_id;
+
+        if (postVaultId) {
+          if (postVaultId !== targetVaultId) return false;
+        } else {
+          // If post has no vault_id tag, only allow if viewing the Master Vault
+          if (!isMasterVault) return false;
+        }
+
         const d = (p.c2pa_manifest_hash || p.raw_capture_digest || '').trim().toLowerCase();
         const t = (p.title || '').trim().toLowerCase();
         const u = (p.media_url || '').trim();
@@ -217,7 +247,7 @@ export const loadVaultItemsFromSupabase = async (): Promise<PrivateVaultItem[]> 
       })
       .map((p: any) => {
         const telemetry = p.sensor_telemetry || {};
-        const isPrivate = telemetry.is_private === true;
+        const isPrivate = telemetry.is_private !== undefined ? Boolean(telemetry.is_private) : true;
         const isPublished = telemetry.is_published !== undefined ? Boolean(telemetry.is_published) : !isPrivate;
 
         return {
@@ -231,6 +261,9 @@ export const loadVaultItemsFromSupabase = async (): Promise<PrivateVaultItem[]> 
           deviceInfo: p.camera_make ? `${p.camera_make} ${p.camera_model || ''}` : 'VEC Hardware Sensor Enclave',
           isPrivate,
           isPublished,
+          vaultId: p.vault_id || telemetry.vault_id || targetVaultId,
+          vaultName: telemetry.vault_name || activeVault.vault_name,
+          creatorName: telemetry.creator_name || activeVault.creator_name,
           c2paSignature: p.hardware_tee_signature || 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
           sensorType: 'Direct CMOS RAW (Zero-Bypass)',
           storageTarget: 'cloud_supabase',

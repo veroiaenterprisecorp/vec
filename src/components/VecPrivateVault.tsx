@@ -22,6 +22,16 @@ import {
   StorageTargetMode,
   isArtworkPermanentlyDestroyed
 } from '../lib/cloudStorage';
+import { 
+  isVaultUnlocked, 
+  getActiveVault, 
+  lockVault, 
+  unlockVaultWithKey, 
+  getCachedRegisteredVaults, 
+  CreatorVault 
+} from '../lib/vaultKeyAuth';
+import { VaultRegistrationModal } from './VaultRegistrationModal';
+import { VaultKeyUnlockModal } from './VaultKeyUnlockModal';
 import { PermanentDeleteModal, DeleteArtworkTarget } from './PermanentDeleteModal';
 import { supabase } from '../lib/supabase';
 import { 
@@ -52,7 +62,11 @@ import {
   ExternalLink,
   Edit3,
   Upload,
-  Check
+  Check,
+  KeyRound,
+  PlusCircle,
+  ShieldAlert,
+  ArrowRight
 } from 'lucide-react';
 
 interface VecPrivateVaultProps {
@@ -64,6 +78,14 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
   onNavigateToStudio,
   onNavigateToPublicVault
 }) => {
+  // Vault Lock & Multi-Tenant Identity States
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => isVaultUnlocked());
+  const [activeVault, setActiveVault] = useState<CreatorVault | null>(() => getActiveVault());
+  const [showRegisterModal, setShowRegisterModal] = useState<boolean>(false);
+  const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
+  const [inlineKeyInput, setInlineKeyInput] = useState<string>('');
+  const [inlineKeyError, setInlineKeyError] = useState<string | null>(null);
+  const [isVerifyingInlineKey, setIsVerifyingInlineKey] = useState<boolean>(false);
   const [items, setItems] = useState<PrivateVaultItem[]>([]);
   const [profile, setProfile] = useState<UserVaultProfile>(getUserVaultProfile());
   const [activeFilter, setActiveFilter] = useState<'all' | 'private' | 'published'>('all');
@@ -162,25 +184,71 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
     }
   };
 
+  // Handle unlocking via the inline input form
+  const handleInlineUnlock = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setInlineKeyError(null);
+    if (!inlineKeyInput.trim()) {
+      setInlineKeyError('Masukkan Kunci Brankas Anda terlebih dahulu.');
+      return;
+    }
+    setIsVerifyingInlineKey(true);
+    try {
+      const res = await unlockVaultWithKey(inlineKeyInput.trim());
+      if (res.success && res.vault) {
+        setIsUnlocked(true);
+        setActiveVault(res.vault);
+        setInlineKeyInput('');
+        showToast(res.message);
+        const fresh = await initVaultAsync();
+        setItems(fresh);
+      } else {
+        setInlineKeyError(res.message || 'Kunci Brankas tidak valid.');
+      }
+    } catch (err: any) {
+      setInlineKeyError(err?.message || 'Gagal memverifikasi kunci.');
+    } finally {
+      setIsVerifyingInlineKey(false);
+    }
+  };
+
   useEffect(() => {
-    // 1. Initial fast synchronous load
-    setItems(getPrivateVaultItems());
-    setProfile(getUserVaultProfile());
+    const syncLockState = () => {
+      const unlocked = isVaultUnlocked();
+      const currentVault = getActiveVault();
+      setIsUnlocked(unlocked);
+      setActiveVault(currentVault);
 
-    // 2. Hydrate from IndexedDB for high-res captures
-    initVaultAsync((loaded) => {
-      setItems(loaded);
-    });
-
-    // 3. Listen to instant updates from Studio or other components
-    const handleUpdate = () => {
-      setItems(getPrivateVaultItems());
+      if (unlocked && currentVault) {
+        initVaultAsync((loaded) => {
+          setItems(loaded);
+        });
+      } else {
+        setItems([]);
+      }
     };
+
+    // 1. Initial load
+    syncLockState();
+
+    // 2. Listen to updates and lock changes
+    const handleUpdate = () => {
+      if (isVaultUnlocked()) {
+        initVaultAsync((loaded) => {
+          setItems(loaded);
+        });
+      } else {
+        setItems([]);
+      }
+    };
+
+    window.addEventListener('vec-vault-lock-state-changed', syncLockState);
     window.addEventListener('vec-vault-updated', handleUpdate);
     window.addEventListener('vec-artwork-destroyed', handleUpdate);
     window.addEventListener('storage', handleUpdate);
 
     return () => {
+      window.removeEventListener('vec-vault-lock-state-changed', syncLockState);
       window.removeEventListener('vec-vault-updated', handleUpdate);
       window.removeEventListener('vec-artwork-destroyed', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
@@ -298,6 +366,136 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
   const cloudCount = activeItems.length;
   const localCount = 0;
 
+  // STRICT ZERO-TRUST: If vault is locked or no active session, render high-security vault lock gate
+  if (!isUnlocked || !activeVault) {
+    return (
+      <div className="space-y-6">
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-mono border border-emerald-400/40">
+            <CheckCircle2 className="w-4 h-4 text-white" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
+
+        {/* LOCKED VAULT HIGH SECURITY GATE */}
+        <div className="max-w-2xl mx-auto py-10 px-4">
+          <div className="p-8 rounded-3xl bg-gradient-to-b from-[#091326] via-[#050B18] to-[#02050E] border border-cyan-500/40 shadow-2xl shadow-cyan-950/60 text-center space-y-6 relative overflow-hidden">
+            
+            {/* Top Security Glow Rings */}
+            <div className="inline-flex p-4 rounded-3xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 shadow-lg shadow-cyan-500/20 relative">
+              <Lock className="w-10 h-10 animate-pulse text-cyan-300" />
+              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 border-2 border-black"></div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-[11px] font-mono text-cyan-300">
+                <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                <span>KEAMANAN TINGGI • ZERO-KNOWLEDGE ENCLAVE</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                Brankas Karya Terkunci
+              </h2>
+              <p className="text-xs sm:text-sm text-neutral-300 max-w-lg mx-auto leading-relaxed">
+                Setiap pendaftar memiliki brankas karya terisolasi sendiri di basis data Supabase.
+                Masukkan Kunci Akses Kriptografis Anda untuk membuka brankas, atau daftarkan akun kreator baru.
+              </p>
+            </div>
+
+            {inlineKeyError && (
+              <div className="p-3 rounded-xl bg-red-950/60 border border-red-500/40 text-red-200 text-xs flex items-center justify-center gap-2 max-w-md mx-auto">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                <span>{inlineKeyError}</span>
+              </div>
+            )}
+
+            {/* Key Input Form */}
+            <form onSubmit={handleInlineUnlock} className="max-w-md mx-auto space-y-3">
+              <div className="relative">
+                <KeyRound className="w-4 h-4 absolute left-3.5 top-3.5 text-cyan-400" />
+                <input
+                  type="text"
+                  placeholder="VEC-VK-XXXX-XXXX-XXXX-XXXX"
+                  value={inlineKeyInput}
+                  onChange={(e) => setInlineKeyInput(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-black/90 border border-cyan-500/50 focus:border-cyan-400 rounded-xl font-mono text-sm tracking-wider text-cyan-200 placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-cyan-400 shadow-inner"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isVerifyingInlineKey}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-600 via-cyan-500 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs tracking-wider shadow-lg shadow-cyan-950/60 flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+              >
+                {isVerifyingInlineKey ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Memverifikasi Kunci Kriptografis...</span>
+                  </>
+                ) : (
+                  <>
+                    <Unlock className="w-4 h-4" />
+                    <span>Buka Kunci Brankas Karya</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Registration CTA Button */}
+            <div className="pt-4 border-t border-neutral-800/80 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <span className="text-xs text-neutral-400">Belum memiliki Kunci Brankas?</span>
+              <button
+                type="button"
+                onClick={() => setShowRegisterModal(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-neutral-900 hover:bg-neutral-800 text-cyan-300 border border-cyan-500/30 hover:border-cyan-400 transition shadow cursor-pointer"
+              >
+                <PlusCircle className="w-4 h-4 text-cyan-400" />
+                <span>Daftar Akun & Buat Brankas Baru</span>
+              </button>
+            </div>
+
+            {/* List of Registered Vaults on Device */}
+            {getCachedRegisteredVaults().length > 0 && (
+              <div className="pt-3 max-w-md mx-auto text-left">
+                <span className="text-[11px] font-mono text-neutral-400 block mb-1.5">
+                  Brankas Terdaftar pada Perangkat Ini:
+                </span>
+                <div className="space-y-1.5">
+                  {getCachedRegisteredVaults().map((v) => (
+                    <div
+                      key={v.id}
+                      className="p-2 rounded-xl bg-neutral-950/80 border border-neutral-800 flex items-center justify-between text-xs"
+                    >
+                      <div className="truncate mr-2">
+                        <div className="text-white font-semibold truncate">{v.vault_name}</div>
+                        <div className="text-[10px] text-neutral-400">{v.creator_name} ({v.creator_handle})</div>
+                      </div>
+                      <span className="font-mono text-[10px] text-cyan-400 bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-500/30 shrink-0">
+                        {v.key_prefix}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+
+        {/* Registration Modal */}
+        <VaultRegistrationModal
+          isOpen={showRegisterModal}
+          onClose={() => setShowRegisterModal(false)}
+          onRegisteredSuccess={(vault) => {
+            setShowRegisterModal(false);
+            setIsUnlocked(true);
+            setActiveVault(vault);
+            showToast(`Brankas "${vault.vault_name}" berhasil dibuka.`);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <input
@@ -372,6 +570,24 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
           </button>
 
           <button
+            onClick={() => lockVault()}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-neutral-900 hover:bg-neutral-800 text-amber-300 border border-neutral-700 transition cursor-pointer"
+            title="Kunci kembali brankas karya"
+          >
+            <Lock className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Kunci Brankas</span>
+          </button>
+
+          <button
+            onClick={() => setShowUnlockModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-neutral-900 hover:bg-neutral-800 text-cyan-300 border border-neutral-700 transition cursor-pointer"
+            title="Ganti kunci atau buka brankas lain"
+          >
+            <KeyRound className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Ganti Kunci</span>
+          </button>
+
+          <button
             onClick={onNavigateToStudio}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-mono font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition shadow-lg shadow-cyan-950 cursor-pointer"
           >
@@ -385,17 +601,17 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         
         {/* Stat 1: Identity & Isolation */}
-        <div className="p-4 rounded-2xl bg-[#050C1E] border border-slate-800 space-y-2">
+        <div className="p-4 rounded-2xl bg-[#050C1E] border border-cyan-500/30 space-y-2">
           <div className="flex items-center justify-between text-xs font-mono text-slate-400">
-            <span>ID Pengguna</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span>Brankas Aktif</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           </div>
-          <div className="text-sm font-bold text-white font-mono truncate" title={profile.userId}>
-            {profile.userId}
+          <div className="text-sm font-bold text-white font-mono truncate" title={activeVault.vault_name}>
+            {activeVault.vault_name}
           </div>
-          <div className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Terisolasi Row Level Security</span>
+          <div className="text-[11px] font-mono text-cyan-300 flex items-center gap-1 truncate">
+            <ShieldCheck className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="truncate">{activeVault.creator_name} ({activeVault.creator_handle})</span>
           </div>
         </div>
 
@@ -430,14 +646,14 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
         {/* Stat 4: Hardware Enclave Key */}
         <div className="p-4 rounded-2xl bg-[#050C1E] border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-xs font-mono text-slate-400">
-            <span>Hardware Enclave Key</span>
+            <span>Kunci Kriptografis Brankas</span>
             <Cpu className="w-3.5 h-3.5 text-emerald-400" />
           </div>
-          <div className="text-xs font-bold text-white font-mono truncate" title={profile.hardwareEnclaveId}>
-            {profile.hardwareEnclaveId}
+          <div className="text-xs font-bold text-cyan-300 font-mono truncate" title={activeVault.key_prefix}>
+            {activeVault.key_prefix}
           </div>
           <div className="text-[11px] font-mono text-slate-400">
-            Enkripsi AES-256-GCM Aktif
+            Enklave {activeVault.security_level}
           </div>
         </div>
 
@@ -1008,6 +1224,27 @@ CREATE POLICY "Public can upload capture objects" ON storage.objects FOR INSERT 
           showToast('Gambar berhasil dihapus secara permanen dari seluruh sistem Supabase.');
           const fresh = await initVaultAsync();
           setItems(fresh);
+        }}
+      />
+
+      {/* Vault Modals */}
+      <VaultRegistrationModal
+        isOpen={showRegisterModal}
+        onClose={() => setShowRegisterModal(false)}
+        onRegisteredSuccess={(vault) => {
+          setShowRegisterModal(false);
+          setIsUnlocked(true);
+          setActiveVault(vault);
+          showToast(`Brankas "${vault.vault_name}" berhasil dibuka.`);
+        }}
+      />
+
+      <VaultKeyUnlockModal
+        isOpen={showUnlockModal}
+        onClose={() => setShowUnlockModal(false)}
+        onRequestRegisterNew={() => {
+          setShowUnlockModal(false);
+          setShowRegisterModal(true);
         }}
       />
 
