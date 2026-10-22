@@ -89,9 +89,9 @@ const DEFAULT_FEATURED: VaultArtwork = {
   authenticityScore: 99.80,
   digest: 'e1a7b8c9d0e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8',
   c2paSignature: 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
-  deviceInfo: 'Direct CMOS RAW • Sony Alpha 7R V Enclave',
+  deviceInfo: 'Kamera Profesional Sony Alpha 7R V',
   curationNumber: 'VEC-2026-0042',
-  description: 'Karya asli yang diverifikasi langsung dengan sertifikasi hardware TEE dan chip NTAG424 DNA. Seluruh riwayat kepemilikan, uji spektrometri pigmen, dan catatan kurasi tersimpan di cluster Supabase PostgreSQL 16.',
+  description: 'Karya asli yang diverifikasi langsung dengan sertifikasi kamera resmi dan segel pengaman fisik kanvas. Seluruh riwayat kepemilikan dan catatan kurasi tersimpan aman.',
   publishedAt: '2026-10-20',
   storageTarget: 'cloud_supabase',
   cloudBucket: 'vec-captures'
@@ -140,7 +140,7 @@ export const VecVault: React.FC<VecVaultProps> = ({
       role: 'VEC Master Curator',
       score: 99.20,
       type: 'COMMENT',
-      content: 'Manifest C2PA tervalidasi penuh via hardware Secure Enclave. Telemetri sensor CMOS terbukti murni tanpa rekonstruksi AI generatif.',
+      content: 'Keaslian foto tervalidasi penuh langsung dari kamera. Gambar terbukti asli tanpa rekayasa kecerdasan buatan.',
       timestamp: '15 menit lalu'
     },
     {
@@ -516,15 +516,15 @@ export const VecVault: React.FC<VecVaultProps> = ({
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono text-cyan-400">
+          <div className="flex items-center gap-2 text-xs font-semibold text-cyan-400">
             <ShieldCheck className="w-4 h-4 text-cyan-400" />
-            <span>IMMUTABLE ART VAULT • LIVE EXHIBITION & REPUTATION-WEIGHTED CURATION</span>
+            <span>KATALOG RESMI • PAMERAN KARYA TERVERIFIKASI & ULASAN KURATOR</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-1">
-            Live Art Vault & Pameran Karya Terpublikasi
+            Katalog Resmi & Pameran Karya Seni Terpilih
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Menampilkan seluruh karya seni dan foto otentik C2PA yang telah diterbitkan oleh seniman dan kolektor.
+            Menampilkan seluruh karya seni dan foto asli terverifikasi yang telah diterbitkan oleh seniman dan kolektor.
           </p>
         </div>
 
@@ -612,17 +612,17 @@ export const VecVault: React.FC<VecVaultProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
               <div className="flex items-center gap-2">
                 <Award className="w-4 h-4 text-cyan-400" />
-                <h3 className="text-sm font-bold text-white font-mono">
-                  Koleksi Karya Terpublikasi di Live Vault ({artworks.length} Karya)
+                <h3 className="text-sm font-bold text-white">
+                  Koleksi Karya Terpublikasi ({artworks.length} Karya)
                 </h3>
                 {userPublishedCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono border border-emerald-500/40">
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] border border-emerald-500/40">
                     {userPublishedCount} karya diterbitkan oleh Anda
                   </span>
                 )}
               </div>
-              <span className="text-[11px] font-mono text-slate-400">
-                Klik karya di bawah untuk meneliti bukti C2PA & kurasi
+              <span className="text-[11px] text-slate-400">
+                Pilih karya untuk melihat rincian keaslian & catatan kurasi
               </span>
             </div>
 
@@ -768,34 +768,34 @@ export const VecVault: React.FC<VecVaultProps> = ({
                   </p>
                 </div>
 
-                <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-1 text-xs font-mono">
+                <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-1 text-xs">
                   <div className="flex items-center justify-between text-[11px] text-slate-400">
-                    <span>SHA-256 RAW Hardware Digest:</span>
+                    <span>Kode Keaslian Unik Karya:</span>
                     <button
                       onClick={handleCopyHash}
-                      className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
+                      className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer font-medium"
                     >
                       {copiedHash ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedHash ? 'Disalin' : 'Salin Hash'}</span>
+                      <span>{copiedHash ? 'Disalin' : 'Salin Kode'}</span>
                     </button>
                   </div>
-                  <div className="text-cyan-300 text-[11px] break-all leading-tight">
+                  <div className="text-cyan-300 text-[11px] break-all leading-tight font-mono">
                     {activeArtwork.digest}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                   <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800">
                     <span className="text-slate-500 block text-[11px]">Skor Keaslian:</span>
                     <span className="text-emerald-400 font-bold text-sm">{activeArtwork.authenticityScore}%</span>
                   </div>
                   <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800">
-                    <span className="text-slate-500 block text-[11px]">NFC Sun Seal:</span>
-                    <span className="text-amber-300 font-bold text-sm">Tervalidasi TEE</span>
+                    <span className="text-slate-500 block text-[11px]">Segel Fisik:</span>
+                    <span className="text-amber-300 font-semibold text-sm">Terverifikasi Sah</span>
                   </div>
                   <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 col-span-2 sm:col-span-1">
-                    <span className="text-slate-500 block text-[11px]">Geoprivasi:</span>
-                    <span className="text-cyan-300 font-bold text-sm">PostGIS Protected</span>
+                    <span className="text-slate-500 block text-[11px]">Privasi Lokasi:</span>
+                    <span className="text-cyan-300 font-semibold text-sm">Terlindungi</span>
                   </div>
                 </div>
               </div>

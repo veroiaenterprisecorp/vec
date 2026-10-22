@@ -27,14 +27,9 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="w-8 h-8 rounded-lg overflow-hidden border border-neutral-700/80 bg-neutral-950 p-0.5 flex items-center justify-center transition group-hover:border-cyan-400/80 shadow-sm">
             <VecOfficialLogo className="w-full h-full" />
           </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold tracking-[0.22em] text-white font-sans group-hover:text-cyan-300 transition-colors uppercase">
-              Veroia
-            </span>
-            <span className="text-[10px] tracking-[0.18em] text-neutral-400 font-sans uppercase -mt-0.5">
-              Provenance
-            </span>
-          </div>
+          <span className="text-sm font-semibold tracking-[0.20em] text-white font-sans group-hover:text-cyan-300 transition-colors uppercase">
+            Veroia Enterprise
+          </span>
         </button>
 
         {/* Zone 2: Navigation Links (Clean Single-Line Typography) */}
@@ -80,7 +75,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'text-neutral-400 hover:text-white'
             }`}
           >
-            Studio Sensor C2PA
+            Studio Kamera
           </button>
         </nav>
 
@@ -91,7 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 border border-neutral-700/80 hover:border-cyan-500/50 rounded-lg shadow-sm transition-all duration-200 cursor-pointer"
           >
             <Camera className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="whitespace-nowrap">Buka Studio Sensor</span>
+            <span className="whitespace-nowrap">Buka Studio Foto</span>
           </button>
 
           <button
@@ -101,8 +96,8 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'bg-emerald-950/60 border-emerald-500/60 text-emerald-300'
                 : 'bg-neutral-950/60 border-neutral-800 text-neutral-500 hover:text-neutral-300 hover:border-neutral-700'
             }`}
-            title="Akses Konsol Master Root Gate"
-            aria-label="Root Gate"
+            title="Akses Pengelola Sistem"
+            aria-label="Pengelola Sistem"
           >
             <KeyRound className="w-3.5 h-3.5" />
           </button>

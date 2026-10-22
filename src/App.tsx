@@ -171,20 +171,20 @@ export default function App() {
               <VecOfficialLogo className="w-full h-full" />
             </div>
             <div>
-              <span className="text-white font-semibold">Veroia Enterprise Corp (VEC)</span>
+              <span className="text-white font-semibold">Veroia Enterprise Corp</span>
               <span className="mx-2 text-neutral-600">·</span>
-              <span className="text-neutral-400">Zero-Trust Cryptographic Hardware Provenance</span>
+              <span className="text-neutral-400">Verifikasi & Sertifikasi Keaslian Karya Seni</span>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-5 text-neutral-400">
-            <span>Brankas Terenkripsi</span>
+            <span>Brankas Aman</span>
             <span aria-hidden="true" className="text-neutral-700">·</span>
-            <span>C2PA v2.1 Verification</span>
+            <span>Standar Verifikasi Resmi</span>
             <span aria-hidden="true" className="text-neutral-700">·</span>
-            <span>Supabase Cloud Integration</span>
+            <span>Penyimpanan Cloud Terproteksi</span>
             <span aria-hidden="true" className="text-neutral-700">·</span>
-            <span>PostGIS Differential Geoprivacy</span>
+            <span>Perlindungan Privasi Lokasi</span>
 
             <span className="text-neutral-800 hidden sm:inline">|</span>
 
@@ -193,11 +193,11 @@ export default function App() {
                 setAdminSubTab('users');
                 setActiveTab('admin-portal');
               }}
-              className="flex items-center gap-1.5 text-neutral-500 hover:text-emerald-400 transition cursor-pointer text-xs font-mono group"
-              title="Akses Konsol Master Root Gate (Admin/Owner)"
+              className="flex items-center gap-1.5 text-neutral-500 hover:text-emerald-400 transition cursor-pointer text-xs group"
+              title="Akses Pengelola Sistem"
             >
               <Lock className="w-3.5 h-3.5 text-neutral-500 group-hover:text-emerald-400 transition" />
-              <span className="opacity-70 group-hover:opacity-100">Root Gate</span>
+              <span className="opacity-70 group-hover:opacity-100">Pengelola Master</span>
             </button>
           </div>
         </div>

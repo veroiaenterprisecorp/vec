@@ -316,15 +316,15 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
       {/* Header & Isolation Overview */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono text-cyan-400">
+          <div className="flex items-center gap-2 text-xs font-semibold text-cyan-400">
             <Lock className="w-4 h-4 text-emerald-400" />
-            <span>KUSTODI EKSKLUSIF • SATU-SATUNYA TEMPAT PENGELOLAAN & PEMUSNAHAN KARYA</span>
+            <span>PENGELOLAAN RESMI • TEMPAT PENGELOLAAN & PENYIMPANAN KARYA PRIBADI</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-1">
-            Brankas Karya (Personal Artwork Vault)
+            Brankas Karya Pribadi
           </h2>
           <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
-            Semua foto hasil jepretan kamera Anda tersimpan di sini secara privat dalam resolusi 100% tanpa kompresi. Halaman ini adalah <strong>satu-satunya tempat resmi untuk memusnahkan karya secara permanen tanpa jejak (Zero-Trace Burn)</strong>.
+            Semua foto hasil jepretan kamera Anda tersimpan di sini secara privat dalam resolusi tinggi asli. Anda dapat mengatur kepemilikan, mempublikasikan karya, atau menghapus karya secara aman kapan saja.
           </p>
         </div>
 
