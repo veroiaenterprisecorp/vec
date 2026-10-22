@@ -176,10 +176,12 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
       setItems(getPrivateVaultItems());
     };
     window.addEventListener('vec-vault-updated', handleUpdate);
+    window.addEventListener('vec-artwork-destroyed', handleUpdate);
     window.addEventListener('storage', handleUpdate);
 
     return () => {
       window.removeEventListener('vec-vault-updated', handleUpdate);
+      window.removeEventListener('vec-artwork-destroyed', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };
   }, []);
@@ -726,7 +728,7 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
                     <button
                       onClick={() => setItemPendingDelete(item)}
                       className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-900 transition cursor-pointer"
-                      title="Pemusnahan Mutlak Karya Permanen (Zero-Trace - Ketik HAPUS)"
+                      title="Hapus gambar ini secara permanen"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -806,7 +808,7 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
                   setItemPendingDelete(target);
                 }}
                 className="p-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-300 transition cursor-pointer"
-                title="Pemusnahan Mutlak Karya Permanen (Ketik HAPUS)"
+                title="Hapus gambar ini secara permanen"
               >
                 <Trash2 className="w-4 h-4 text-rose-400" />
               </button>
@@ -975,7 +977,7 @@ CREATE POLICY "Public can upload capture objects" ON storage.objects FOR INSERT 
         onDeleted={(deletedId) => {
           setItems((prev) => prev.filter((i) => i.id !== deletedId && !isArtworkPermanentlyDestroyed(i)));
           setItemPendingDelete(null);
-          showToast('Karya berhasil dimusnahkan secara permanen dari Cloud & Perangkat tanpa jejak (Zero-Trace Verified).');
+          showToast('Gambar berhasil dihapus secara permanen dari seluruh sistem.');
         }}
       />
 

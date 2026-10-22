@@ -365,11 +365,30 @@ export const updateVaultItemPhoto = (id: string, newPhotoUrl: string, newDigest?
   return updated;
 };
 
-export const deletePrivateVaultItem = (id: string): PrivateVaultItem[] => {
+export const deletePrivateVaultItem = (id: string, digest?: string, photoUrl?: string): PrivateVaultItem[] => {
   const current = getPrivateVaultItems();
-  const updated = current.filter((item) => item.id !== id);
+  const cleanId = (id || '').trim().toLowerCase();
+  const cleanDigest = (digest || '').trim().toLowerCase();
+  const cleanUrl = (photoUrl || '').trim();
+
+  // Find all matching item IDs to delete from IndexedDB
+  const idsToDelete = new Set<string>();
+  if (id) idsToDelete.add(id);
+
+  current.forEach((item) => {
+    if (item.id === id) idsToDelete.add(item.id);
+    if (cleanId && item.id.toLowerCase() === cleanId) idsToDelete.add(item.id);
+    if (cleanDigest && cleanDigest.length > 8 && item.digest && item.digest.trim().toLowerCase() === cleanDigest) idsToDelete.add(item.id);
+    if (cleanUrl && item.photoUrl === cleanUrl) idsToDelete.add(item.id);
+  });
+
+  const updated = current.filter((item) => !idsToDelete.has(item.id));
   memoryCache = updated;
-  deleteIdbItem(id);
+
+  idsToDelete.forEach((delId) => {
+    deleteIdbItem(delId);
+  });
+
   safeSaveToLocalStorage(updated);
   notifyVaultChanged(updated);
   return updated;

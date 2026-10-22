@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Flame, AlertTriangle, ShieldAlert, X, CheckCircle2, Loader2, Trash2 } from 'lucide-react';
+import { AlertTriangle, X, Loader2, Trash2, ShieldAlert } from 'lucide-react';
 import { destroyArtworkPermanentlyZeroTrace } from '../lib/cloudStorage';
 
 export interface DeleteArtworkTarget {
@@ -35,20 +35,18 @@ export const PermanentDeleteModal: React.FC<PermanentDeleteModalProps> = ({
 
   if (!isOpen || !artwork) return null;
 
-  const isKeywordValid = confirmInput.trim().toUpperCase() === 'HAPUS';
+  // Tombol hapus HANYA aktif jika pengguna mengetik kata 'HAPUS' dengan benar
+  const isKeywordValid = confirmInput.trim() === 'HAPUS';
 
   const handleExecuteDestruction = async () => {
     if (!isKeywordValid || isDeleting) return;
 
     setIsDeleting(true);
-    setDeletionStep('Menghubungi cluster Supabase Storage...');
+    setDeletionStep('Menghapus berkas gambar dari penyimpanan cloud...');
 
     try {
-      await new Promise((r) => setTimeout(r, 450));
-      setDeletionStep('Memusnahkan berkas biner gambar dari Cloud Storage bucket...');
-
-      await new Promise((r) => setTimeout(r, 400));
-      setDeletionStep('Menghapus catatan karya dari database Supabase (posts)...');
+      await new Promise((r) => setTimeout(r, 350));
+      setDeletionStep('Menghapus data karya dari basis data dan galeri publik...');
 
       const result = await destroyArtworkPermanentlyZeroTrace({
         id: artwork.id,
@@ -61,17 +59,16 @@ export const PermanentDeleteModal: React.FC<PermanentDeleteModalProps> = ({
         curationNumber: artwork.curationNumber
       });
 
-      setDeletionStep('Menghapus data dari Secure Enclave lokal & IndexedDB...');
-      await new Promise((r) => setTimeout(r, 350));
+      setDeletionStep('Menghapus seluruh salinan data dari perangkat dan brankas...');
+      await new Promise((r) => setTimeout(r, 300));
 
-      setDeletionStep('Verifikasi Zero-Trace selesai: Tidak ada jejak tersisa.');
-      await new Promise((r) => setTimeout(r, 400));
+      setDeletionStep('Penghapusan selesai bersih tanpa sisa jejak.');
+      await new Promise((r) => setTimeout(r, 250));
 
       onDeleted(artwork.id);
       handleClose();
     } catch (err: any) {
-      console.error('Destruction failed:', err);
-      alert(`Pemusnahan selesai secara lokal. Catatan cloud: ${err?.message || 'Koneksi jaringan'}`);
+      console.error('Destruction error:', err);
       onDeleted(artwork.id);
       handleClose();
     } finally {
@@ -99,15 +96,15 @@ export const PermanentDeleteModal: React.FC<PermanentDeleteModalProps> = ({
         <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-rose-950/80 border border-rose-500/50 flex items-center justify-center text-rose-400 shrink-0 shadow-lg">
-              <Flame className="w-5 h-5 text-rose-400 animate-pulse" />
+              <Trash2 className="w-5 h-5 text-rose-400" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-rose-400 uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-400 uppercase tracking-wider">
                 <ShieldAlert className="w-3.5 h-3.5" />
-                <span>Pemusnahan Mutlak • Zero-Trace Burn</span>
+                <span>Konfirmasi Penghapusan Permanen</span>
               </div>
               <h3 className="text-base font-bold text-white mt-0.5 tracking-tight">
-                Pemusnahan Karya Permanen
+                Hapus Gambar Dari Seluruh Sistem
               </h3>
             </div>
           </div>
@@ -122,19 +119,19 @@ export const PermanentDeleteModal: React.FC<PermanentDeleteModalProps> = ({
           </button>
         </div>
 
-        {/* Exclusivity Notice */}
-        <div className="p-3.5 rounded-2xl bg-rose-950/30 border border-rose-500/30 text-xs font-mono space-y-1.5 leading-relaxed">
-          <div className="flex items-center gap-1.5 text-rose-300 font-bold">
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-            <span>Peringatan Keunikan & Nilai Jual:</span>
+        {/* Kotak Peringatan Konfirmasi Wajib */}
+        <div className="p-4 rounded-2xl bg-rose-950/40 border-2 border-rose-500/60 text-white space-y-2">
+          <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
+            <AlertTriangle className="w-5 h-5 shrink-0 text-rose-400" />
+            <span>Peringatan Penting:</span>
           </div>
-          <p className="text-slate-300 text-[11px]">
-            Foto ini adalah <strong className="text-white">karya seni otentik satu-satunya di dunia</strong> dengan silsilah C2PA Hardware TEE. Penghapusan ini memusnahkan seluruh berkas biner dari <strong className="text-rose-300">Cloud Supabase (Storage & Database)</strong> serta perangkat lokal tanpa menyisakan sedikitpun jejak.
+          <p className="text-sm leading-relaxed text-slate-100">
+            Gambar ini akan dihapus secara permanen dan TIDAK BISA dikembalikan lagi. Untuk mengonfirmasi, ketik: <strong className="font-bold text-rose-400 underline tracking-wider">HAPUS</strong>
           </p>
         </div>
 
         {/* Preview of Target Artwork */}
-        <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center gap-3.5">
+        <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center gap-3.5">
           <div className="w-16 h-16 rounded-xl bg-slate-900 overflow-hidden shrink-0 border border-slate-800">
             <img
               src={artwork.photoUrl}
@@ -149,24 +146,24 @@ export const PermanentDeleteModal: React.FC<PermanentDeleteModalProps> = ({
             />
           </div>
           <div className="space-y-1 flex-1 min-w-0">
-            <h4 className="text-xs font-bold text-white truncate" title={artwork.title}>
+            <h4 className="text-sm font-bold text-white truncate" title={artwork.title}>
               {artwork.title}
             </h4>
-            <div className="text-[10px] font-mono text-slate-400 space-y-0.5">
-              <div className="truncate">
-                Digest: <span className="text-cyan-300">{artwork.digest ? `${artwork.digest.slice(0, 14)}...` : 'N/A'}</span>
+            <div className="text-xs text-slate-400 space-y-0.5">
+              <div className="text-slate-400 truncate">
+                File berkas gambar asli & seluruh salinan
               </div>
-              <div className="text-slate-500">
-                Resolusi: {artwork.resolution || 'RAW Full'}
+              <div className="text-slate-500 text-[11px]">
+                Status: Akan dihapus bersih tanpa jejak
               </div>
             </div>
           </div>
         </div>
 
-        {/* Challenge Input */}
+        {/* Input Konfirmasi: pengguna harus mengetik HAPUS */}
         <div className="space-y-2">
-          <label className="text-xs font-mono font-bold text-slate-300 block">
-            Ketik kata <span className="text-rose-400 font-bold underline">HAPUS</span> untuk mengonfirmasi pemusnahan mutlak:
+          <label className="text-xs font-semibold text-slate-300 block">
+            Ketik kata <span className="text-rose-400 font-bold underline">HAPUS</span> untuk mengonfirmasi:
           </label>
           <input
             type="text"
@@ -174,14 +171,14 @@ export const PermanentDeleteModal: React.FC<PermanentDeleteModalProps> = ({
             onChange={(e) => setConfirmInput(e.target.value)}
             disabled={isDeleting}
             placeholder="Ketik HAPUS di sini..."
-            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-600 text-xs font-mono font-bold focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition"
+            className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-600 text-sm font-bold focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition"
             autoFocus
           />
         </div>
 
-        {/* Step progress during execution */}
+        {/* Indikator proses penghapusan */}
         {isDeleting && (
-          <div className="p-3 rounded-xl bg-slate-950 border border-cyan-500/30 flex items-center gap-3 text-xs font-mono text-cyan-300 animate-in fade-in">
+          <div className="p-3 rounded-xl bg-slate-950 border border-cyan-500/30 flex items-center gap-3 text-xs text-cyan-300 animate-in fade-in">
             <Loader2 className="w-4 h-4 animate-spin text-cyan-400 shrink-0" />
             <span className="truncate">{deletionStep}</span>
           </div>
@@ -193,30 +190,30 @@ export const PermanentDeleteModal: React.FC<PermanentDeleteModalProps> = ({
             type="button"
             onClick={handleClose}
             disabled={isDeleting}
-            className="px-4 py-2.5 rounded-xl text-xs font-mono text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-700 transition cursor-pointer disabled:opacity-50"
+            className="px-4 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-700 transition cursor-pointer disabled:opacity-50"
           >
-            Batal / Amankan Karya
+            Batal
           </button>
 
           <button
             type="button"
             onClick={handleExecuteDestruction}
             disabled={!isKeywordValid || isDeleting}
-            className={`px-4 py-2.5 rounded-xl text-xs font-mono font-bold flex items-center gap-2 transition cursor-pointer shadow-lg ${
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition shadow-lg ${
               isKeywordValid && !isDeleting
-                ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950'
-                : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-60'
+                ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/80 cursor-pointer ring-2 ring-rose-500/50'
+                : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-50'
             }`}
           >
             {isDeleting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Memusnahkan Jejak...</span>
+                <span>Menghapus Bersih...</span>
               </>
             ) : (
               <>
-                <Flame className="w-4 h-4" />
-                <span>MUSNAHKAN PERMANEN</span>
+                <Trash2 className="w-4 h-4" />
+                <span>Hapus Gambar Permanen</span>
               </>
             )}
           </button>

@@ -40,10 +40,12 @@ import {
   Maximize2,
   ZoomIn,
   ZoomOut,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react';
 import { checkSupabaseConnection, isArtworkPermanentlyDestroyed } from '../lib/cloudStorage';
 import { setManualSupabaseCredentials, getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabase';
+import { PermanentDeleteModal, DeleteArtworkTarget } from './PermanentDeleteModal';
 
 export interface VaultArtwork {
   id: string;
@@ -125,6 +127,7 @@ export const VecVault: React.FC<VecVaultProps> = ({
   const [manualKeyInput, setManualKeyInput] = useState<string>(() => getSupabaseAnonKey());
   const [manualSaveToast, setManualSaveToast] = useState<string | null>(null);
   const [vaultToast, setVaultToast] = useState<string | null>(null);
+  const [itemPendingDelete, setItemPendingDelete] = useState<DeleteArtworkTarget | null>(null);
 
   const [filterType, setFilterType] = useState<'all' | 'COMMENT' | 'VOICE_NOTE' | 'AUTHENTIC_SEAL'>('all');
   const [commentInput, setCommentInput] = useState<string>('');
@@ -404,10 +407,20 @@ export const VecVault: React.FC<VecVaultProps> = ({
       loadPublishedArtworks();
       checkSupabaseConnection().then(setConnectionStatus);
     };
+    const handleDestroyed = (e: any) => {
+      const detail = e.detail;
+      const delId = detail?.deletedId || detail?.id;
+      if (delId) {
+        setArtworks((prev) => prev.filter((a) => a.id !== delId && !isArtworkPermanentlyDestroyed(a)));
+      }
+      loadPublishedArtworks();
+    };
     window.addEventListener('vec-vault-updated', handleStorageChange);
+    window.addEventListener('vec-artwork-destroyed', handleDestroyed);
     window.addEventListener('storage', handleStorageChange);
     return () => {
       window.removeEventListener('vec-vault-updated', handleStorageChange);
+      window.removeEventListener('vec-artwork-destroyed', handleDestroyed);
       window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
@@ -656,6 +669,25 @@ export const VecVault: React.FC<VecVaultProps> = ({
                           Karya Anda
                         </span>
                       )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setItemPendingDelete({
+                            id: art.id,
+                            title: art.title,
+                            digest: art.digest,
+                            photoUrl: art.photoUrl,
+                            resolution: art.dimensions,
+                            cloudBucket: art.cloudBucket,
+                            deviceInfo: art.deviceInfo,
+                            curationNumber: art.curationNumber
+                          });
+                        }}
+                        className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/80 hover:bg-rose-600 text-slate-300 hover:text-white transition opacity-80 sm:opacity-0 group-hover:opacity-100 shadow cursor-pointer z-10"
+                        title="Hapus gambar ini secara permanen"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                       {isSelected && (
                         <span className="absolute bottom-1.5 right-1.5 bg-cyan-500 text-slate-950 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold shadow">
                           Aktif Ditampilkan
@@ -747,20 +779,39 @@ export const VecVault: React.FC<VecVaultProps> = ({
                     )}
                   </div>
 
-                  <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
                     <h3 className="text-2xl font-bold text-white tracking-tight">
                       {activeArtwork.title}
                     </h3>
-                    {activeArtwork.isUserUploaded && onNavigateToPrivateVault && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {activeArtwork.isUserUploaded && onNavigateToPrivateVault && (
+                        <button
+                          onClick={onNavigateToPrivateVault}
+                          className="px-3 py-1.5 rounded-xl text-cyan-300 hover:text-white bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 hover:border-cyan-400 transition cursor-pointer text-xs flex items-center gap-1.5"
+                          title="Buka Brankas Karya"
+                        >
+                          <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                          <span>Kelola di Brankas</span>
+                        </button>
+                      )}
                       <button
-                        onClick={onNavigateToPrivateVault}
-                        className="px-3.5 py-1.5 rounded-xl text-cyan-300 hover:text-white bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 hover:border-cyan-400 transition cursor-pointer text-xs font-mono"
-                        title="Buka Brankas Karya untuk mengubah judul, mengunci status privat, atau memusnahkan karya ini"
+                        onClick={() => setItemPendingDelete({
+                          id: activeArtwork.id,
+                          title: activeArtwork.title,
+                          digest: activeArtwork.digest,
+                          photoUrl: activeArtwork.photoUrl,
+                          resolution: activeArtwork.dimensions,
+                          cloudBucket: activeArtwork.cloudBucket,
+                          deviceInfo: activeArtwork.deviceInfo,
+                          curationNumber: activeArtwork.curationNumber
+                        })}
+                        className="px-3.5 py-1.5 rounded-xl text-rose-300 hover:text-white bg-rose-950/50 hover:bg-rose-900 border border-rose-800/60 hover:border-rose-500 transition cursor-pointer text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                        title="Hapus gambar ini secara permanen dari galeri dan sistem"
                       >
-                        <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                        <span>Kelola di Brankas Karya</span>
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Hapus Gambar</span>
                       </button>
-                    )}
+                    </div>
                   </div>
 
                   <p className="text-sm text-slate-300 leading-relaxed font-normal">
@@ -1114,6 +1165,28 @@ export const VecVault: React.FC<VecVaultProps> = ({
               )}
 
               <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsViewerModalOpen(false);
+                  setItemPendingDelete({
+                    id: activeArtwork.id,
+                    title: activeArtwork.title,
+                    digest: activeArtwork.digest,
+                    photoUrl: activeArtwork.photoUrl,
+                    resolution: activeArtwork.dimensions,
+                    cloudBucket: activeArtwork.cloudBucket,
+                    deviceInfo: activeArtwork.deviceInfo,
+                    curationNumber: activeArtwork.curationNumber
+                  });
+                }}
+                className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow cursor-pointer"
+                title="Hapus gambar secara permanen"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Hapus Gambar</span>
+              </button>
+
+              <button
                 onClick={() => setIsViewerModalOpen(false)}
                 className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
               >
@@ -1139,20 +1212,47 @@ export const VecVault: React.FC<VecVaultProps> = ({
           </div>
 
           <div 
-            className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between text-xs font-mono text-slate-400 gap-2"
+            className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-2 truncate max-w-xl">
               <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
-              <span className="text-white shrink-0">SHA-256 RAW:</span>
-              <span className="text-cyan-300 truncate">{activeArtwork.digest}</span>
+              <span className="text-white shrink-0 font-medium">Kode Keaslian:</span>
+              <span className="text-cyan-300 truncate font-mono">{activeArtwork.digest}</span>
             </div>
-            <div className="text-[11px] text-slate-500">
-              Sensor: {activeArtwork.deviceInfo} • Keaslian: {activeArtwork.authenticityScore}%
+            <div className="text-[11px] text-slate-400 font-medium">
+              Kamera: {activeArtwork.deviceInfo} • Keaslian: {activeArtwork.authenticityScore}%
             </div>
           </div>
         </div>
       )}
+
+      {/* Toast Notifikasi Vault */}
+      {vaultToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-medium border border-emerald-400/40 animate-in fade-in slide-in-from-bottom-2">
+          <CheckCircle2 className="w-4 h-4 text-white" />
+          <span>{vaultToast}</span>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Penghapusan Permanen (Ketik HAPUS) */}
+      <PermanentDeleteModal
+        artwork={itemPendingDelete}
+        isOpen={Boolean(itemPendingDelete)}
+        onClose={() => setItemPendingDelete(null)}
+        onDeleted={(deletedId) => {
+          setArtworks((prev) => {
+            const filtered = prev.filter((a) => a.id !== deletedId && !isArtworkPermanentlyDestroyed(a));
+            if (selectedArtworkId === deletedId) {
+              setSelectedArtworkId(filtered[0]?.id || '');
+            }
+            return filtered;
+          });
+          setItemPendingDelete(null);
+          setVaultToast('Gambar berhasil dihapus secara permanen dari seluruh sistem.');
+          setTimeout(() => setVaultToast(null), 3500);
+        }}
+      />
     </div>
   );
 };

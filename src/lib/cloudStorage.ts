@@ -765,13 +765,18 @@ export const destroyArtworkPermanentlyZeroTrace = async (params: {
 
   // 4. Local storage & IndexedDB wipe
   try {
-    deletePrivateVaultItem(id);
+    deletePrivateVaultItem(id, digest, photoUrl || cloudStorageUrl);
   } catch (localErr) {
     console.warn('Local wipe note:', localErr);
   }
 
   // 5. Broadcast instant purge event
   if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('vec-artwork-destroyed', {
+        detail: { deletedId: id, digest, title, photoUrl: photoUrl || cloudStorageUrl, curationNumber }
+      })
+    );
     window.dispatchEvent(
       new CustomEvent('vec-vault-updated', {
         detail: { deletedId: id, digest, title, curationNumber }
