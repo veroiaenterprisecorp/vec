@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Header } from './components/Header';
 import { VecOverview } from './components/VecOverview';
-import { VecVault } from './components/VecVault';
-import { VecStudio } from './components/VecStudio';
-import { VecPrivateVault } from './components/VecPrivateVault';
-import { MasterAdminPortal, AdminPortalTab } from './components/MasterAdminPortal';
-import { VEC_FULL_SQL_SCRIPT } from './data/vecSqlSchema';
 import { VecOfficialLogo } from './components/VecOfficialLogo';
-import { Check } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import { vecoutAll, isVaultUnlocked } from './lib/vaultKeyAuth';
 import { checkAdminSession } from './lib/masterAdminStorage';
+import type { AdminPortalTab } from './components/MasterAdminPortal';
+
+// Code-split heavy tabs to reduce initial bundle and memory footprint
+const VecVault = lazy(() => import('./components/VecVault').then((m) => ({ default: m.VecVault })));
+const VecStudio = lazy(() => import('./components/VecStudio').then((m) => ({ default: m.VecStudio })));
+const VecPrivateVault = lazy(() => import('./components/VecPrivateVault').then((m) => ({ default: m.VecPrivateVault })));
+const MasterAdminPortal = lazy(() => import('./components/MasterAdminPortal').then((m) => ({ default: m.MasterAdminPortal })));
 
 export type AppTab = 'overview' | 'private-vault' | 'vault' | 'studio' | 'admin-portal';
 
@@ -121,22 +123,32 @@ export default function App() {
     triggerToast("Vecout ('): Seluruh sesi aktif dan brankas telah dikunci rapat.");
   };
 
-  const handleCopyAllSql = () => {
-    navigator.clipboard.writeText(VEC_FULL_SQL_SCRIPT);
-    setCopied(true);
-    triggerToast('Skrip SQL lengkap berhasil disalin!');
-    setTimeout(() => setCopied(false), 2500);
+  const handleCopyAllSql = async () => {
+    try {
+      const { VEC_FULL_SQL_SCRIPT } = await import('./data/vecSqlSchema');
+      await navigator.clipboard.writeText(VEC_FULL_SQL_SCRIPT);
+      setCopied(true);
+      triggerToast('Skrip SQL lengkap berhasil disalin!');
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      triggerToast('Gagal menyalin skrip SQL.');
+    }
   };
 
-  const handleDownloadSql = () => {
-    const element = document.createElement('a');
-    const file = new Blob([VEC_FULL_SQL_SCRIPT], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = 'vec_schema_supabase.sql';
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-    triggerToast('File vec_schema_supabase.sql berhasil diunduh!');
+  const handleDownloadSql = async () => {
+    try {
+      const { VEC_FULL_SQL_SCRIPT } = await import('./data/vecSqlSchema');
+      const element = document.createElement('a');
+      const file = new Blob([VEC_FULL_SQL_SCRIPT], { type: 'text/plain' });
+      element.href = URL.createObjectURL(file);
+      element.download = 'vec_schema_supabase.sql';
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      triggerToast('File vec_schema_supabase.sql berhasil diunduh!');
+    } catch {
+      triggerToast('Gagal mengunduh skrip SQL.');
+    }
   };
 
   const handleNavigate = (tab: string) => {
@@ -173,48 +185,57 @@ export default function App() {
         onVecout={handleVecout}
       />
 
-      {/* Main Luxury Content Container */}
+      {/* Main Content Container with Suspense Lazy Loading */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'overview' && (
-          <VecOverview onNavigate={handleNavigate} />
-        )}
+        <Suspense
+          fallback={
+            <div className="flex flex-col items-center justify-center min-h-[400px] gap-3 text-neutral-400">
+              <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+              <span className="text-xs font-mono tracking-wider uppercase text-neutral-500">Memuat Modul VEC...</span>
+            </div>
+          }
+        >
+          {activeTab === 'overview' && (
+            <VecOverview onNavigate={handleNavigate} />
+          )}
 
-        {activeTab === 'vault' && (
-          <VecVault 
-            onNavigateToStudio={() => setActiveTab('studio')}
-            onNavigateToPrivateVault={() => setActiveTab('private-vault')}
-          />
-        )}
+          {activeTab === 'vault' && (
+            <VecVault 
+              onNavigateToStudio={() => setActiveTab('studio')}
+              onNavigateToPrivateVault={() => setActiveTab('private-vault')}
+            />
+          )}
 
-        {activeTab === 'private-vault' && (
-          <VecPrivateVault 
-            onNavigateToStudio={() => setActiveTab('studio')}
-            onNavigateToPublicVault={() => setActiveTab('vault')}
-          />
-        )}
+          {activeTab === 'private-vault' && (
+            <VecPrivateVault 
+              onNavigateToStudio={() => setActiveTab('studio')}
+              onNavigateToPublicVault={() => setActiveTab('vault')}
+            />
+          )}
 
-        {activeTab === 'studio' && (
-          <VecStudio 
-            onNavigateToPrivateVault={() => setActiveTab('private-vault')}
-            onNavigateToPublicVault={() => setActiveTab('vault')}
-          />
-        )}
+          {activeTab === 'studio' && (
+            <VecStudio 
+              onNavigateToPrivateVault={() => setActiveTab('private-vault')}
+              onNavigateToPublicVault={() => setActiveTab('vault')}
+            />
+          )}
 
-        {activeTab === 'admin-portal' && (
-          <MasterAdminPortal
-            initialAdminTab={adminSubTab}
-            onBackToPublicSite={() => {
-              if (typeof window !== 'undefined' && window.history.pushState) {
-                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-                window.history.pushState({ path: cleanUrl }, '', cleanUrl);
-              }
-              setActiveTab('overview');
-            }}
-            onCopyAllSql={handleCopyAllSql}
-            copiedSql={copied}
-            onDownloadSql={handleDownloadSql}
-          />
-        )}
+          {activeTab === 'admin-portal' && (
+            <MasterAdminPortal
+              initialAdminTab={adminSubTab}
+              onBackToPublicSite={() => {
+                if (typeof window !== 'undefined' && window.history.pushState) {
+                  const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                  window.history.pushState({ path: cleanUrl }, '', cleanUrl);
+                }
+                setActiveTab('overview');
+              }}
+              onCopyAllSql={handleCopyAllSql}
+              copiedSql={copied}
+              onDownloadSql={handleDownloadSql}
+            />
+          )}
+        </Suspense>
       </main>
 
       {/* Premium Institutional Footer */}
