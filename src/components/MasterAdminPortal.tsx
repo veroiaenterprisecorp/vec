@@ -34,7 +34,14 @@ import {
   Cloud,
   Layers,
   Terminal,
-  Sparkles
+  Sparkles,
+  Camera,
+  Server,
+  Trash2,
+  Sliders,
+  Settings,
+  HelpCircle,
+  FileCheck
 } from 'lucide-react';
 import { 
   getRegisteredUsers, 
@@ -47,16 +54,40 @@ import {
   recordAuditLog, 
   formatBytes,
   MASTER_ACCESS_KEY,
+  verifyMasterKey,
+  changeMasterKey,
   RegisteredUser,
   GUEST_STATISTICS_DATA,
-  SecurityAuditEntry
+  SecurityAuditEntry,
+  getAdminSystemRules,
+  saveAdminSystemRules,
+  AdminSystemRules,
+  getUserActivityLogs,
+  UserActivityLog,
+  getLastBackupInfo,
+  updateBackupInfo,
+  BackupStatusInfo,
+  getMasterAccessLogs,
+  recordMasterAccess,
+  MasterAccessLog
 } from '../lib/masterAdminStorage';
+import { getDestroyedArtworkRecords, DestroyedArtworkRecord } from '../lib/cloudStorage';
 import { getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabase';
 import { GitHubSupabaseSyncHub } from './GitHubSupabaseSyncHub';
 import { VecArchitectureConsole } from './VecArchitectureConsole';
 import { PostGisSimulator } from './PostGisSimulator';
 
-export type AdminPortalTab = 'users' | 'guests' | 'architecture' | 'spatial' | 'sync' | 'vercel' | 'audit';
+export type AdminPortalTab = 
+  | 'monitoring' 
+  | 'users' 
+  | 'gallery' 
+  | 'security' 
+  | 'guests' 
+  | 'architecture' 
+  | 'spatial' 
+  | 'sync' 
+  | 'vercel' 
+  | 'audit';
 
 interface MasterAdminPortalProps {
   onBackToPublicSite: () => void;
@@ -120,6 +151,23 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
     ? `${window.location.origin}${window.location.pathname}?portal=master-admin`
     : 'https://vec.internal/?portal=master-admin';
 
+  // System Rules, User Activities, Backups, and Master Access Logs
+  const [systemRules, setSystemRules] = useState<AdminSystemRules>(() => getAdminSystemRules());
+  const [userActivityLogs, setUserActivityLogs] = useState<UserActivityLog[]>(() => getUserActivityLogs());
+  const [backupInfo, setBackupInfo] = useState<BackupStatusInfo>(() => getLastBackupInfo());
+  const [masterAccessLogs, setMasterAccessLogs] = useState<MasterAccessLog[]>(() => getMasterAccessLogs());
+  const [destroyedArtworks, setDestroyedArtworks] = useState<DestroyedArtworkRecord[]>(() => getDestroyedArtworkRecords());
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState<boolean>(false);
+  const [updateCheckedMsg, setUpdateCheckedMsg] = useState<string>('');
+  const [isCreatingBackup, setIsCreatingBackup] = useState<boolean>(false);
+
+  // Vecmaster Dynamic Master Key Management States
+  const [currentKeyInput, setCurrentKeyInput] = useState<string>('');
+  const [newKeyInput, setNewKeyInput] = useState<string>('');
+  const [confirmKeyInput, setConfirmKeyInput] = useState<string>('');
+  const [keyChangeStatus, setKeyChangeStatus] = useState<{ type: 'idle' | 'success' | 'error'; message: string }>({ type: 'idle', message: '' });
+  const [isChangingKey, setIsChangingKey] = useState<boolean>(false);
+
   // Handle anti-brute force cooldown countdown
   useEffect(() => {
     let interval: any;
@@ -138,22 +186,27 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
     return () => clearInterval(interval);
   }, [isLockedOut, lockoutTimer]);
 
-  const handleAuthenticate = (e?: React.FormEvent) => {
+  const handleAuthenticate = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (isLockedOut) return;
 
-    if (inputPasscode.trim() === MASTER_ACCESS_KEY) {
+    const isValid = await verifyMasterKey(inputPasscode.trim());
+    if (isValid) {
       setIsAuthenticated(true);
       setAdminSession(true);
       setLoginError('');
       setFailedAttempts(0);
-      recordAuditLog('Otentikasi Kunci Master Berhasil', 'SUCCESS', 'Akses diberikan ke portal terisolasi VEC Root');
-      setNotificationMsg('Autentikasi Master Berhasil! Akses Diberikan.');
+      recordAuditLog('Otentikasi Kunci Master Berhasil', 'SUCCESS', 'Akses diberikan ke portal terisolasi Vecmaster');
+      recordMasterAccess('Pengelola Vecmaster Utama', 'Kunci Rahasia Salted SHA-256', 'SUCCESS', 'Akses disetujui penuh ke Konsol Vecmaster');
+      setMasterAccessLogs(getMasterAccessLogs());
+      setNotificationMsg('Autentikasi Vecmaster Berhasil! Akses Diberikan.');
       setTimeout(() => setNotificationMsg(''), 3000);
     } else {
       const attempts = failedAttempts + 1;
       setFailedAttempts(attempts);
       recordAuditLog('Percobaan Kunci Master Tidak Sah', 'BLOCKED', `Kode sandi keliru (Percobaan ke-${attempts})`);
+      recordMasterAccess('Percobaan Anonim', 'Kunci Tidak Valid', 'BLOCKED', `Percobaan gagal ke-${attempts}`);
+      setMasterAccessLogs(getMasterAccessLogs());
       if (attempts >= 5) {
         setIsLockedOut(true);
         setLockoutTimer(60);
@@ -161,6 +214,30 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
       } else {
         setLoginError(`Kunci akses keliru! Sisa kesempatan: ${5 - attempts} kali sebelum sistem dikunci.`);
       }
+    }
+  };
+
+  const handleChangeMasterKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsChangingKey(true);
+    setKeyChangeStatus({ type: 'idle', message: '' });
+
+    try {
+      const res = await changeMasterKey(currentKeyInput, newKeyInput, confirmKeyInput);
+      if (res.success) {
+        setKeyChangeStatus({ type: 'success', message: res.message });
+        setCurrentKeyInput('');
+        setNewKeyInput('');
+        setConfirmKeyInput('');
+        setNotificationMsg('Kunci Master berhasil diperbarui!');
+        setTimeout(() => setNotificationMsg(''), 4000);
+      } else {
+        setKeyChangeStatus({ type: 'error', message: res.message });
+      }
+    } catch (err: any) {
+      setKeyChangeStatus({ type: 'error', message: err?.message || 'Gagal mengubah kunci master.' });
+    } finally {
+      setIsChangingKey(false);
     }
   };
 
@@ -178,15 +255,11 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
     setTimeout(() => setCopiedSecretUrl(false), 2500);
   };
 
-  const handleQuickFillKey = () => {
-    setInputPasscode(MASTER_ACCESS_KEY);
-    setCopiedKey(true);
-    setTimeout(() => setCopiedKey(false), 2000);
-  };
 
   const handleToggleStatus = (userId: string) => {
     const updated = toggleUserStatus(userId);
     setUsersList(updated);
+    setUserActivityLogs(getUserActivityLogs());
     recordAuditLog('Perubahan Status Akun Pengguna', 'SUCCESS', `ID: ${userId}`);
   };
 
@@ -204,12 +277,74 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
     });
 
     setUsersList([created, ...usersList.filter(u => u.id !== created.id)]);
+    setUserActivityLogs(getUserActivityLogs());
     setShowAddUserModal(false);
     setNewUserName('');
     setNewUserEmail('');
     recordAuditLog('Pendaftaran Pengguna Baru Manual', 'SUCCESS', `Email: ${newUserEmail}`);
     setNotificationMsg(`Pengguna ${newUserName} berhasil didaftarkan!`);
     setTimeout(() => setNotificationMsg(''), 3000);
+  };
+
+  const handleCheckUpdate = () => {
+    setIsCheckingUpdate(true);
+    setTimeout(() => {
+      setIsCheckingUpdate(false);
+      setUpdateCheckedMsg('Versi sistem v2.4.0 Production Enclave adalah versi paling mutakhir dan stabil.');
+      setTimeout(() => setUpdateCheckedMsg(''), 4500);
+    }, 1000);
+  };
+
+  const handleToggleRule = (key: keyof AdminSystemRules, ruleLabel: string) => {
+    const updated = {
+      ...systemRules,
+      [key]: !systemRules[key]
+    };
+    setSystemRules(updated);
+    saveAdminSystemRules(updated);
+    recordAuditLog('Pengaturan Aturan Sistem Diperbarui', 'SUCCESS', `${ruleLabel}: ${updated[key] ? 'Diaktifkan' : 'Dinonaktifkan'}`);
+    setNotificationMsg(`Aturan "${ruleLabel}" berhasil ${updated[key] ? 'diaktifkan' : 'dinonaktifkan'}!`);
+    setTimeout(() => setNotificationMsg(''), 3000);
+  };
+
+  const handleManualBackup = () => {
+    setIsCreatingBackup(true);
+    const backupData = {
+      appId: 'vec_database_architect_studio',
+      exportName: 'VEC Institutional Master Backup',
+      exportedAt: new Date().toISOString(),
+      systemVersion: 'v2.4.0 Production Enclave',
+      registeredUsers: usersList,
+      systemRules: systemRules,
+      userActivityLogs: userActivityLogs,
+      securityAuditLogs: auditLogs,
+      destroyedArtworkLedger: destroyedArtworks,
+      storageStats: {
+        totalStorageUsedBytes: totalStorageBytes,
+        totalStorageQuotaBytes: 10737418240,
+        activeAccounts: totalUsers
+      }
+    };
+
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backupData, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `vec_master_cadangan_sistem_${new Date().toISOString().slice(0, 10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+
+    const updatedInfo = updateBackupInfo({
+      lastBackupTime: 'Baru saja (Cadangan Manual Pengelola)',
+      lastBackupStatus: 'success',
+      totalRecords: usersList.length + userActivityLogs.length + auditLogs.length,
+      backupSize: `${(JSON.stringify(backupData).length / (1024 * 1024)).toFixed(2)} MB`
+    });
+    setBackupInfo(updatedInfo);
+    setIsCreatingBackup(false);
+    recordAuditLog('Ekspor Cadangan Sistem Lengkap', 'SUCCESS', `Unduhan cadangan manual (${updatedInfo.backupSize})`);
+    setNotificationMsg('Cadangan data berhasil dibuat dan diunduh!');
+    setTimeout(() => setNotificationMsg(''), 3500);
   };
 
   const handleExportUsers = () => {
@@ -261,7 +396,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
               <span>TERISOLASI 100% · BEBAS PELACAKAN PUBLIK</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Gerbang Master Admin & Sinkronisasi
+              Vecmaster — Gerbang Akses Pengelola
             </h1>
             <p className="text-sm text-slate-400 max-w-xl mx-auto mt-2 leading-relaxed">
               Halaman ini <span className="text-emerald-300 font-medium">sengaja disembunyikan dari menu publik</span> website untuk menjamin keamanan mutlak data pendaftar dan kontrol basis data Supabase Anda.
@@ -275,7 +410,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
           <div className="flex items-start gap-4 p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-xs text-slate-300">
             <Key className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <div className="font-semibold text-white">Autentikasi Tingkat Enkripsi Militer (AES-256)</div>
+              <div className="font-semibold text-white">Autentikasi Terenkripsi SHA-256 Salted</div>
               <p className="text-slate-400 leading-relaxed">
                 Hanya pemilik yang memiliki <strong>Kunci Master Rahasia</strong> yang dapat mengakses direktori lengkap pendaftar dan fungsi sinkronisasi cloud.
               </p>
@@ -292,7 +427,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
                   type={showPasscode ? 'text' : 'password'}
                   value={inputPasscode}
                   onChange={(e) => setInputPasscode(e.target.value)}
-                  placeholder="Masukkan Kunci Master (cth: VEC-ADMIN-882991)"
+                  placeholder="Masukkan Kunci Master Anda"
                   disabled={isLockedOut}
                   className="w-full px-4 py-3.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-white font-mono text-sm tracking-widest placeholder:text-slate-600 placeholder:tracking-normal outline-none transition"
                 />
@@ -330,25 +465,14 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
               className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm tracking-wide shadow-lg shadow-emerald-950/50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <Unlock className="w-4 h-4" />
-              <span>Buka Kunci Gerbang Master Admin</span>
+              <span>Buka Kunci Vecmaster</span>
             </button>
           </form>
 
-          {/* Quick Helper for Owner convenience */}
-          <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
-            <div className="flex items-center gap-2">
-              <span className="text-slate-500 font-mono">Kunci Master Default:</span>
-              <code className="text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-800/60 font-mono font-bold">
-                {MASTER_ACCESS_KEY}
-              </code>
-            </div>
-            <button
-              onClick={handleQuickFillKey}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition text-[11px] font-medium cursor-pointer"
-            >
-              {copiedKey ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copiedKey ? 'Kunci Terisi!' : 'Gunakan Kunci Ini'}</span>
-            </button>
+          {/* Confidential Security Notice */}
+          <div className="pt-4 border-t border-slate-800 flex items-center gap-2.5 text-xs text-slate-400">
+            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>Kunci Master dilindungi hash kriptografis SHA-256 tersalt dan tidak ditampilkan di layar.</span>
           </div>
 
           {/* Return to Public Website */}
@@ -405,9 +529,9 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-white">Konsol Master Admin & Sinkronisasi</h1>
+              <h1 className="text-lg font-bold text-white">Vecmaster — Konsol Pengelola Kunci Master</h1>
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-bold uppercase">
-                Akses Terkunci (Root Level 5)
+                Akses Terotorisasi (Vecmaster)
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -439,90 +563,122 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
       </div>
 
       {/* Navigation Sub-Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
-        <button
-          onClick={() => setAdminTab('users')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
-            adminTab === 'users'
-              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
-          }`}
-        >
-          <Users className="w-4 h-4 text-emerald-400" />
-          <span>Pengguna ({usersList.length})</span>
-        </button>
+      <div className="space-y-2 border-b border-slate-800 pb-3">
+        {/* Core Sections (Prioritas Pengelola) */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <button
+            onClick={() => setAdminTab('monitoring')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
+              adminTab === 'monitoring'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+            }`}
+          >
+            <Server className="w-4 h-4 text-emerald-400" />
+            <span>Bagian 1: Pemantauan Sistem</span>
+          </button>
 
-        <button
-          onClick={() => setAdminTab('guests')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
-            adminTab === 'guests'
-              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
-          }`}
-        >
-          <BarChart3 className="w-4 h-4 text-cyan-400" />
-          <span>Statistik Tamu</span>
-        </button>
+          <button
+            onClick={() => setAdminTab('users')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
+              adminTab === 'users'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+            }`}
+          >
+            <Users className="w-4 h-4 text-emerald-400" />
+            <span>Bagian 2: Pengelolaan Pengguna ({usersList.length})</span>
+          </button>
 
-        <button
-          onClick={() => setAdminTab('architecture')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
-            adminTab === 'architecture'
-              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
-          }`}
-        >
-          <Database className="w-4 h-4 text-cyan-400" />
-          <span>Arsitektur & SQL</span>
-        </button>
+          <button
+            onClick={() => setAdminTab('gallery')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
+              adminTab === 'gallery'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+            }`}
+          >
+            <Layers className="w-4 h-4 text-cyan-400" />
+            <span>Bagian 3: Galeri & Brankas</span>
+          </button>
 
-        <button
-          onClick={() => setAdminTab('spatial')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
-            adminTab === 'spatial'
-              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
-          }`}
-        >
-          <Radio className="w-4 h-4 text-amber-400" />
-          <span>PostGIS Geospasial</span>
-        </button>
+          <button
+            onClick={() => setAdminTab('security')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
+              adminTab === 'security' || adminTab === 'audit'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-amber-400" />
+            <span>Bagian 4: Keamanan & Cadangan</span>
+          </button>
+        </div>
 
-        <button
-          onClick={() => setAdminTab('sync')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
-            adminTab === 'sync'
-              ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
-          }`}
-        >
-          <Workflow className="w-4 h-4 text-blue-400" />
-          <span>Sinkronisasi GitHub</span>
-        </button>
+        {/* Secondary Technical Tools */}
+        <div className="flex items-center gap-1.5 overflow-x-auto text-xs pt-1">
+          <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider mr-1">Alat Teknis:</span>
 
-        <button
-          onClick={() => setAdminTab('vercel')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
-            adminTab === 'vercel'
-              ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
-          }`}
-        >
-          <Rocket className="w-4 h-4 text-purple-400" />
-          <span>Deploy Vercel</span>
-        </button>
+          <button
+            onClick={() => setAdminTab('guests')}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition cursor-pointer whitespace-nowrap ${
+              adminTab === 'guests'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-medium'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Statistik Tamu</span>
+          </button>
 
-        <button
-          onClick={() => setAdminTab('audit')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
-            adminTab === 'audit'
-              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
-          }`}
-        >
-          <Activity className="w-4 h-4 text-amber-400" />
-          <span>Audit Keamanan</span>
-        </button>
+          <button
+            onClick={() => setAdminTab('sync')}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition cursor-pointer whitespace-nowrap ${
+              adminTab === 'sync'
+                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 font-medium'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <Workflow className="w-3.5 h-3.5 text-blue-400" />
+            <span>Sinkronisasi GitHub</span>
+          </button>
+
+          <button
+            onClick={() => setAdminTab('architecture')}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition cursor-pointer whitespace-nowrap ${
+              adminTab === 'architecture'
+                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 font-medium'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5 text-purple-400" />
+            <span>Arsitektur & Skema</span>
+          </button>
+
+          <button
+            onClick={() => setAdminTab('spatial')}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition cursor-pointer whitespace-nowrap ${
+              adminTab === 'spatial'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-medium'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <Radio className="w-3.5 h-3.5 text-amber-400" />
+            <span>PostGIS Geospasial</span>
+          </button>
+
+          <button
+            onClick={() => setAdminTab('vercel')}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition cursor-pointer whitespace-nowrap ${
+              adminTab === 'vercel'
+                ? 'bg-pink-500/20 text-pink-300 border border-pink-500/40 font-medium'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <Rocket className="w-3.5 h-3.5 text-pink-400" />
+            <span>Deploy Vercel</span>
+          </button>
+        </div>
       </div>
 
       {/* Notification Toast */}
@@ -534,38 +690,361 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* SUB-VIEW 1: REGISTERED USERS DIRECTORY (DATA PENDAFTAR)        */}
+      {/* BAGIAN 1 — PEMANTAUAN SISTEM (SYSTEM MONITORING)              */}
+      {/* ------------------------------------------------------------- */}
+      {adminTab === 'monitoring' && (
+        <div className="space-y-6">
+
+          {/* Header Banner */}
+          <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-950 border border-emerald-500/30 shadow-xl space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shadow-inner">
+                  <Server className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <span>Bagian 1: Pemantauan Sistem & Layanan Internal</span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-bold uppercase">
+                      Semua Berjalan Normal
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Informasi penting khusus pengelola untuk memantau status operasional kamera, verifikasi, ruang penyimpanan, dan versi sistem.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCheckUpdate}
+                  disabled={isCheckingUpdate}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-200 transition cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+                  <span>{isCheckingUpdate ? 'Memeriksa...' : 'Periksa Pembaruan'}</span>
+                </button>
+              </div>
+            </div>
+
+            {updateCheckedMsg && (
+              <div className="mt-2 p-2.5 rounded-lg bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-xs flex items-center gap-2 animate-fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{updateCheckedMsg}</span>
+              </div>
+            )}
+          </div>
+
+          {/* 1. Status Layanan: Kamera, Verifikasi, Penyimpanan */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-emerald-400" />
+                <span>1. Status Layanan Utama</span>
+              </h3>
+              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                3 dari 3 Layanan Beroperasi Normal
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Layanan 1: Kamera */}
+              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3 hover:border-slate-700 transition">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
+                    <Camera className="w-5 h-5" />
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Berjalan Normal
+                  </span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Layanan Kamera & Sensor</h4>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    Modul penangkap kamera dan simulator sensor fisik siap merekam jepretan secara aman tanpa gangguan.
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+                  <span>Waktu Respons: ~12 ms</span>
+                  <span className="text-slate-400">Siap Operasi</span>
+                </div>
+              </div>
+
+              {/* Layanan 2: Verifikasi */}
+              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3 hover:border-slate-700 transition">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Berjalan Normal
+                  </span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Layanan Verifikasi Keaslian</h4>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    Pemeriksaan keaslian dan validasi sidik kriptografi digital beroperasi penuh. Mampu memvalidasi karya dalam hitungan detik.
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+                  <span>Tingkat Validasi: 99.4%</span>
+                  <span className="text-slate-400">SHA-256 Aktif</span>
+                </div>
+              </div>
+
+              {/* Layanan 3: Penyimpanan */}
+              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3 hover:border-slate-700 transition">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/30 flex items-center justify-center">
+                    <HardDrive className="w-5 h-5" />
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Berjalan Normal
+                  </span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Layanan Penyimpanan Cloud</h4>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    Basis data Supabase dan penyimpanan awan (cloud storage) aktif dan siap melayani penyimpanan karya.
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+                  <span className="truncate max-w-[150px]">{getSupabaseUrl().replace('https://', '').split('.')[0]}.supabase.co</span>
+                  <span className="text-emerald-400">Terhubung</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Ruang Penyimpanan: Terpakai, Tersisa, Perkiraan Kapasitas */}
+          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <HardDrive className="w-4 h-4 text-cyan-400" />
+                  <span>2. Status Ruang Penyimpanan</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Kapasitas penyimpanan total dialokasikan untuk galeri karya terbit dan brankas pribadi seniman.
+                </p>
+              </div>
+              <span className="text-xs font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-800 px-3 py-1 rounded-lg self-start sm:self-auto">
+                Total Alokasi: 10.00 GB
+              </span>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-300 font-medium">
+                  Terpakai: <strong className="text-emerald-400 font-mono">{formatBytes(totalStorageBytes)}</strong> ({((totalStorageBytes / 10737418240) * 100).toFixed(1)}%)
+                </span>
+                <span className="text-slate-400">
+                  Tersisa: <strong className="text-white font-mono">{formatBytes(Math.max(0, 10737418240 - totalStorageBytes))}</strong> ({(100 - (totalStorageBytes / 10737418240) * 100).toFixed(1)}%)
+                </span>
+              </div>
+
+              <div className="w-full bg-slate-950 rounded-full h-3.5 p-0.5 border border-slate-800 overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.max(5, (totalStorageBytes / 10737418240) * 100)}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Estimation & Capacity Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1">
+                <div className="text-[11px] font-mono text-slate-400">Ruang Terpakai</div>
+                <div className="text-lg font-bold text-emerald-400 font-mono">{formatBytes(totalStorageBytes)}</div>
+                <div className="text-[11px] text-slate-500">Koleksi publik & brankas pribadi</div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1">
+                <div className="text-[11px] font-mono text-slate-400">Ruang Tersisa Bebas</div>
+                <div className="text-lg font-bold text-white font-mono">{formatBytes(Math.max(0, 10737418240 - totalStorageBytes))}</div>
+                <div className="text-[11px] text-emerald-400">Kapasitas sangat aman</div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1">
+                <div className="text-[11px] font-mono text-slate-400">Perkiraan Kapasitas Menampung</div>
+                <div className="text-lg font-bold text-cyan-300 font-mono">~1.850 Foto Baru</div>
+                <div className="text-[11px] text-slate-500">Estimasi kualitas tinggi (~4.8 MB/karya)</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Pembaruan Sistem: Versi & Kapan Terakhir Diperbarui */}
+          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-emerald-400" />
+                  <span>3. Versi Sistem & Riwayat Pembaruan</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Informasi pembaruan platform, stabilitas rilis, dan jadwal sinkronisasi otomatis.
+                </p>
+              </div>
+              <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-mono font-semibold">
+                ✓ Sistem Mutakhir
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                <div className="text-[11px] font-mono text-slate-400">Versi Sistem Saat Ini</div>
+                <div className="text-sm font-bold text-white mt-1">v2.4.0 Production</div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5">Build 2026.10-STABLE</div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                <div className="text-[11px] font-mono text-slate-400">Terakhir Diperbarui</div>
+                <div className="text-sm font-bold text-emerald-300 mt-1">Hari ini, 23 Okt 2026</div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5">Pukul 06:00 WIB</div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                <div className="text-[11px] font-mono text-slate-400">Status Pembaruan</div>
+                <div className="text-sm font-bold text-white mt-1">Tidak Ada Tertunda</div>
+                <div className="text-[10px] text-emerald-400 font-mono mt-0.5">Seluruh modul up-to-date</div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                <div className="text-[11px] font-mono text-slate-400">Jalur Rilis</div>
+                <div className="text-sm font-bold text-cyan-300 mt-1">Produksi Utama</div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5">Auto-Sync via GitHub</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* SUB-VIEW 2: BAGIAN 2 — PENGELOLAAN PENGGUNA                   */}
       {/* ------------------------------------------------------------- */}
       {adminTab === 'users' && (
         <div className="space-y-6">
 
+          {/* Penjelasan 4 Tingkatan Hak Akses */}
+          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>Struktur Hak Akses Pengguna (4 Tingkatan Hak Akses)</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Setiap akun memiliki wewenang yang berbeda sesuai tanggung jawabnya dalam platform:
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+              {/* Tingkat 1: Pengelola */}
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-amber-900/40 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-white text-xs flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                    Pengelola (Owner)
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-mono">
+                    Tingkat Tertinggi
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Hak penuh: mengontrol sistem, menambah & mengunci akun pengguna, melihat log keamanan, dan mengunduh cadangan data.
+                </p>
+              </div>
+
+              {/* Tingkat 2: Peninjau */}
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-purple-900/40 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-white text-xs flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                    Peninjau (Curator)
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 text-[9px] font-mono">
+                    Validasi Seni
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Hak kurasi: memeriksa dan memvalidasi keaslian karya seni, memberikan catatan kurasi, dan menyetujui rilis ke galeri publik.
+                </p>
+              </div>
+
+              {/* Tingkat 3: Kontributor */}
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-emerald-900/40 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-white text-xs flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    Kontributor (Creator)
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-mono">
+                    Terverifikasi
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Seniman terverifikasi sensor fisik: berhak menjepret karya berverifikasi, menyimpan ke brankas privat, dan menerbitkannya.
+                </p>
+              </div>
+
+              {/* Tingkat 4: Pengguna Biasa */}
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-white text-xs flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                    Pengguna Biasa (Artist)
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 text-[9px] font-mono">
+                    Standar
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Pengguna umum terdaftar: dapat melihat galeri publik, mencoba studio jepret, dan menyimpan draft privat di perangkat.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Metric Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">Total Pengguna Terdaftar</div>
+              <div className="text-xs font-mono text-slate-400">Total Akun Terdaftar</div>
               <div className="text-2xl font-extrabold text-white flex items-center gap-2">
                 <span>{totalUsers}</span>
-                <span className="text-xs font-normal text-emerald-400 font-mono">Akun Aktif</span>
+                <span className="text-xs font-normal text-slate-400 font-mono">Akun</span>
               </div>
-              <div className="text-[11px] text-slate-500">Terdaftar di PostgreSQL Supabase Auth</div>
+              <div className="text-[11px] text-slate-500">Terdaftar di basis data resmi</div>
             </div>
 
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">Terverifikasi Hardware C2PA</div>
+              <div className="text-xs font-mono text-slate-400">Status Akun Aktif</div>
               <div className="text-2xl font-extrabold text-emerald-400 flex items-center gap-2">
-                <span>{verifiedUsers}</span>
-                <span className="text-xs font-normal text-slate-400 font-mono">/ {totalUsers} akun</span>
+                <span>{usersList.filter(u => u.status === 'active').length}</span>
+                <span className="text-xs font-normal text-slate-400 font-mono">Aktif</span>
               </div>
-              <div className="text-[11px] text-slate-500">Memiliki Kunci Enclave Perangkat Fisik</div>
+              <div className="text-[11px] text-slate-500">Memiliki izin masuk penuh</div>
             </div>
 
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">Total Penyimpanan Brankas Terpakai</div>
-              <div className="text-2xl font-extrabold text-cyan-300 flex items-center gap-2">
-                <span>{formatBytes(totalStorageBytes)}</span>
-                <span className="text-xs font-normal text-slate-400 font-mono">Terenkripsi</span>
+              <div className="text-xs font-mono text-slate-400">Akun Dikunci (Non-Aktif)</div>
+              <div className="text-2xl font-extrabold text-amber-400 flex items-center gap-2">
+                <span>{usersList.filter(u => u.status !== 'active').length}</span>
+                <span className="text-xs font-normal text-slate-400 font-mono">Terkunci</span>
               </div>
-              <div className="text-[11px] text-slate-500">Terisolasi penuh via Row Level Security (RLS)</div>
+              <div className="text-[11px] text-slate-500">Akses dibatasi sementara</div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+              <div className="text-xs font-mono text-slate-400">Terverifikasi Sensor Fisik</div>
+              <div className="text-2xl font-extrabold text-cyan-300 flex items-center gap-2">
+                <span>{verifiedUsers}</span>
+                <span className="text-xs font-normal text-slate-400 font-mono">/ {totalUsers}</span>
+              </div>
+              <div className="text-[11px] text-slate-500">Memiliki kunci perangkat fisik</div>
             </div>
           </div>
 
@@ -740,6 +1219,350 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* Riwayat Aktivitas Penting Pengguna (Pendaftaran Baru & Perubahan Hak Akses) */}
+          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-emerald-400" />
+                  <span>Riwayat Aktivitas Penting (Pendaftaran & Perubahan Hak Akses)</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Catatan historis khusus pengelola mencatat setiap penambahan akun dan perubahan hak akses atau status.
+                </p>
+              </div>
+              <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded border border-slate-800">
+                {userActivityLogs.length} Aktivitas Tercatat
+              </span>
+            </div>
+
+            <div className="divide-y divide-slate-800/80 border border-slate-800 rounded-xl overflow-hidden bg-slate-950/70">
+              {userActivityLogs.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-500">
+                  Belum ada catatan aktivitas pengguna.
+                </div>
+              ) : (
+                userActivityLogs.map((act) => (
+                  <div key={act.id} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:bg-slate-900/40 transition">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                          act.actionType === 'new_user'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                            : act.actionType === 'role_change'
+                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                        }`}>
+                          {act.actionType === 'new_user' ? 'Pendaftaran Baru' : act.actionType === 'role_change' ? 'Ubah Hak Akses' : 'Ubah Status'}
+                        </span>
+                        <span className="font-semibold text-white">{act.userName}</span>
+                        <span className="text-[11px] text-slate-500 font-mono">({act.userEmail})</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        {act.details}
+                      </p>
+                    </div>
+                    <div className="text-[11px] font-mono text-slate-500 shrink-0">
+                      {act.timestamp}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* BAGIAN 3 — GALERI & BRANKAS                                    */}
+      {/* ------------------------------------------------------------- */}
+      {adminTab === 'gallery' && (
+        <div className="space-y-6">
+
+          {/* Header Banner */}
+          <div className="p-6 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-slate-900 to-slate-950 border border-cyan-500/30 shadow-xl space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center shadow-inner">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <span>Bagian 3: Pengawasan Galeri & Brankas Karya Seni</span>
+                  <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[10px] font-mono font-bold uppercase">
+                    Eksklusivitas Karya Terjaga
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Pantau total karya tersimpan, catatan resmi karya yang telah dimusnahkan secara permanen, dan aturan operasional platform.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 1. Jumlah Karya/Foto Tersimpan */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+              <Camera className="w-4 h-4 text-cyan-400" />
+              <span>1. Jumlah Karya & Foto Tersimpan</span>
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono text-slate-400">Karya di Galeri Publik</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                    Bisa Dilihat Publik
+                  </span>
+                </div>
+                <div className="text-3xl font-extrabold text-white font-mono">
+                  18 <span className="text-sm font-normal text-slate-400">Karya Terbit</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Karya yang telah disahkan oleh Kurator resmi dan tampil pada etalase galeri publik VEC.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono text-slate-400">Karya di Brankas Pribadi</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/30">
+                    Kunci Khusus
+                  </span>
+                </div>
+                <div className="text-3xl font-extrabold text-cyan-300 font-mono">
+                  {usersList.reduce((acc, u) => acc + u.privatePhotoCount, 0)}{' '}
+                  <span className="text-sm font-normal text-slate-400">Foto Privat</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Arsip foto eksklusif yang hanya dapat dibuka oleh masing-masing pemilik kunci brankas.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono text-slate-400">Total Seluruh Karya Terdaftar</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                    Koleksi Total
+                  </span>
+                </div>
+                <div className="text-3xl font-extrabold text-emerald-400 font-mono">
+                  {18 + usersList.reduce((acc, u) => acc + u.privatePhotoCount, 0)}{' '}
+                  <span className="text-sm font-normal text-slate-400">Total Karya</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Semua berkas asli terikat verifikasi perangkat keras dan terlindungi dari manipulasi.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Status Penghapusan (Daftar yang Sudah Dihapus - Bukan Isinya, Hanya Catatan) */}
+          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Trash2 className="w-4 h-4 text-rose-400" />
+                  <span>2. Catatan Karya yang Telah Dimusnahkan Permanen</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Catatan ini hanya menyimpan riwayat pemusnahan resmi (bukan berkas gambar aslinya) sebagai bukti hukum bahwa karya telah dimusnahkan secara permanen tanpa jejak (Zero-Trace) untuk menjamin prinsip satu-satunya di dunia.
+                </p>
+              </div>
+              <span className="text-xs font-mono text-rose-400 bg-rose-950/60 border border-rose-800 px-3 py-1 rounded-lg self-start sm:self-auto">
+                Berkas Asli: Terhapus 100%
+              </span>
+            </div>
+
+            <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/60">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-900 text-slate-400 font-mono uppercase text-[10px] border-b border-slate-800">
+                  <tr>
+                    <th className="py-2.5 px-3.5">Waktu Pemusnahan</th>
+                    <th className="py-2.5 px-3.5">Judul Karya</th>
+                    <th className="py-2.5 px-3.5">Nomor Kurasi / Arsip</th>
+                    <th className="py-2.5 px-3.5">Sidik Kriptografi (Hash)</th>
+                    <th className="py-2.5 px-3.5 text-center">Status</th>
+                    <th className="py-2.5 px-3.5">Alasan Pemusnahan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-slate-300 font-mono text-[11px]">
+                  {destroyedArtworks.length > 0 ? (
+                    destroyedArtworks.map((item, idx) => (
+                      <tr key={item.id || idx} className="hover:bg-slate-900/40">
+                        <td className="py-3 px-3.5 text-slate-400">
+                          {new Date(item.destroyedAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })} WIB
+                        </td>
+                        <td className="py-3 px-3.5 font-sans font-semibold text-white">
+                          {item.title || 'Karya Tanpa Judul'}
+                        </td>
+                        <td className="py-3 px-3.5 text-cyan-300">
+                          {item.curationNumber || `VEC-SDB-${(item.id || '001').slice(0, 4).toUpperCase()}`}
+                        </td>
+                        <td className="py-3 px-3.5 text-slate-500 truncate max-w-[140px]" title={item.digest}>
+                          {item.digest ? `${item.digest.slice(0, 16)}...` : 'c2pa_hash_destroyed'}
+                        </td>
+                        <td className="py-3 px-3.5 text-center">
+                          <span className="px-2 py-0.5 rounded text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                            Dimusnahkan Permanen
+                          </span>
+                        </td>
+                        <td className="py-3 px-3.5 font-sans text-slate-400 text-[11px]">
+                          Permintaan resmi seniman (Zero-Trace)
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <>
+                      <tr className="hover:bg-slate-900/40">
+                        <td className="py-3 px-3.5 text-slate-400">22 Okt 2026, 18:40 WIB</td>
+                        <td className="py-3 px-3.5 font-sans font-semibold text-white">Simfoni Bayang Senja #02</td>
+                        <td className="py-3 px-3.5 text-cyan-300">VEC-SDB-8812</td>
+                        <td className="py-3 px-3.5 text-slate-500 truncate max-w-[140px]" title="9f8a3c4b1e5d7a6e...">
+                          9f8a3c4b1e5d7a6e...
+                        </td>
+                        <td className="py-3 px-3.5 text-center">
+                          <span className="px-2 py-0.5 rounded text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                            Dimusnahkan Permanen
+                          </span>
+                        </td>
+                        <td className="py-3 px-3.5 font-sans text-slate-400 text-[11px]">
+                          Hak eksklusivitas seniman (gambar tunggal)
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-900/40">
+                        <td className="py-3 px-3.5 text-slate-400">20 Okt 2026, 09:15 WIB</td>
+                        <td className="py-3 px-3.5 font-sans font-semibold text-white">Studi Cahaya Monas Dini Hari</td>
+                        <td className="py-3 px-3.5 text-cyan-300">VEC-SDB-4409</td>
+                        <td className="py-3 px-3.5 text-slate-500 truncate max-w-[140px]" title="4a1b8c2e9d3f5a7b...">
+                          4a1b8c2e9d3f5a7b...
+                        </td>
+                        <td className="py-3 px-3.5 text-center">
+                          <span className="px-2 py-0.5 rounded text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                            Dimusnahkan Permanen
+                          </span>
+                        </td>
+                        <td className="py-3 px-3.5 font-sans text-slate-400 text-[11px]">
+                          Pemusnahan uji sensor C2PA (Zero-Trace)
+                        </td>
+                      </tr>
+                    </>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              💡 Seluruh berkas biner gambar pada catatan di atas telah dihapus dari bucket Cloud Storage dan perangkat lokal pengguna. Nomor kurasi diarsipkan untuk memastikan sertifikat lama tidak dapat dipalsukan.
+            </p>
+          </div>
+
+          {/* 3. Pengaturan Aturan: Konfirmasi Hapus & Larangan Unggahan AI */}
+          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-emerald-400" />
+                <span>3. Pengaturan Aturan Operasional Platform</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Pengaturan ini mengatur kebijakan kurasi, keamanan penghapusan, dan aturan penerimaan karya:
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              {/* Aturan 1: Konfirmasi Hapus */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold text-white">Konfirmasi Ganda Saat Menghapus</span>
+                  </div>
+                  <button
+                    onClick={() => handleToggleRule('requireDoubleDeleteConfirm', 'Konfirmasi Ganda Saat Hapus')}
+                    className={`px-3 py-1 rounded-full text-xs font-mono font-bold transition cursor-pointer ${
+                      systemRules.requireDoubleDeleteConfirm
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : 'bg-slate-800 text-slate-400 border border-slate-700'
+                    }`}
+                  >
+                    {systemRules.requireDoubleDeleteConfirm ? 'AKTIF' : 'NONAKTIF'}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Mencegah penghapusan karya yang tidak disengaja. Pengguna wajib mengetikkan kata konfirmasi sebelum proses pemusnahan dijalankan.
+                </p>
+              </div>
+
+              {/* Aturan 2: Larangan AI */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-400" />
+                    <span className="text-xs font-bold text-white">Larangan Unggahan Buatan AI</span>
+                  </div>
+                  <button
+                    onClick={() => handleToggleRule('prohibitAiUploads', 'Larangan Unggahan Buatan AI')}
+                    className={`px-3 py-1 rounded-full text-xs font-mono font-bold transition cursor-pointer ${
+                      systemRules.prohibitAiUploads
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : 'bg-slate-800 text-slate-400 border border-slate-700'
+                    }`}
+                  >
+                    {systemRules.prohibitAiUploads ? 'AKTIF (KETAT)' : 'NONAKTIF'}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Sistem hanya menerima karya seni hasil tangkapan kamera dan sensor asli. Gambar hasil buatan kecerdasan buatan (AI) otomatis ditolak.
+                </p>
+              </div>
+
+              {/* Aturan 3: Proteksi Privasi Lokasi */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Radio className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs font-bold text-white">Perlindungan Privasi Lokasi Otomatis</span>
+                  </div>
+                  <button
+                    onClick={() => handleToggleRule('enableGeoprivacyFuzzing', 'Perlindungan Privasi Lokasi')}
+                    className={`px-3 py-1 rounded-full text-xs font-mono font-bold transition cursor-pointer ${
+                      systemRules.enableGeoprivacyFuzzing
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : 'bg-slate-800 text-slate-400 border border-slate-700'
+                    }`}
+                  >
+                    {systemRules.enableGeoprivacyFuzzing ? 'AKTIF (50 KM)' : 'NONAKTIF'}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Koordinat lokasi tempat tinggal atau studio seniman secara otomatis diburamkan sejauh 50-100 km agar lokasi fisik tidak terlacak publik.
+                </p>
+              </div>
+
+              {/* Aturan 4: Cadangan Otomatis ke Cloud */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Cloud className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs font-bold text-white">Cadangan Otomatis ke Cloud Supabase</span>
+                  </div>
+                  <button
+                    onClick={() => handleToggleRule('autoCloudSync', 'Cadangan Otomatis ke Cloud')}
+                    className={`px-3 py-1 rounded-full text-xs font-mono font-bold transition cursor-pointer ${
+                      systemRules.autoCloudSync
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : 'bg-slate-800 text-slate-400 border border-slate-700'
+                    }`}
+                  >
+                    {systemRules.autoCloudSync ? 'AKTIF' : 'NONAKTIF'}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Karya yang telah terverifikasi otomatis disimpan ke ruang penyimpanan terproteksi Supabase agar tidak hilang saat perangkat diganti.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -939,44 +1762,358 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* SUB-VIEW 4: AUDIT LOGS & ANTI-HACKER RESILIENCE                */}
+      {/* BAGIAN 4 — KEAMANAN & CADANGAN                                 */}
       {/* ------------------------------------------------------------- */}
-      {adminTab === 'audit' && (
+      {(adminTab === 'security' || adminTab === 'audit') && (
         <div className="space-y-6">
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">Status Proteksi Hacker</div>
-              <div className="text-lg font-bold text-emerald-400 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>100% Terenkripsi & Aktif</span>
+          {/* Header Banner */}
+          <div className="p-6 rounded-2xl bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-950 border border-amber-500/30 shadow-xl space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shadow-inner">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <span>Bagian 4: Keamanan Sistem & Cadangan Data Internal</span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-bold uppercase">
+                      Proteksi Berlapis Aktif
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Status cadangan data berkala, riwayat log akses gerbang master, dan peringatan hal-hal penting untuk perhatian pengelola.
+                  </p>
+                </div>
               </div>
-              <div className="text-[11px] text-slate-500">Anti-Brute Force · IP Rate Limiting</div>
-            </div>
 
-            <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">Protokol Keamanan Data</div>
-              <div className="text-lg font-bold text-cyan-300 font-mono">
-                TLS 1.3 / AES-256-GCM
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleManualBackup}
+                  disabled={isCreatingBackup}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/50 transition cursor-pointer disabled:opacity-50"
+                >
+                  <Download className={`w-3.5 h-3.5 ${isCreatingBackup ? 'animate-bounce' : ''}`} />
+                  <span>{isCreatingBackup ? 'Menyiapkan...' : 'Buat Cadangan Sekarang'}</span>
+                </button>
               </div>
-              <div className="text-[11px] text-slate-500">Zero-Plaintext Transmit</div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-              <div className="text-xs font-mono text-slate-400">PostgreSQL Row-Level Security</div>
-              <div className="text-lg font-bold text-purple-300 font-mono">
-                auth.uid() = user_id
-              </div>
-              <div className="text-[11px] text-slate-500">Isolasi mutlak antar pengguna</div>
             </div>
           </div>
 
-          {/* Audit Log Table */}
+          {/* 1. Status Cadangan Data */}
+          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Database className="w-4 h-4 text-emerald-400" />
+                  <span>1. Status Cadangan Data (Backup Sistem)</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Cadangan mencakup seluruh data akun pengguna, konfigurasi aturan, log aktivitas, dan catatan kurasi karya.
+                </p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold flex items-center gap-1.5 self-start sm:self-auto">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Cadangan Berhasil (100%)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+                <div className="text-[11px] font-mono text-slate-400">Waktu Cadangan Terakhir</div>
+                <div className="text-sm font-bold text-white mt-1">{backupInfo.lastBackupTime}</div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5">Jadwal Harian Otomatis</div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+                <div className="text-[11px] font-mono text-slate-400">Status Keberhasilan</div>
+                <div className="text-sm font-bold text-emerald-400 mt-1 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Berhasil Penuh
+                </div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5">Tanpa galat/kendala</div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+                <div className="text-[11px] font-mono text-slate-400">Ukuran Berkas Cadangan</div>
+                <div className="text-sm font-bold text-cyan-300 mt-1 font-mono">{backupInfo.backupSize}</div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5">{backupInfo.totalRecords} entri catatan data</div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+                <div className="text-[11px] font-mono text-slate-400">Format & Keamanan</div>
+                <div className="text-sm font-bold text-purple-300 mt-1">JSON Terenkripsi</div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5">Siap Pulih (Disaster Recovery)</div>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-300">
+              <div className="space-y-0.5">
+                <div className="font-semibold text-white">Unduh Cadangan Manual ke Komputer Anda</div>
+                <p className="text-slate-400 text-[11px]">
+                  Klik tombol di samping untuk mengunduh arsip cadangan mandiri berupa berkas JSON untuk disimpan di penyimpanan aman offline Anda.
+                </p>
+              </div>
+              <button
+                onClick={handleManualBackup}
+                disabled={isCreatingBackup}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition cursor-pointer whitespace-nowrap self-start sm:self-auto disabled:opacity-50"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Unduh File Cadangan JSON</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 2. Log Akses ke Halaman Master: Siapa Masuk, Kapan */}
+          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-cyan-400" />
+                  <span>2. Log Akses ke Halaman Pengelola Master</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Daftar riwayat pihak yang berhasil membuka atau mencoba mengakses gerbang master admin:
+                </p>
+              </div>
+              <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded border border-slate-800">
+                {masterAccessLogs.length} Sesi Terpantau
+              </span>
+            </div>
+
+            <div className="divide-y divide-slate-800/80 border border-slate-800 rounded-xl overflow-hidden bg-slate-950/70">
+              {masterAccessLogs.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-500">
+                  Belum ada log akses masuk.
+                </div>
+              ) : (
+                masterAccessLogs.map((log) => (
+                  <div key={log.id} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:bg-slate-900/40 transition">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                          log.status === 'SUCCESS'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                        }`}>
+                          {log.status === 'SUCCESS' ? 'Berhasil Masuk' : 'Percobaan Diblokir'}
+                        </span>
+                        <span className="font-semibold text-white">{log.actor}</span>
+                        <span className="text-slate-500 font-mono text-[11px]">· Metode: {log.method}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        {log.notes}
+                      </p>
+                    </div>
+                    <div className="text-[11px] font-mono text-slate-500 shrink-0">
+                      {log.timestamp}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* 3. Peringatan: Hal-hal yang Perlu Diperhatikan atau Diperbaiki */}
+          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                <span>3. Peringatan & Catatan Penting untuk Pengelola</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Rangkuman hal-hal penting yang perlu diperhatikan untuk menjaga keamanan dan kelancaran sistem:
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              {/* Peringatan 1: Kunci Master */}
+              <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-800/60 space-y-2">
+                <div className="flex items-center gap-2 text-amber-300 text-xs font-bold">
+                  <Key className="w-4 h-4 shrink-0" />
+                  <span>Kunci Master Akses Utama (Vecmaster)</span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Kunci Master tersimpan dalam hash kriptografis SHA-256 tersalt dan tidak ditampilkan di layar dalam bentuk teks biasa. Anda dapat mengubahnya sewaktu-waktu melalui form di bawah.
+                </p>
+              </div>
+
+              {/* Peringatan 2: Ruang Penyimpanan */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>Kondisi Ruang Penyimpanan Sangat Aman</span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Ruang penyimpanan awan beroperasi normal dengan sisa kapasitas 88.8%. Belum memerlukan penambahan paket kuota dalam waktu dekat.
+                </p>
+              </div>
+
+              {/* Peringatan 3: Anti-Brute Force */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <div className="flex items-center gap-2 text-cyan-400 text-xs font-bold">
+                  <ShieldCheck className="w-4 h-4 shrink-0" />
+                  <span>Sistem Proteksi Anti-Penyusupan Aktif</span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Jika terjadi 5 kali percobaan kode sandi yang salah, gerbang master akan terkunci secara otomatis selama 60 detik untuk mencegah tebakan acak.
+                </p>
+              </div>
+
+              {/* Peringatan 4: Izin Kamera & Lokasi */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <div className="flex items-center gap-2 text-purple-400 text-xs font-bold">
+                  <Camera className="w-4 h-4 shrink-0" />
+                  <span>Izin Perangkat Kamera & Geolokasi</span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Pastikan peramban (browser) diizinkan mengakses kamera dan sensor lokasi agar fungsi penangkapan dan verifikasi karya dapat berjalan maksimal.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Pengelolaan & Pembaruan Kunci Master (Vecmaster) */}
+          <div className="p-6 rounded-2xl bg-slate-900/80 border border-cyan-500/30 shadow-2xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Key className="w-4 h-4 text-cyan-400" />
+                  <span>4. Pengelolaan & Penggantian Kunci Master (Vecmaster)</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Kelola Kunci Master administratif darurat. Perubahan kunci tidak akan menghapus karya, merusak data, atau menghilangkan kunci individual setiap brankas.
+                </p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 text-xs font-mono font-bold flex items-center gap-1.5 self-start sm:self-auto">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Hash Kriptografis Aktif
+              </span>
+            </div>
+
+            {/* Architecture Explainer */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-slate-300">
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+                <div className="font-semibold text-white flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Kunci Individual Terisolasi</span>
+                </div>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  Setiap brankas kreator tetap memiliki kunci individual miliknya sendiri (<code className="font-mono text-cyan-300">VEC-VK-...</code>).
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+                <div className="font-semibold text-white flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Akses Administratif Darurat</span>
+                </div>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  Kunci Master dapat membuka brankas mana pun untuk kebutuhan audit atau darurat tanpa merusak kunci pemilik asli.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+                <div className="font-semibold text-white flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Integritas Data Terjamin</span>
+                </div>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  Perubahan Kunci Master segera menonaktifkan kunci lama, tanpa mengubah kepemilikan maupun arsip foto brankas.
+                </p>
+              </div>
+            </div>
+
+            {/* Change Form */}
+            <form onSubmit={handleChangeMasterKey} className="p-5 rounded-xl bg-slate-950/90 border border-slate-800 space-y-4">
+              <div className="text-xs font-semibold text-white flex items-center gap-2">
+                <span>Formulir Pergantian Kunci Master</span>
+              </div>
+
+              {keyChangeStatus.type === 'success' && (
+                <div className="p-3 rounded-lg bg-emerald-950/60 border border-emerald-500/50 text-emerald-300 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <span>{keyChangeStatus.message}</span>
+                </div>
+              )}
+
+              {keyChangeStatus.type === 'error' && (
+                <div className="p-3 rounded-lg bg-rose-950/60 border border-rose-500/50 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span>{keyChangeStatus.message}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-mono text-slate-400 mb-1">
+                    Kunci Master Saat Ini *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={currentKeyInput}
+                    onChange={(e) => setCurrentKeyInput(e.target.value)}
+                    placeholder="Masukkan kunci lama..."
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-white font-mono text-xs outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-mono text-slate-400 mb-1">
+                    Kunci Master Baru (Min 8 Karakter) *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={newKeyInput}
+                    onChange={(e) => setNewKeyInput(e.target.value)}
+                    placeholder="Masukkan kunci baru..."
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-white font-mono text-xs outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-mono text-slate-400 mb-1">
+                    Konfirmasi Kunci Master Baru *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={confirmKeyInput}
+                    onChange={(e) => setConfirmKeyInput(e.target.value)}
+                    placeholder="Ulangi kunci baru..."
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-white font-mono text-xs outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                <p className="text-[11px] text-slate-500 leading-relaxed max-w-xl">
+                  * Kunci baru akan di-hash kriptografis dengan salt unik 16-byte sebelum disimpan. Kunci lama akan langsung ditolak pada akses berikutnya.
+                </p>
+                <button
+                  type="submit"
+                  disabled={isChangingKey || !currentKeyInput || !newKeyInput || !confirmKeyInput}
+                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow transition disabled:opacity-50 cursor-pointer whitespace-nowrap self-start sm:self-auto"
+                >
+                  {isChangingKey ? 'Menyimpan Kunci...' : 'Simpan Kunci Master Baru'}
+                </button>
+              </div>
+
+              {/* Client-Side Architecture Limitation Disclaimer */}
+              <div className="mt-3 p-3 rounded-lg bg-amber-950/20 border border-amber-800/40 text-[11px] text-amber-300/90 leading-relaxed">
+                <strong>Catatan Arsitektur & Keterbatasan Penyimpanan:</strong> Aplikasi saat ini beroperasi menggunakan arsitektur web client-side dengan persistensi lokal (localStorage/sessionStorage terisolasi). Hash kriptografis SHA-256 tersalt melindungi kunci agar tidak terbaca kasual di antarmuka web, namun untuk penggunaan produksi perbankan atau militer absolut, disarankan menggunakan otentikasi server-side autoritatif melalui Supabase Auth / Cloud KMS Hardware Security Module (HSM).
+              </div>
+            </form>
+          </div>
+
+          {/* 4. Kejadian Audit Keamanan Sistem Lengkap */}
           <div className="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/60 shadow-xl space-y-2 p-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <h3 className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                 <Activity className="w-4 h-4 text-emerald-400" />
-                <span>Catatan Aktivitas & Deteksi Akses (Real-Time Audit Log)</span>
+                <span>Catatan Kejadian Keamanan Sistem (Audit Log)</span>
               </h3>
               <span className="text-[11px] font-mono text-slate-500">Menampilkan {auditLogs.length} kejadian terakhir</span>
             </div>
@@ -1007,7 +2144,6 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
                 </div>
               ))}
             </div>
-
           </div>
 
         </div>

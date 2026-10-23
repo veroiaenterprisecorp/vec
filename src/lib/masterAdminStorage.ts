@@ -40,8 +40,129 @@ export interface SecurityAuditEntry {
 const REGISTERED_USERS_KEY = 'vec_registered_users_directory';
 const ADMIN_SESSION_KEY = 'vec_admin_fortress_token';
 const AUDIT_LOG_KEY = 'vec_admin_audit_logs';
+const MASTER_CREDENTIAL_KEY = 'vec_master_credential_store_v1';
+const DEFAULT_INITIAL_MASTER_KEY = 'VEC-ADMIN-882991';
+const DEFAULT_INITIAL_SALT = 'vec_master_salt_2026';
 
-export const MASTER_ACCESS_KEY = 'VEC-ADMIN-882991';
+// Legacy fallback constant (used only for backward compatibility if unseeded)
+export const MASTER_ACCESS_KEY = DEFAULT_INITIAL_MASTER_KEY;
+
+export interface MasterCredentialRecord {
+  keyHash: string;
+  salt: string;
+  updatedAt: string;
+  version: number;
+}
+
+async function sha256Hex(content: string): Promise<string> {
+  const data = new TextEncoder().encode(content);
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+    try {
+      const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(hashBuffer))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+    } catch {
+      // Fallback below
+    }
+  }
+  let hash = 0;
+  for (let i = 0; i < content.length; i++) {
+    hash = (hash << 5) - hash + content.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(16).padStart(64, '0');
+}
+
+export async function getMasterCredential(): Promise<MasterCredentialRecord> {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(MASTER_CREDENTIAL_KEY) : null;
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch {}
+
+  const initialHash = await sha256Hex(`${DEFAULT_INITIAL_SALT}::${DEFAULT_INITIAL_MASTER_KEY}`);
+  const record: MasterCredentialRecord = {
+    keyHash: initialHash,
+    salt: DEFAULT_INITIAL_SALT,
+    updatedAt: '2026-10-20 00:00:00 UTC',
+    version: 1
+  };
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(MASTER_CREDENTIAL_KEY, JSON.stringify(record));
+    }
+  } catch {}
+  return record;
+}
+
+export async function verifyMasterKey(candidateKey: string): Promise<boolean> {
+  const clean = candidateKey.trim();
+  if (!clean) return false;
+  const credential = await getMasterCredential();
+  const computed = await sha256Hex(`${credential.salt}::${clean}`);
+  return computed === credential.keyHash;
+}
+
+export async function changeMasterKey(
+  currentKey: string,
+  newKey: string,
+  confirmNewKey: string
+): Promise<{ success: boolean; message: string }> {
+  const cleanCurrent = currentKey.trim();
+  const cleanNew = newKey.trim();
+  const cleanConfirm = confirmNewKey.trim();
+
+  if (!cleanCurrent) {
+    return { success: false, message: 'Masukkan Kunci Master yang sedang aktif saat ini.' };
+  }
+
+  const isValidCurrent = await verifyMasterKey(cleanCurrent);
+  if (!isValidCurrent) {
+    return { success: false, message: 'Kunci Master saat ini tidak sesuai. Verifikasi ditolak.' };
+  }
+
+  if (!cleanNew || cleanNew.length < 8) {
+    return { success: false, message: 'Kunci Master baru harus memiliki panjang minimal 8 karakter.' };
+  }
+
+  if (cleanNew !== cleanConfirm) {
+    return { success: false, message: 'Konfirmasi kunci master baru tidak cocok. Periksa kembali input Anda.' };
+  }
+
+  if (cleanNew === cleanCurrent) {
+    return { success: false, message: 'Kunci Master baru tidak boleh sama persis dengan kunci master yang sedang aktif.' };
+  }
+
+  const randomBytes = new Uint8Array(16);
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+    window.crypto.getRandomValues(randomBytes);
+  } else {
+    for (let i = 0; i < 16; i++) randomBytes[i] = Math.floor(Math.random() * 256);
+  }
+  const newSalt = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  const newHash = await sha256Hex(`${newSalt}::${cleanNew}`);
+
+  const newRecord: MasterCredentialRecord = {
+    keyHash: newHash,
+    salt: newSalt,
+    updatedAt: new Date().toISOString(),
+    version: Date.now()
+  };
+
+  try {
+    localStorage.setItem(MASTER_CREDENTIAL_KEY, JSON.stringify(newRecord));
+    recordAuditLog('Perubahan Kunci Master Berhasil', 'SUCCESS', 'Kunci Master sistem diperbarui dan di-hash SHA-256');
+    recordMasterAccess('Pengelola Master', 'Pembaruan Kredensial', 'SUCCESS', 'Kunci Master berhasil diperbarui');
+    return {
+      success: true,
+      message: 'Kunci Master berhasil diperbarui! Kunci master lama sudah tidak berlaku.'
+    };
+  } catch (err: any) {
+    return { success: false, message: `Gagal menyimpan Kunci Master baru: ${err?.message || 'Storage error'}` };
+  }
+}
 
 export const INITIAL_REGISTERED_USERS: RegisteredUser[] = [
   {
@@ -181,14 +302,24 @@ export function saveRegisteredUsers(users: RegisteredUser[]): void {
 
 export function toggleUserStatus(userId: string): RegisteredUser[] {
   const users = getRegisteredUsers();
+  let changedUser: RegisteredUser | null = null;
   const updated = users.map(u => {
     if (u.id === userId) {
       const nextStatus: 'active' | 'locked' = u.status === 'active' ? 'locked' : 'active';
-      return { ...u, status: nextStatus };
+      changedUser = { ...u, status: nextStatus };
+      return changedUser;
     }
     return u;
   });
   saveRegisteredUsers(updated);
+  if (changedUser) {
+    recordUserActivity(
+      'status_toggle',
+      (changedUser as RegisteredUser).name,
+      (changedUser as RegisteredUser).email,
+      `Status akun diubah menjadi ${(changedUser as RegisteredUser).status === 'active' ? 'Aktif' : 'Dikunci'}`
+    );
+  }
   return updated;
 }
 
@@ -205,6 +336,12 @@ export function addNewRegisteredUser(user: Omit<RegisteredUser, 'id' | 'storageU
   };
   const updated = [newUser, ...users];
   saveRegisteredUsers(updated);
+  recordUserActivity(
+    'new_user',
+    newUser.name,
+    newUser.email,
+    `Pendaftaran akun baru dengan peran ${newUser.role} (Alokasi: ${formatBytes(newUser.storageQuotaBytes)})`
+  );
   return newUser;
 }
 
@@ -293,3 +430,233 @@ export function formatBytes(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
+
+// -------------------------------------------------------------
+// BAGIAN 3 & 4: PENGATURAN ATURAN, CADANGAN & LOG AKSES MASTER
+// -------------------------------------------------------------
+
+export interface AdminSystemRules {
+  requireDoubleDeleteConfirm: boolean;
+  prohibitAiUploads: boolean;
+  enableGeoprivacyFuzzing: boolean;
+  autoCloudSync: boolean;
+}
+
+const DEFAULT_SYSTEM_RULES: AdminSystemRules = {
+  requireDoubleDeleteConfirm: true,
+  prohibitAiUploads: true,
+  enableGeoprivacyFuzzing: true,
+  autoCloudSync: true
+};
+
+const RULES_STORAGE_KEY = 'vec_admin_system_rules_v1';
+const USER_ACTIVITY_KEY = 'vec_admin_user_activity_history_v1';
+const BACKUP_STATUS_KEY = 'vec_admin_backup_status_v1';
+const MASTER_ACCESS_KEY_STORAGE = 'vec_admin_master_access_history_v1';
+
+export function getAdminSystemRules(): AdminSystemRules {
+  try {
+    const raw = localStorage.getItem(RULES_STORAGE_KEY);
+    if (!raw) return DEFAULT_SYSTEM_RULES;
+    return { ...DEFAULT_SYSTEM_RULES, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_SYSTEM_RULES;
+  }
+}
+
+export function saveAdminSystemRules(rules: AdminSystemRules): void {
+  try {
+    localStorage.setItem(RULES_STORAGE_KEY, JSON.stringify(rules));
+  } catch (err) {
+    console.warn('Gagal menyimpan aturan sistem:', err);
+  }
+}
+
+export interface UserActivityLog {
+  id: string;
+  timestamp: string;
+  actionType: 'new_user' | 'role_change' | 'status_toggle' | 'quota_change';
+  userName: string;
+  userEmail: string;
+  details: string;
+}
+
+export function getUserActivityLogs(): UserActivityLog[] {
+  try {
+    const raw = localStorage.getItem(USER_ACTIVITY_KEY);
+    if (!raw) {
+      const initial: UserActivityLog[] = [
+        {
+          id: 'act_01',
+          timestamp: '2026-10-22 14:10 WIB',
+          actionType: 'role_change',
+          userName: 'BK Arifullah',
+          userEmail: 'bk.arifullah@gmail.com',
+          details: 'Pengesahan hak akses Pengelola Master (Super Admin / Owner)'
+        },
+        {
+          id: 'act_02',
+          timestamp: '2026-10-21 09:30 WIB',
+          actionType: 'new_user',
+          userName: 'Dian Sastro Wardoyo',
+          userEmail: 'dian.sastro@veroia.art',
+          details: 'Pendaftaran akun baru sebagai Peninjau (Curator) Resmi'
+        },
+        {
+          id: 'act_03',
+          timestamp: '2026-10-20 16:45 WIB',
+          actionType: 'status_toggle',
+          userName: 'Raden Saleh Syarif',
+          userEmail: 'raden.saleh@indonesia.art',
+          details: 'Status akun diaktifkan penuh dengan kuota brankas 10 GB'
+        },
+        {
+          id: 'act_04',
+          timestamp: '2026-10-19 11:20 WIB',
+          actionType: 'new_user',
+          userName: 'Marcus Vance',
+          userEmail: 'm.vance@apnews-demo.org',
+          details: 'Pendaftaran kontributor pers jurnalisme terverifikasi hardware'
+        }
+      ];
+      localStorage.setItem(USER_ACTIVITY_KEY, JSON.stringify(initial));
+      return initial;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+export function recordUserActivity(
+  actionType: UserActivityLog['actionType'],
+  userName: string,
+  userEmail: string,
+  details: string
+): void {
+  try {
+    const list = getUserActivityLogs();
+    const newEntry: UserActivityLog = {
+      id: `act_${Date.now()}`,
+      timestamp: new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }) + ' WIB',
+      actionType,
+      userName,
+      userEmail,
+      details
+    };
+    const updated = [newEntry, ...list].slice(0, 50);
+    localStorage.setItem(USER_ACTIVITY_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.warn('Gagal mencatat aktivitas pengguna:', err);
+  }
+}
+
+export interface BackupStatusInfo {
+  lastBackupTime: string;
+  lastBackupStatus: 'success' | 'failed' | 'in_progress';
+  backupSize: string;
+  totalRecords: number;
+  downloadUrl?: string;
+}
+
+export function getLastBackupInfo(): BackupStatusInfo {
+  try {
+    const raw = localStorage.getItem(BACKUP_STATUS_KEY);
+    if (!raw) {
+      const defaultInfo: BackupStatusInfo = {
+        lastBackupTime: 'Hari ini, 06:00 WIB (Cadangan Harian Otomatis)',
+        lastBackupStatus: 'success',
+        backupSize: '2.84 MB',
+        totalRecords: 124
+      };
+      localStorage.setItem(BACKUP_STATUS_KEY, JSON.stringify(defaultInfo));
+      return defaultInfo;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return {
+      lastBackupTime: 'Hari ini, 06:00 WIB',
+      lastBackupStatus: 'success',
+      backupSize: '2.84 MB',
+      totalRecords: 124
+    };
+  }
+}
+
+export function updateBackupInfo(info: Partial<BackupStatusInfo>): BackupStatusInfo {
+  const current = getLastBackupInfo();
+  const merged: BackupStatusInfo = { ...current, ...info };
+  try {
+    localStorage.setItem(BACKUP_STATUS_KEY, JSON.stringify(merged));
+  } catch (err) {
+    console.warn('Gagal memperbarui status cadangan:', err);
+  }
+  return merged;
+}
+
+export interface MasterAccessLog {
+  id: string;
+  timestamp: string;
+  actor: string;
+  method: string;
+  status: 'SUCCESS' | 'BLOCKED';
+  notes: string;
+}
+
+export function getMasterAccessLogs(): MasterAccessLog[] {
+  try {
+    const raw = localStorage.getItem(MASTER_ACCESS_KEY_STORAGE);
+    if (!raw) {
+      const initial: MasterAccessLog[] = [
+        {
+          id: 'acc_01',
+          timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB (Sesi Aktif)',
+          actor: 'Pengelola Master Utama',
+          method: 'Kunci Rahasia AES-256',
+          status: 'SUCCESS',
+          notes: 'Akses disetujui penuh ke Konsol Pengelola Master'
+        },
+        {
+          id: 'acc_02',
+          timestamp: 'Kemarin, 21:14 WIB',
+          actor: 'Pengelola Master Utama',
+          method: 'Kunci Rahasia AES-256',
+          status: 'SUCCESS',
+          notes: 'Sesi pengelolaan rutin dan pemeriksaan status penyimpanan'
+        },
+        {
+          id: 'acc_03',
+          timestamp: '21 Okt 2026, 03:22 WIB',
+          actor: 'Pemindai Anonim Tidak Dikenal',
+          method: 'Percobaan Akses URL Langsung',
+          status: 'BLOCKED',
+          notes: 'Diblokir otomatis oleh Gerbang Master (Sistem Proteksi Keamanan)'
+        }
+      ];
+      localStorage.setItem(MASTER_ACCESS_KEY_STORAGE, JSON.stringify(initial));
+      return initial;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+export function recordMasterAccess(actor: string, method: string, status: 'SUCCESS' | 'BLOCKED', notes: string): void {
+  try {
+    const logs = getMasterAccessLogs();
+    const newEntry: MasterAccessLog = {
+      id: `acc_${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
+      actor,
+      method,
+      status,
+      notes
+    };
+    const updated = [newEntry, ...logs].slice(0, 30);
+    localStorage.setItem(MASTER_ACCESS_KEY_STORAGE, JSON.stringify(updated));
+  } catch (err) {
+    console.warn('Gagal mencatat log akses master:', err);
+  }
+}
+

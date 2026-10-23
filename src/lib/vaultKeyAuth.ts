@@ -11,6 +11,7 @@
  */
 
 import { supabase, getActiveSupabaseClient } from './supabase';
+import { verifyMasterKey, setAdminSession } from './masterAdminStorage';
 
 export interface CreatorVault {
   id: string;                      // UUID
@@ -300,25 +301,34 @@ export const registerNewCreatorVault = async (params: {
  * Attempts to unlock a vault using a raw key string.
  * Checks against Supabase and locally registered vaults.
  */
-export const unlockVaultWithKey = async (rawKeyInput: string): Promise<{
+/**
+ * Attempts to unlock a vault using a raw key string.
+ * Enforces individual vault keys, with dynamic Master Key administrative override.
+ */
+export const unlockVaultWithKey = async (rawKeyInput: string, targetVaultId?: string): Promise<{
   success: boolean;
   vault?: CreatorVault;
   message: string;
 }> => {
-  const cleanKey = rawKeyInput.trim().toUpperCase();
-  if (!cleanKey) {
+  const cleanKey = rawKeyInput.trim();
+  const cleanKeyUpper = cleanKey.toUpperCase();
+  if (!cleanKeyUpper) {
     return { success: false, message: 'Masukkan Kunci Brankas Anda terlebih dahulu.' };
   }
 
-  // 1. Try matching against local cached vaults first
+  // 1. Try matching against local cached vaults with individual key
   const localVaults = getCachedRegisteredVaults();
   for (const vault of localVaults) {
-    const computedHash = await hashVaultKey(cleanKey, vault.key_salt);
+    // If a specific target vault is requested, check only that vault first
+    if (targetVaultId && vault.id !== targetVaultId) {
+      continue;
+    }
+    const computedHash = await hashVaultKey(cleanKeyUpper, vault.key_salt);
     if (computedHash === vault.key_hash) {
       const session: UnlockedVaultSession = {
         vault,
         unlockedAt: Date.now(),
-        rawKeyMasked: maskVaultKey(cleanKey)
+        rawKeyMasked: maskVaultKey(cleanKeyUpper)
       };
       if (typeof window !== 'undefined') {
         localStorage.setItem(VAULT_SESSION_KEY, JSON.stringify(session));
@@ -327,22 +337,23 @@ export const unlockVaultWithKey = async (rawKeyInput: string): Promise<{
       return {
         success: true,
         vault,
-        message: `Brankas "${vault.vault_name}" berhasil dibuka.`
+        message: `Brankas "${vault.vault_name}" berhasil dibuka menggunakan kunci individual.`
       };
     }
   }
 
-  // 2. Query Supabase `creator_vaults` table to check remote vaults
+  // 2. Query Supabase `creator_vaults` table to check remote vaults with individual key
   try {
     const client = getActiveSupabaseClient();
-    const { data: remoteVaults, error } = await client
-      .from('creator_vaults')
-      .select('*')
-      .limit(100);
+    const query = client.from('creator_vaults').select('*');
+    if (targetVaultId) {
+      query.eq('id', targetVaultId);
+    }
+    const { data: remoteVaults, error } = await query.limit(100);
 
     if (!error && remoteVaults && remoteVaults.length > 0) {
       for (const rv of remoteVaults) {
-        const computed = await hashVaultKey(cleanKey, rv.key_salt);
+        const computed = await hashVaultKey(cleanKeyUpper, rv.key_salt);
         if (computed === rv.key_hash) {
           const matchedVault: CreatorVault = {
             id: rv.id,
@@ -364,7 +375,7 @@ export const unlockVaultWithKey = async (rawKeyInput: string): Promise<{
           const session: UnlockedVaultSession = {
             vault: matchedVault,
             unlockedAt: Date.now(),
-            rawKeyMasked: maskVaultKey(cleanKey)
+            rawKeyMasked: maskVaultKey(cleanKeyUpper)
           };
           if (typeof window !== 'undefined') {
             localStorage.setItem(VAULT_SESSION_KEY, JSON.stringify(session));
@@ -382,12 +393,18 @@ export const unlockVaultWithKey = async (rawKeyInput: string): Promise<{
     console.warn('Supabase remote vault check error:', e);
   }
 
-  // 3. Fallback master key check
-  if (cleanKey === 'VEC-MASTER-KEY' || cleanKey === 'VEC-VK-0000-0000-0000-0000') {
+  // 3. Dynamic Master Key Administrative Check (Emergency / Overseer Access)
+  const isMasterAuthorized = await verifyMasterKey(cleanKey);
+  if (isMasterAuthorized) {
+    const allVaults = getCachedRegisteredVaults();
+    const targetVault = targetVaultId 
+      ? (allVaults.find(v => v.id === targetVaultId) || DEFAULT_MASTER_VAULT)
+      : (allVaults[0] || DEFAULT_MASTER_VAULT);
+
     const session: UnlockedVaultSession = {
-      vault: DEFAULT_MASTER_VAULT,
+      vault: targetVault,
       unlockedAt: Date.now(),
-      rawKeyMasked: DEFAULT_MASTER_VAULT.key_prefix
+      rawKeyMasked: 'VEC-MASTER-OVERRIDE'
     };
     if (typeof window !== 'undefined') {
       localStorage.setItem(VAULT_SESSION_KEY, JSON.stringify(session));
@@ -395,14 +412,14 @@ export const unlockVaultWithKey = async (rawKeyInput: string): Promise<{
     notifyLockStateChanged();
     return {
       success: true,
-      vault: DEFAULT_MASTER_VAULT,
-      message: 'Brankas Master terverifikasi dan berhasil dibuka.'
+      vault: targetVault,
+      message: `Akses Darurat Master: Brankas "${targetVault.vault_name}" berhasil dibuka dengan Kunci Master.`
     };
   }
 
   return {
     success: false,
-    message: 'Kunci Brankas tidak valid atau tidak cocok dengan brankas mana pun di basis data.'
+    message: 'Kunci Brankas tidak valid atau tidak cocok dengan brankas yang dituju.'
   };
 };
 
@@ -413,5 +430,21 @@ export const lockVault = (): void => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(VAULT_SESSION_KEY);
   }
+  notifyLockStateChanged();
+};
+
+/**
+ * Vecout ('): Menutup seluruh sesi aktif, mengunci kembali semua brankas,
+ * dan membersihkan kredensial sementara dari memori sesi.
+ * Data permanen (karya, brankas) tetap aman tersimpan.
+ */
+export const vecoutAll = (): void => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(VAULT_SESSION_KEY);
+    sessionStorage.removeItem('vec_admin_fortress_token');
+    sessionStorage.removeItem('vec_unlocked_vault_session_v1');
+    sessionStorage.removeItem('vec_temp_master_key');
+  }
+  setAdminSession(false);
   notifyLockStateChanged();
 };

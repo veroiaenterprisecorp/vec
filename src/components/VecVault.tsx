@@ -38,12 +38,11 @@ import {
   Maximize2,
   ZoomIn,
   ZoomOut,
-  Download,
-  Trash2
+  Download
 } from 'lucide-react';
 import { checkSupabaseConnection, isArtworkPermanentlyDestroyed } from '../lib/cloudStorage';
 import { setManualSupabaseCredentials, getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabase';
-import { PermanentDeleteModal, DeleteArtworkTarget } from './PermanentDeleteModal';
+
 
 export interface VaultArtwork {
   id: string;
@@ -106,7 +105,6 @@ export const VecVault: React.FC<VecVaultProps> = ({
   const [manualKeyInput, setManualKeyInput] = useState<string>(() => getSupabaseAnonKey());
   const [manualSaveToast, setManualSaveToast] = useState<string | null>(null);
   const [vaultToast, setVaultToast] = useState<string | null>(null);
-  const [itemPendingDelete, setItemPendingDelete] = useState<DeleteArtworkTarget | null>(null);
 
   const [filterType, setFilterType] = useState<'all' | 'COMMENT' | 'VOICE_NOTE' | 'AUTHENTIC_SEAL'>('all');
   const [commentInput, setCommentInput] = useState<string>('');
@@ -422,7 +420,7 @@ export const VecVault: React.FC<VecVaultProps> = ({
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-rose-950/50 hover:bg-rose-900/70 text-rose-300 border border-rose-800 transition cursor-pointer"
             title="Hapus seluruh cache & log tersimpan di peramban dan muat ulang hanya dari database Supabase"
           >
-            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+            <RefreshCw className="w-3.5 h-3.5 text-rose-400" />
             <span className="hidden sm:inline">Bersihkan Cache</span>
           </button>
 
@@ -535,28 +533,9 @@ export const VecVault: React.FC<VecVaultProps> = ({
                       />
                       {art.isUserUploaded && (
                         <span className="absolute top-1.5 left-1.5 bg-emerald-600/90 backdrop-blur-md px-1.5 py-0.5 rounded text-[9px] font-mono font-bold text-white shadow">
-                          Karya Anda
+                          Karya Terverifikasi
                         </span>
                       )}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setItemPendingDelete({
-                            id: art.id,
-                            title: art.title,
-                            digest: art.digest,
-                            photoUrl: art.photoUrl,
-                            resolution: art.dimensions,
-                            cloudBucket: art.cloudBucket,
-                            deviceInfo: art.deviceInfo,
-                            curationNumber: art.curationNumber
-                          });
-                        }}
-                        className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/80 hover:bg-rose-600 text-slate-300 hover:text-white transition opacity-80 sm:opacity-0 group-hover:opacity-100 shadow cursor-pointer z-10"
-                        title="Hapus gambar ini secara permanen"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
                       {isSelected && (
                         <span className="absolute bottom-1.5 right-1.5 bg-cyan-500 text-slate-950 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold shadow">
                           Aktif Ditampilkan
@@ -660,23 +639,6 @@ export const VecVault: React.FC<VecVaultProps> = ({
                           <span>Kelola di Brankas</span>
                         </button>
                       )}
-                      <button
-                        onClick={() => setItemPendingDelete({
-                          id: activeArtwork.id,
-                          title: activeArtwork.title,
-                          digest: activeArtwork.digest,
-                          photoUrl: activeArtwork.photoUrl,
-                          resolution: activeArtwork.dimensions,
-                          cloudBucket: activeArtwork.cloudBucket,
-                          deviceInfo: activeArtwork.deviceInfo,
-                          curationNumber: activeArtwork.curationNumber
-                        })}
-                        className="px-3.5 py-1.5 rounded-xl text-rose-300 hover:text-white bg-rose-950/50 hover:bg-rose-900 border border-rose-800/60 hover:border-rose-500 transition cursor-pointer text-xs font-semibold flex items-center gap-1.5 shadow-sm"
-                        title="Hapus gambar ini secara permanen dari galeri dan sistem"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                        <span>Hapus Gambar</span>
-                      </button>
                     </div>
                   </div>
 
@@ -1031,28 +993,6 @@ export const VecVault: React.FC<VecVaultProps> = ({
               )}
 
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsViewerModalOpen(false);
-                  setItemPendingDelete({
-                    id: activeArtwork.id,
-                    title: activeArtwork.title,
-                    digest: activeArtwork.digest,
-                    photoUrl: activeArtwork.photoUrl,
-                    resolution: activeArtwork.dimensions,
-                    cloudBucket: activeArtwork.cloudBucket,
-                    deviceInfo: activeArtwork.deviceInfo,
-                    curationNumber: activeArtwork.curationNumber
-                  });
-                }}
-                className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow cursor-pointer"
-                title="Hapus gambar secara permanen"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Hapus Gambar</span>
-              </button>
-
-              <button
                 onClick={() => setIsViewerModalOpen(false)}
                 className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
               >
@@ -1100,25 +1040,6 @@ export const VecVault: React.FC<VecVaultProps> = ({
           <span>{vaultToast}</span>
         </div>
       )}
-
-      {/* Modal Konfirmasi Penghapusan Permanen (Ketik HAPUS) */}
-      <PermanentDeleteModal
-        artwork={itemPendingDelete}
-        isOpen={Boolean(itemPendingDelete)}
-        onClose={() => setItemPendingDelete(null)}
-        onDeleted={(deletedId) => {
-          setArtworks((prev) => {
-            const filtered = prev.filter((a) => a.id !== deletedId && !isArtworkPermanentlyDestroyed(a));
-            if (selectedArtworkId === deletedId) {
-              setSelectedArtworkId(filtered[0]?.id || '');
-            }
-            return filtered;
-          });
-          setItemPendingDelete(null);
-          setVaultToast('Gambar berhasil dihapus secara permanen dari seluruh sistem.');
-          setTimeout(() => setVaultToast(null), 3500);
-        }}
-      />
     </div>
   );
 };

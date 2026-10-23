@@ -7,7 +7,9 @@ import { VecPrivateVault } from './components/VecPrivateVault';
 import { MasterAdminPortal, AdminPortalTab } from './components/MasterAdminPortal';
 import { VEC_FULL_SQL_SCRIPT } from './data/vecSqlSchema';
 import { VecOfficialLogo } from './components/VecOfficialLogo';
-import { Check, Lock } from 'lucide-react';
+import { Check } from 'lucide-react';
+import { vecoutAll, isVaultUnlocked } from './lib/vaultKeyAuth';
+import { checkAdminSession } from './lib/masterAdminStorage';
 
 export type AppTab = 'overview' | 'private-vault' | 'vault' | 'studio' | 'admin-portal';
 
@@ -26,11 +28,14 @@ export default function App() {
   const [adminSubTab, setAdminSubTab] = useState<AdminPortalTab>(() => {
     if (typeof window !== 'undefined') {
       const hash = window.location.hash.toLowerCase();
+      if (hash.includes('monitoring')) return 'monitoring';
+      if (hash.includes('gallery')) return 'gallery';
+      if (hash.includes('security')) return 'security';
       if (hash.includes('spatial')) return 'spatial';
       if (hash.includes('architecture') || hash.includes('sql')) return 'architecture';
       if (hash.includes('sync')) return 'sync';
     }
-    return 'users';
+    return 'monitoring';
   });
 
   const [copied, setCopied] = useState<boolean>(false);
@@ -44,6 +49,10 @@ export default function App() {
       if (search.includes('portal=') || search.includes('admin') || hash.includes('admin') || hash.includes('portal')) {
         setActiveTab('admin-portal');
       }
+      if (hash.includes('monitoring')) setAdminSubTab('monitoring');
+      if (hash.includes('gallery')) setAdminSubTab('gallery');
+      if (hash.includes('security')) setAdminSubTab('security');
+      if (hash.includes('users')) setAdminSubTab('users');
       if (hash.includes('spatial')) setAdminSubTab('spatial');
       if (hash.includes('architecture') || hash.includes('sql')) setAdminSubTab('architecture');
       if (hash.includes('sync')) setAdminSubTab('sync');
@@ -73,7 +82,43 @@ export default function App() {
     setShowToast(true);
     setTimeout(() => {
       setShowToast(false);
-    }, 3200);
+    }, 3500);
+  };
+
+  // Inactivity Auto-Lock: Otomatis mengunci setelah 5 menit (300.000 ms) tanpa interaksi
+  useEffect(() => {
+    const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
+    let timer: NodeJS.Timeout | null = null;
+
+    const performAutoLock = () => {
+      const isUnlockedNow = isVaultUnlocked();
+      const isAdminActive = checkAdminSession();
+
+      if (isUnlockedNow || isAdminActive) {
+        vecoutAll();
+        triggerToast('Sesi dan brankas dikunci otomatis karena tidak ada aktivitas selama 5 menit.');
+      }
+    };
+
+    const resetTimer = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(performAutoLock, INACTIVITY_TIMEOUT_MS);
+    };
+
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    events.forEach((evt) => window.addEventListener(evt, resetTimer, { passive: true }));
+
+    resetTimer();
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      events.forEach((evt) => window.removeEventListener(evt, resetTimer));
+    };
+  }, []);
+
+  const handleVecout = () => {
+    vecoutAll();
+    triggerToast("Vecout ('): Seluruh sesi aktif dan brankas telah dikunci rapat.");
   };
 
   const handleCopyAllSql = () => {
@@ -95,7 +140,15 @@ export default function App() {
   };
 
   const handleNavigate = (tab: string) => {
-    if (tab === 'spatial' || tab === 'architecture' || tab === 'sync') {
+    if (
+      tab === 'monitoring' ||
+      tab === 'users' ||
+      tab === 'gallery' ||
+      tab === 'security' ||
+      tab === 'spatial' ||
+      tab === 'architecture' ||
+      tab === 'sync'
+    ) {
       setAdminSubTab(tab as AdminPortalTab);
       setActiveTab('admin-portal');
     } else {
@@ -117,6 +170,7 @@ export default function App() {
         onCopyAll={handleCopyAllSql}
         copied={copied}
         onDownloadSql={handleDownloadSql}
+        onVecout={handleVecout}
       />
 
       {/* Main Luxury Content Container */}
@@ -190,14 +244,13 @@ export default function App() {
 
             <button
               onClick={() => {
-                setAdminSubTab('users');
+                setAdminSubTab('monitoring');
                 setActiveTab('admin-portal');
               }}
-              className="flex items-center gap-1.5 text-neutral-500 hover:text-emerald-400 transition cursor-pointer text-xs group"
-              title="Akses Pengelola Sistem"
+              className="text-[11px] text-neutral-600 hover:text-neutral-400 transition-colors cursor-pointer select-none"
+              title="Konsol Vecmaster"
             >
-              <Lock className="w-3.5 h-3.5 text-neutral-500 group-hover:text-emerald-400 transition" />
-              <span className="opacity-70 group-hover:opacity-100">Pengelola Master</span>
+              Vecmaster
             </button>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { VecOfficialLogo } from './VecOfficialLogo';
-import { Camera, Lock, KeyRound } from 'lucide-react';
+import { Camera, Lock, Power } from 'lucide-react';
 import { isVaultUnlocked } from '../lib/vaultKeyAuth';
 
 interface HeaderProps {
@@ -10,11 +10,13 @@ interface HeaderProps {
   onCopyAll?: () => void;
   copied?: boolean;
   onDownloadSql?: () => void;
+  onVecout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
-  setActiveTab
+  setActiveTab,
+  onVecout
 }) => {
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => isVaultUnlocked());
 
@@ -98,7 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </nav>
 
-        {/* Zone 3: Primary Action & Discreet Root Gate */}
+        {/* Zone 3: Primary Action & Vecout */}
         <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={() => setActiveTab('studio')}
@@ -109,16 +111,12 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('admin-portal')}
-            className={`p-2 rounded-lg border text-xs transition duration-200 cursor-pointer ${
-              activeTab === 'admin-portal'
-                ? 'bg-emerald-950/60 border-emerald-500/60 text-emerald-300'
-                : 'bg-neutral-950/60 border-neutral-800 text-neutral-500 hover:text-neutral-300 hover:border-neutral-700'
-            }`}
-            title="Akses Pengelola Sistem"
-            aria-label="Pengelola Sistem"
+            onClick={onVecout}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-300 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/60 hover:border-rose-600 rounded-lg shadow-sm transition-all duration-200 cursor-pointer"
+            title="Vecout ('): Kunci seluruh brankas dan keluar dari sesi aktif"
           >
-            <KeyRound className="w-3.5 h-3.5" />
+            <Power className="w-3.5 h-3.5 text-rose-400" />
+            <span className="whitespace-nowrap font-medium">Vecout (')</span>
           </button>
         </div>
 
@@ -159,13 +157,12 @@ export const Header: React.FC<HeaderProps> = ({
           Studio
         </button>
         <button
-          onClick={() => setActiveTab('admin-portal')}
-          className={`p-1.5 rounded-md whitespace-nowrap transition-colors ${
-            activeTab === 'admin-portal' ? 'text-emerald-300 bg-emerald-950/60' : 'text-neutral-500'
-          }`}
-          title="Root Gate"
+          onClick={onVecout}
+          className="px-2.5 py-1.5 rounded-md whitespace-nowrap text-xs text-rose-300 bg-rose-950/50 hover:bg-rose-900/60 border border-rose-800/50 flex items-center gap-1 cursor-pointer"
+          title="Vecout ('): Kunci Sesi"
         >
-          <Lock className="w-3.5 h-3.5" />
+          <Power className="w-3 h-3 text-rose-400" />
+          <span>Vecout (')</span>
         </button>
       </div>
 
