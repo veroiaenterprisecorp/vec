@@ -224,6 +224,36 @@ export const getStoredLocalItems = (): PrivateVaultItem[] => {
 
 let memoryCache: PrivateVaultItem[] = getStoredLocalItems();
 
+const getAllVaultPartitionItems = (): PrivateVaultItem[] => {
+  const merged = new Map<string, PrivateVaultItem>();
+
+  const addToMap = (items: PrivateVaultItem[] = []) => {
+    items.forEach((item) => {
+      if (item?.id) merged.set(item.id, item);
+    });
+  };
+
+  addToMap(getStoredLocalItems());
+
+  if (typeof window !== 'undefined') {
+    const tenantKeys = Object.keys(localStorage).filter((key) => key.startsWith('vec_tenant_vault_'));
+    tenantKeys.forEach((key) => {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        const parsed: PrivateVaultItem[] = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          addToMap(parsed);
+        }
+      } catch {
+        // ignore malformed tenant data and rely on the global index
+      }
+    });
+  }
+
+  return [...merged.values()].sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
+};
+
 const persistLocalVaultItems = (items: PrivateVaultItem[]): void => {
   const clean = filterDestroyedItems(items).sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
   memoryCache = clean;
@@ -250,8 +280,8 @@ const notifyVaultChanged = (items: PrivateVaultItem[]) => {
  * Digunakan oleh Ruang Admin (MasterAdminPortal) untuk pengawasan menyeluruh.
  */
 export const getAllRegisteredArtworks = (): PrivateVaultItem[] => {
-  const localItems = getStoredLocalItems();
-  return filterDestroyedItems(localItems).sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
+  const mergedItems = getAllVaultPartitionItems();
+  return filterDestroyedItems(mergedItems).sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
 };
 
 /**
@@ -262,7 +292,7 @@ export const getAllRegisteredArtworks = (): PrivateVaultItem[] => {
  * HARUS TETAP MUNCUL DI VAULT PUBLIK.
  */
 export const getPublicVaultItems = (): PrivateVaultItem[] => {
-  const all = getStoredLocalItems();
+  const all = getAllVaultPartitionItems();
   return all.filter((item) => isVaultItemVisibleInPublicVault(item));
 };
 
@@ -495,12 +525,12 @@ export const updateVaultItemPrivacy = async (
   isPublished: boolean, 
   newTitle?: string
 ): Promise<PrivateVaultItem[]> => {
-  const current = getStoredLocalItems();
-  let targetVaultId: string | undefined;
+  const allItems = getAllVaultPartitionItems();
+  const matched = allItems.find((item) => item.id === id);
+  const targetVaultId = matched?.vaultId || getActiveVault()?.id || DEFAULT_MASTER_VAULT.id;
 
-  const updated = current.map((item) => {
+  const updated = allItems.map((item) => {
     if (item.id === id) {
-      targetVaultId = item.vaultId;
       return {
         ...item,
         isPrivate,
@@ -513,26 +543,20 @@ export const updateVaultItemPrivacy = async (
 
   persistLocalVaultItems(updated);
 
-  // Perbarui juga di partisi database tenant jika diketahui
-  const activeVault = getActiveVault();
-  const vaultIdToUpdate = targetVaultId || activeVault?.id;
-  if (vaultIdToUpdate) {
-    const tenantItems = getTenantVaultItems(vaultIdToUpdate);
-    const updatedTenant = tenantItems.map((item) => {
-      if (item.id === id) {
-        return {
-          ...item,
-          isPrivate,
-          isPublished,
-          title: newTitle !== undefined ? newTitle : item.title
-        };
-      }
-      return item;
-    });
-    persistTenantVaultItems(vaultIdToUpdate, updatedTenant);
-  }
+  const tenantItems = getTenantVaultItems(targetVaultId);
+  const updatedTenant = tenantItems.map((item) => {
+    if (item.id === id) {
+      return {
+        ...item,
+        isPrivate,
+        isPublished,
+        title: newTitle !== undefined ? newTitle : item.title
+      };
+    }
+    return item;
+  });
+  persistTenantVaultItems(targetVaultId, updatedTenant);
 
-  // Sync perubahan status ke Supabase
   try {
     const client = getActiveSupabaseClient();
     const { data: post } = await client.from('posts').select('sensor_telemetry').eq('id', id).single();
@@ -566,12 +590,12 @@ export const adminToggleArtworkPermission = async (id: string, makePublic: boole
 
 export const updateVaultItemTitle = async (id: string, newTitle: string): Promise<PrivateVaultItem[]> => {
   const cleanTitle = newTitle.trim();
-  const current = getStoredLocalItems();
-  let targetVaultId: string | undefined;
+  const allItems = getAllVaultPartitionItems();
+  const matched = allItems.find((item) => item.id === id);
+  const targetVaultId = matched?.vaultId || getActiveVault()?.id || DEFAULT_MASTER_VAULT.id;
 
-  const updated = current.map((item) => {
+  const updated = allItems.map((item) => {
     if (item.id === id) {
-      targetVaultId = item.vaultId;
       return { ...item, title: cleanTitle || item.title };
     }
     return item;
@@ -579,16 +603,12 @@ export const updateVaultItemTitle = async (id: string, newTitle: string): Promis
 
   persistLocalVaultItems(updated);
 
-  const activeVault = getActiveVault();
-  const vaultIdToUpdate = targetVaultId || activeVault?.id;
-  if (vaultIdToUpdate) {
-    const tenantItems = getTenantVaultItems(vaultIdToUpdate);
-    const updatedTenant = tenantItems.map((item) => {
-      if (item.id === id) return { ...item, title: cleanTitle || item.title };
-      return item;
-    });
-    persistTenantVaultItems(vaultIdToUpdate, updatedTenant);
-  }
+  const tenantItems = getTenantVaultItems(targetVaultId);
+  const updatedTenant = tenantItems.map((item) => {
+    if (item.id === id) return { ...item, title: cleanTitle || item.title };
+    return item;
+  });
+  persistTenantVaultItems(targetVaultId, updatedTenant);
 
   try {
     const client = getActiveSupabaseClient();
@@ -601,12 +621,12 @@ export const updateVaultItemTitle = async (id: string, newTitle: string): Promis
 };
 
 export const updateVaultItemPhoto = (id: string, newPhotoUrl: string, newDigest?: string): PrivateVaultItem[] => {
-  const current = getStoredLocalItems();
-  let targetVaultId: string | undefined;
+  const allItems = getAllVaultPartitionItems();
+  const matched = allItems.find((item) => item.id === id);
+  const targetVaultId = matched?.vaultId || getActiveVault()?.id || DEFAULT_MASTER_VAULT.id;
 
-  const updated = current.map((item) => {
+  const updated = allItems.map((item) => {
     if (item.id === id) {
-      targetVaultId = item.vaultId;
       return { ...item, photoUrl: newPhotoUrl, digest: newDigest || item.digest };
     }
     return item;
@@ -614,16 +634,12 @@ export const updateVaultItemPhoto = (id: string, newPhotoUrl: string, newDigest?
 
   persistLocalVaultItems(updated);
 
-  const activeVault = getActiveVault();
-  const vaultIdToUpdate = targetVaultId || activeVault?.id;
-  if (vaultIdToUpdate) {
-    const tenantItems = getTenantVaultItems(vaultIdToUpdate);
-    const updatedTenant = tenantItems.map((item) => {
-      if (item.id === id) return { ...item, photoUrl: newPhotoUrl, digest: newDigest || item.digest };
-      return item;
-    });
-    persistTenantVaultItems(vaultIdToUpdate, updatedTenant);
-  }
+  const tenantItems = getTenantVaultItems(targetVaultId);
+  const updatedTenant = tenantItems.map((item) => {
+    if (item.id === id) return { ...item, photoUrl: newPhotoUrl, digest: newDigest || item.digest };
+    return item;
+  });
+  persistTenantVaultItems(targetVaultId, updatedTenant);
 
   return updated;
 };
@@ -633,7 +649,7 @@ export const deletePrivateVaultItem = (id: string, digest?: string, photoUrl?: s
   const cleanDigest = (digest || '').trim().toLowerCase();
   const cleanUrl = (photoUrl || '').trim();
 
-  const current = getStoredLocalItems();
+  const current = getAllVaultPartitionItems();
   const idsToDelete = new Set<string>();
   const affectedVaultIds = new Set<string>();
   if (id) idsToDelete.add(id);
@@ -660,7 +676,6 @@ export const deletePrivateVaultItem = (id: string, digest?: string, photoUrl?: s
   const activeVault = getActiveVault();
   if (activeVault) affectedVaultIds.add(activeVault.id);
 
-  // Hapus dari partisi database tenant yang terpengaruh
   affectedVaultIds.forEach((vId) => {
     const tenantItems = getTenantVaultItems(vId);
     const filteredTenant = tenantItems.filter((i) => !idsToDelete.has(i.id));
