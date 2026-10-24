@@ -1279,6 +1279,9 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
                           <div className="text-cyan-300 font-semibold truncate max-w-[180px]">
                             {user.vaultName || 'Brankas Utama'}
                           </div>
+                          <div className="text-[10px] text-emerald-400 font-mono">
+                            DB: vec_tenant_vault_{(user.vaultId || user.id).slice(0, 8)}...
+                          </div>
                           {user.keyPrefix && (
                             <div className="text-[10px] text-slate-500 font-mono">
                               Kunci: {user.keyPrefix}...

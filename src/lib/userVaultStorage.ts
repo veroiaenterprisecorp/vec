@@ -267,26 +267,94 @@ export const getPublicVaultItems = (): PrivateVaultItem[] => {
 };
 
 /**
- * Mendapatkan karya di Brankas Pribadi milik pengguna yang sedang membuka brankas.
- * Jika brankas terkunci (isVaultUnlocked() === false), mengembalikan array kosong
- * sehingga UI Brankas menampilkan layar terkunci, TANPA mempengaruhi galeri publik!
+ * Kunci penyimpanan database terisolasi untuk tiap partisi brankas pendaftar.
+ * Format: vec_tenant_vault_<vaultId>
  */
-export const getPrivateVaultItems = (): PrivateVaultItem[] => {
+export const getTenantStorageKey = (vaultId: string): string => {
+  return `vec_tenant_vault_${vaultId}`;
+};
+
+/**
+ * Membaca karya yang tersimpan secara eksklusif di database brankas milik satu pendaftar.
+ * Menjamin karya tidak saling tercampur antar pendaftar.
+ */
+export const getTenantVaultItems = (vaultId: string): PrivateVaultItem[] => {
+  if (typeof window === 'undefined' || !vaultId) return [];
+  try {
+    const key = getTenantStorageKey(vaultId);
+    const raw = localStorage.getItem(key);
+    if (!raw) {
+      // Jika ini adalah Brankas Master Utama, inisialisasi dengan mahakarya kurator
+      if (vaultId === DEFAULT_MASTER_VAULT.id || vaultId === 'b2222222-2222-4222-8222-222222222222') {
+        const initial = filterDestroyedItems(INITIAL_CURATED_ARTWORKS);
+        localStorage.setItem(key, JSON.stringify(initial));
+        return initial;
+      }
+      return [];
+    }
+    const parsed: PrivateVaultItem[] = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return filterDestroyedItems(parsed).sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
+  } catch (err) {
+    console.warn('Gagal membaca partisi database brankas tenant:', vaultId, err);
+    return [];
+  }
+};
+
+/**
+ * Menyimpan karya secara eksklusif ke database brankas milik satu pendaftar.
+ */
+export const persistTenantVaultItems = (vaultId: string, items: PrivateVaultItem[]): void => {
+  if (typeof window === 'undefined' || !vaultId) return;
+  const clean = filterDestroyedItems(items).sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
+  try {
+    const key = getTenantStorageKey(vaultId);
+    localStorage.setItem(key, JSON.stringify(clean));
+  } catch (err) {
+    console.warn('Gagal menyimpan ke partisi database brankas tenant:', vaultId, err);
+  }
+};
+
+/**
+ * Mendapatkan karya di Brankas Pribadi milik pendaftar yang sedang membuka brankas.
+ * 
+ * ATURAN MULTI-TENANT ISOLASI KETAT:
+ * - Masing-masing pendaftar memiliki ruang sendiri dan database berangkas sendiri.
+ * - Karya seni antar pendaftar TIDAK AKAN SALING TERCAMPUR.
+ * - Jika brankas terkunci, mengembalikan array kosong.
+ */
+export const getPrivateVaultItems = (overrideVaultId?: string): PrivateVaultItem[] => {
   const unlocked = isVaultUnlocked();
   const activeVault = getActiveVault();
 
-  if (!unlocked || !activeVault) {
+  const targetVaultId = overrideVaultId || (unlocked && activeVault ? activeVault.id : null);
+  if (!targetVaultId) {
     return [];
   }
 
-  const all = getStoredLocalItems();
-  const isMasterVault = activeVault.id === DEFAULT_MASTER_VAULT.id;
+  // 1. Ambil secara eksklusif dari partisi database milik pendaftar ini
+  const tenantItems = getTenantVaultItems(targetVaultId);
+  if (tenantItems && tenantItems.length > 0) {
+    return tenantItems;
+  }
 
-  return all.filter((item) => {
-    if (isMasterVault) return true;
-    if (item.vaultId) return item.vaultId === activeVault.id;
-    return true;
-  });
+  // 2. Jika partisi tenant baru dibuat, cek apakah ada karya pendaftar ini di cache global
+  const all = getStoredLocalItems();
+  const matching = all.filter((item) => item.vaultId === targetVaultId);
+  if (matching.length > 0) {
+    persistTenantVaultItems(targetVaultId, matching);
+    return matching;
+  }
+
+  // 3. Jika ini adalah Master Vault dan partisi belum dibuat
+  if (targetVaultId === DEFAULT_MASTER_VAULT.id || targetVaultId === 'b2222222-2222-4222-8222-222222222222') {
+    const initial = filterDestroyedItems(INITIAL_CURATED_ARTWORKS);
+    persistTenantVaultItems(targetVaultId, initial);
+    return initial;
+  }
+
+  // Pendaftar baru memulai dengan ruang brankas bersih miliknya sendiri (0 karya)
+  return [];
 };
 
 /**
@@ -391,9 +459,27 @@ export const savePrivateVaultItem = (item: PrivateVaultItem): PrivateVaultItem[]
     return getStoredLocalItems();
   }
 
+  const activeVault = getActiveVault();
+  const itemVaultId = item.vaultId || (activeVault ? activeVault.id : DEFAULT_MASTER_VAULT.id);
+  const enrichedItem: PrivateVaultItem = {
+    ...item,
+    vaultId: itemVaultId,
+    vaultName: item.vaultName || (activeVault?.vault_name) || 'Brankas Karya Resmi',
+    creatorName: item.creatorName || (activeVault?.creator_name) || 'Kolektor / Seniman'
+  };
+
+  // 1. Simpan langsung ke partisi database milik pendaftar ini (terisolasi penuh)
+  if (itemVaultId) {
+    const tenantItems = getTenantVaultItems(itemVaultId);
+    const filteredTenant = tenantItems.filter((i) => i.id !== enrichedItem.id);
+    const updatedTenant = [enrichedItem, ...filteredTenant];
+    persistTenantVaultItems(itemVaultId, updatedTenant);
+  }
+
+  // 2. Simpan juga ke indeks global (untuk pemantauan Admin dan publikasi Katalog Publik)
   const current = getStoredLocalItems();
-  const filtered = current.filter((i) => i.id !== item.id);
-  const updated = [item, ...filtered];
+  const filtered = current.filter((i) => i.id !== enrichedItem.id);
+  const updated = [enrichedItem, ...filtered];
 
   persistLocalVaultItems(updated);
   return updated;
@@ -410,8 +496,11 @@ export const updateVaultItemPrivacy = async (
   newTitle?: string
 ): Promise<PrivateVaultItem[]> => {
   const current = getStoredLocalItems();
+  let targetVaultId: string | undefined;
+
   const updated = current.map((item) => {
     if (item.id === id) {
+      targetVaultId = item.vaultId;
       return {
         ...item,
         isPrivate,
@@ -423,6 +512,25 @@ export const updateVaultItemPrivacy = async (
   });
 
   persistLocalVaultItems(updated);
+
+  // Perbarui juga di partisi database tenant jika diketahui
+  const activeVault = getActiveVault();
+  const vaultIdToUpdate = targetVaultId || activeVault?.id;
+  if (vaultIdToUpdate) {
+    const tenantItems = getTenantVaultItems(vaultIdToUpdate);
+    const updatedTenant = tenantItems.map((item) => {
+      if (item.id === id) {
+        return {
+          ...item,
+          isPrivate,
+          isPublished,
+          title: newTitle !== undefined ? newTitle : item.title
+        };
+      }
+      return item;
+    });
+    persistTenantVaultItems(vaultIdToUpdate, updatedTenant);
+  }
 
   // Sync perubahan status ke Supabase
   try {
@@ -459,14 +567,28 @@ export const adminToggleArtworkPermission = async (id: string, makePublic: boole
 export const updateVaultItemTitle = async (id: string, newTitle: string): Promise<PrivateVaultItem[]> => {
   const cleanTitle = newTitle.trim();
   const current = getStoredLocalItems();
+  let targetVaultId: string | undefined;
+
   const updated = current.map((item) => {
     if (item.id === id) {
+      targetVaultId = item.vaultId;
       return { ...item, title: cleanTitle || item.title };
     }
     return item;
   });
 
   persistLocalVaultItems(updated);
+
+  const activeVault = getActiveVault();
+  const vaultIdToUpdate = targetVaultId || activeVault?.id;
+  if (vaultIdToUpdate) {
+    const tenantItems = getTenantVaultItems(vaultIdToUpdate);
+    const updatedTenant = tenantItems.map((item) => {
+      if (item.id === id) return { ...item, title: cleanTitle || item.title };
+      return item;
+    });
+    persistTenantVaultItems(vaultIdToUpdate, updatedTenant);
+  }
 
   try {
     const client = getActiveSupabaseClient();
@@ -480,14 +602,29 @@ export const updateVaultItemTitle = async (id: string, newTitle: string): Promis
 
 export const updateVaultItemPhoto = (id: string, newPhotoUrl: string, newDigest?: string): PrivateVaultItem[] => {
   const current = getStoredLocalItems();
+  let targetVaultId: string | undefined;
+
   const updated = current.map((item) => {
     if (item.id === id) {
+      targetVaultId = item.vaultId;
       return { ...item, photoUrl: newPhotoUrl, digest: newDigest || item.digest };
     }
     return item;
   });
 
   persistLocalVaultItems(updated);
+
+  const activeVault = getActiveVault();
+  const vaultIdToUpdate = targetVaultId || activeVault?.id;
+  if (vaultIdToUpdate) {
+    const tenantItems = getTenantVaultItems(vaultIdToUpdate);
+    const updatedTenant = tenantItems.map((item) => {
+      if (item.id === id) return { ...item, photoUrl: newPhotoUrl, digest: newDigest || item.digest };
+      return item;
+    });
+    persistTenantVaultItems(vaultIdToUpdate, updatedTenant);
+  }
+
   return updated;
 };
 
@@ -498,13 +635,36 @@ export const deletePrivateVaultItem = (id: string, digest?: string, photoUrl?: s
 
   const current = getStoredLocalItems();
   const idsToDelete = new Set<string>();
+  const affectedVaultIds = new Set<string>();
   if (id) idsToDelete.add(id);
 
   current.forEach((item) => {
-    if (item.id === id) idsToDelete.add(item.id);
-    if (cleanId && item.id.toLowerCase() === cleanId) idsToDelete.add(item.id);
-    if (cleanDigest && cleanDigest.length > 8 && item.digest && item.digest.trim().toLowerCase() === cleanDigest) idsToDelete.add(item.id);
-    if (cleanUrl && item.photoUrl === cleanUrl) idsToDelete.add(item.id);
+    if (item.id === id) {
+      idsToDelete.add(item.id);
+      if (item.vaultId) affectedVaultIds.add(item.vaultId);
+    }
+    if (cleanId && item.id.toLowerCase() === cleanId) {
+      idsToDelete.add(item.id);
+      if (item.vaultId) affectedVaultIds.add(item.vaultId);
+    }
+    if (cleanDigest && cleanDigest.length > 8 && item.digest && item.digest.trim().toLowerCase() === cleanDigest) {
+      idsToDelete.add(item.id);
+      if (item.vaultId) affectedVaultIds.add(item.vaultId);
+    }
+    if (cleanUrl && item.photoUrl === cleanUrl) {
+      idsToDelete.add(item.id);
+      if (item.vaultId) affectedVaultIds.add(item.vaultId);
+    }
+  });
+
+  const activeVault = getActiveVault();
+  if (activeVault) affectedVaultIds.add(activeVault.id);
+
+  // Hapus dari partisi database tenant yang terpengaruh
+  affectedVaultIds.forEach((vId) => {
+    const tenantItems = getTenantVaultItems(vId);
+    const filteredTenant = tenantItems.filter((i) => !idsToDelete.has(i.id));
+    persistTenantVaultItems(vId, filteredTenant);
   });
 
   const updated = current.filter((item) => !idsToDelete.has(item.id));
@@ -529,15 +689,21 @@ export const updateVaultItemCloudStatus = (
 };
 
 export const getUserVaultProfile = (): UserVaultProfile => {
-  const items = getStoredLocalItems();
+  const activeVault = getActiveVault();
+  const items = getPrivateVaultItems();
+  const totalBytes = items.reduce((acc, it) => {
+    const sizeMb = parseFloat(it.fileSize) || 3.5;
+    return acc + Math.round(sizeMb * 1024 * 1024);
+  }, 0);
+
   return {
-    userId: 'usr_vec_78942a0c',
-    displayName: 'Pengguna Terverifikasi VEC',
+    userId: activeVault ? activeVault.id : 'usr_vec_master',
+    displayName: activeVault ? activeVault.creator_name : 'Pengguna Terverifikasi VEC',
     trustTier: 'HARDWARE_ATTESTED',
     authenticityScore: 99.40,
-    hardwareEnclaveId: 'TEE-KNOX-TITAN-0x8892FA1B',
-    encryptionMode: 'AES-256-GCM + Supabase Cloud Storage',
-    storageUsedBytes: items.length * 3.5 * 1024 * 1024,
+    hardwareEnclaveId: activeVault ? `TEE-${activeVault.key_prefix.replace(/[^A-Z0-9]/g, '')}` : 'TEE-KNOX-TITAN-0x8892FA1B',
+    encryptionMode: 'AES-256-GCM + Multi-Tenant Isolated DB',
+    storageUsedBytes: totalBytes > 0 ? totalBytes : (items.length * 3.5 * 1024 * 1024),
     maxStorageBytes: 5 * 1024 * 1024 * 1024,
     cloudStorageEnabled: true
   };

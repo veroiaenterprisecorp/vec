@@ -250,8 +250,15 @@ export const registerNewCreatorVault = async (params: {
     created_at: new Date().toISOString()
   };
 
-  // 1. Save to local cache
+  // 1. Save to local cache & initialize clean isolated database partition for this registrant
   saveVaultToLocalCache(newVault);
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(`vec_tenant_vault_${newVault.id}`, JSON.stringify([]));
+    } catch (e) {
+      console.warn('Tenant partition init error:', e);
+    }
+  }
 
   // 2. Synchronize to Admin Control Room Directory & Audit Logs
   try {
