@@ -282,9 +282,7 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
     // 2. Listen to updates and lock changes
     const handleUpdate = () => {
       if (isVaultUnlocked()) {
-        initVaultAsync((loaded) => {
-          setItems(loaded);
-        });
+        setItems(getPrivateVaultItems());
       } else {
         setItems([]);
       }
@@ -308,7 +306,6 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
     const newIsPublished = !newIsPrivate;
     const updated = await updateVaultItemPrivacy(item.id, newIsPrivate, newIsPublished);
     setItems(updated);
-    window.dispatchEvent(new Event('storage'));
 
     if (newIsPublished) {
       showToast(`Menerbitkan "${item.title}" ke Live Vault & Supabase...`);
@@ -1396,4 +1393,3 @@ CREATE POLICY "Public can upload capture objects" ON storage.objects FOR INSERT 
     </div>
   );
 };
-

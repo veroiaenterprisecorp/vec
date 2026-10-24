@@ -264,7 +264,6 @@ const persistLocalVaultItems = (items: PrivateVaultItem[]): void => {
       console.warn('Error persisting vault items to localStorage:', e);
     }
     window.dispatchEvent(new CustomEvent('vec-vault-updated', { detail: clean }));
-    window.dispatchEvent(new Event('storage'));
   }
 };
 

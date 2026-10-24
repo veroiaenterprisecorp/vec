@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
-  initVaultAsync, 
   PrivateVaultItem,
   purgeAllLocalVaultCache,
   getPublicVaultItems
@@ -291,10 +290,6 @@ export const VecVault: React.FC<VecVaultProps> = ({
     checkSupabaseConnection().then(setConnectionStatus);
     loadPublishedArtworks();
     fetchLiveInteractions();
-
-    initVaultAsync().then(() => {
-      loadPublishedArtworks();
-    });
 
     const handleStorageChange = () => {
       loadPublishedArtworks();
