@@ -48,6 +48,7 @@ import {
 } from 'lucide-react';
 import { 
   getRegisteredUsers, 
+  fetchRegisteredUsersFromSupabase,
   saveRegisteredUsers, 
   toggleUserStatus, 
   addNewRegisteredUser, 
@@ -83,6 +84,7 @@ import {
   isDestroyedArtworkCandidate 
 } from '../lib/userVaultStorage';
 import { getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabase';
+import { registerNewCreatorVault } from '../lib/vaultKeyAuth';
 import { GitHubSupabaseSyncHub } from './GitHubSupabaseSyncHub';
 import { VecArchitectureConsole } from './VecArchitectureConsole';
 import { PostGisSimulator } from './PostGisSimulator';
@@ -132,8 +134,12 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
     }
   }, [initialAdminTab]);
 
-  // Registered Users Directory State
+  // Registered Users Directory State - Pure Supabase Data
   const [usersList, setUsersList] = useState<RegisteredUser[]>(() => getRegisteredUsers());
+  const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(true);
+  const [isRefreshingUsers, setIsRefreshingUsers] = useState<boolean>(false);
+  const [usersLoadError, setUsersLoadError] = useState<string | null>(null);
+  const [usersDataSource, setUsersDataSource] = useState<'supabase_live' | 'local_fallback'>('supabase_live');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [showAddUserModal, setShowAddUserModal] = useState<boolean>(false);
@@ -183,11 +189,38 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
     setTimeout(() => setAdminToast(null), 3500);
   };
 
+  const loadUsersFromSupabase = async (showToastOnManual = false) => {
+    setIsRefreshingUsers(true);
+    setUsersLoadError(null);
+    try {
+      const res = await fetchRegisteredUsersFromSupabase();
+      setUsersList(res.users);
+      setUsersDataSource(res.source);
+      if (res.error) {
+        setUsersLoadError(res.error);
+        if (showToastOnManual) showAdminToast(`Status Supabase: ${res.error}`);
+      } else if (showToastOnManual) {
+        showAdminToast(`Berhasil memuat ${res.users.length} akun terdaftar dari basis data Supabase.`);
+      }
+    } catch (err: any) {
+      console.warn('loadUsersFromSupabase caught:', err);
+      setUsersLoadError(err?.message || 'Gagal memuat pengguna dari basis data');
+      if (showToastOnManual) showAdminToast('Gagal memuat pengguna dari Supabase.');
+    } finally {
+      setIsLoadingUsers(false);
+      setIsRefreshingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUsersFromSupabase();
+  }, []);
+
   useEffect(() => {
     const handleVaultSync = () => {
       setAllArtworks(getAllRegisteredArtworks());
       setDestroyedArtworks(getDestroyedArtworkRecords());
-      setUsersList(getRegisteredUsers());
+      loadUsersFromSupabase();
       setAuditLogs(getAuditLogs());
       setUserActivityLogs(getUserActivityLogs());
     };
@@ -348,27 +381,31 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
     showAdminToast(res.message);
   };
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserName.trim() || !newUserEmail.trim()) return;
 
-    const created = addNewRegisteredUser({
-      name: newUserName.trim(),
-      email: newUserEmail.trim(),
-      role: newUserRole,
-      c2paVerified: newUserRole === 'Verified Creator' || newUserRole === 'Super Admin (Owner)',
-      hardwareEnclaveId: `TEE-${newUserRole.includes('Creator') ? 'LEICA-M11' : 'GENERIC'}-${Math.floor(1000 + Math.random() * 9000)}`,
-      storageQuotaBytes: newUserQuotaGb * 1024 * 1024 * 1024
-    });
+    try {
+      const cleanHandle = newUserName.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      await registerNewCreatorVault({
+        creatorName: newUserName.trim(),
+        creatorHandle: cleanHandle || 'creator_' + Date.now().toString(36),
+        email: newUserEmail.trim(),
+        vaultName: `Brankas ${newUserName.trim()}`,
+        securityLevel: 'HARDWARE_ENCLAVE_256'
+      });
+      showAdminToast(`Pengguna ${newUserName} berhasil didaftarkan ke Supabase!`);
+    } catch (regErr: any) {
+      console.warn('handleCreateUser notice:', regErr);
+      showAdminToast(`Pendaftaran manual: ${regErr?.message || 'Gagal menyimpan ke basis data'}`);
+    }
 
-    setUsersList([created, ...usersList.filter(u => u.id !== created.id)]);
+    loadUsersFromSupabase();
     setUserActivityLogs(getUserActivityLogs());
     setShowAddUserModal(false);
     setNewUserName('');
     setNewUserEmail('');
     recordAuditLog('Pendaftaran Pengguna Baru Manual', 'SUCCESS', `Email: ${newUserEmail}`);
-    setNotificationMsg(`Pengguna ${newUserName} berhasil didaftarkan!`);
-    setTimeout(() => setNotificationMsg(''), 3000);
   };
 
   const handleCheckUpdate = () => {
@@ -1180,6 +1217,16 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
 
             <div className="flex items-center gap-2">
               <button
+                onClick={() => loadUsersFromSupabase(true)}
+                disabled={isRefreshingUsers}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-cyan-950/70 hover:bg-cyan-900 border border-cyan-800 text-xs text-cyan-200 transition cursor-pointer disabled:opacity-50"
+                title="Muat ulang data terbaru langsung dari tabel Supabase"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isRefreshingUsers ? 'animate-spin' : ''}`} />
+                <span>{isRefreshingUsers ? 'Menyinkronkan...' : 'Segarkan Data'}</span>
+              </button>
+
+              <button
                 onClick={() => setShowAddUserModal(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer shadow-sm"
               >
@@ -1197,6 +1244,33 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Supabase Live Status Bar */}
+          <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${usersLoadError ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'}`}></span>
+              <span className="font-semibold text-white">Sumber Data: Supabase PostgreSQL</span>
+              <span className="text-slate-400 font-mono text-[11px]">(public.users & public.creator_vaults)</span>
+            </div>
+            <div className="text-[11px] text-slate-400 font-mono">
+              {isLoadingUsers ? 'Memuat dari Supabase...' : `${totalUsers} akun terhubung`}
+            </div>
+          </div>
+
+          {usersLoadError && (
+            <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-800/60 text-xs text-amber-200 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>{usersLoadError}</span>
+              </div>
+              <button
+                onClick={() => loadUsersFromSupabase(true)}
+                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-semibold text-[11px] shrink-0"
+              >
+                Coba Lagi
+              </button>
+            </div>
+          )}
 
           {/* Registered Users Table */}
           <div className="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/60 shadow-xl">

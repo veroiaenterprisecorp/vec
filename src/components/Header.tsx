@@ -138,7 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onVecout}
             className="inline-flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold text-rose-300 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/60 hover:border-rose-600 rounded-lg shadow-sm transition-all duration-200 cursor-pointer"
-            title="Vecout ('): Kunci seluruh brankas dan keluar dari sesi aktif"
+            title="Vecout: Kunci seluruh brankas dan keluar dari sesi aktif"
           >
             <Power className="w-3.5 h-3.5 text-rose-400" />
             <span className="whitespace-nowrap font-medium">Vecout</span>
@@ -203,10 +203,10 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={onVecout}
           className="px-2.5 py-1.5 rounded-md whitespace-nowrap text-xs text-rose-300 bg-rose-950/50 hover:bg-rose-900/60 border border-rose-800/50 flex items-center gap-1 cursor-pointer"
-          title="Vecout ('): Kunci Sesi"
+          title="Vecout: Kunci Sesi"
         >
           <Power className="w-3 h-3 text-rose-400" />
-          <span>Vecout (')</span>
+          <span>Vecout</span>
         </button>
       </div>
 

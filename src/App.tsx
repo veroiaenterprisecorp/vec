@@ -120,7 +120,7 @@ export default function App() {
 
   const handleVecout = () => {
     vecoutAll();
-    triggerToast("Vecout ('): Seluruh sesi aktif dan brankas telah dikunci rapat.");
+    triggerToast("Vecout: Seluruh sesi aktif dan brankas telah dikunci rapat.");
   };
 
   const handleCopyAllSql = () => {

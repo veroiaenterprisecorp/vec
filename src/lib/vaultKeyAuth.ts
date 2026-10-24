@@ -279,38 +279,97 @@ export const registerNewCreatorVault = async (params: {
     console.warn('Admin user directory sync note:', adminSyncErr);
   }
 
-  // 3. Persist to Supabase `creator_vaults` and `users` tables
+  // 3. Persist to Supabase: Attempt secure RPC first, then direct table operations
+  let supabasePersisted = false;
+  let supabaseErrorDetail: string | undefined = undefined;
+
   try {
     const client = getActiveSupabaseClient();
     
-    // Save to creator_vaults
-    await client.from('creator_vaults').upsert([{
-      id: newVault.id,
-      creator_name: newVault.creator_name,
-      creator_handle: newVault.creator_handle,
-      email: newVault.email,
-      vault_name: newVault.vault_name,
-      key_hash: newVault.key_hash,
-      key_salt: newVault.key_salt,
-      key_prefix: newVault.key_prefix,
-      security_level: newVault.security_level,
-      total_artworks: 0,
-      published_artworks: 0,
-      created_at: newVault.created_at
-    }]);
+    // Attempt 1: Call secure RPC function if deployed
+    try {
+      const { data: rpcData, error: rpcError } = await client.rpc('vec_fn_register_creator_vault', {
+        p_id: newVault.id,
+        p_creator_name: newVault.creator_name,
+        p_creator_handle: newVault.creator_handle,
+        p_email: newVault.email,
+        p_vault_name: newVault.vault_name,
+        p_key_hash: newVault.key_hash,
+        p_key_salt: newVault.key_salt,
+        p_key_prefix: newVault.key_prefix,
+        p_security_level: newVault.security_level
+      });
 
-    // Also register in public.users to satisfy foreign key constraints across the entire app
-    await client.from('users').upsert([{
-      id: newVault.id,
-      username: newVault.creator_handle.replace('@', ''),
-      email: newVault.email,
-      full_name: newVault.creator_name,
-      trust_tier: 'HARDWARE_ATTESTED',
-      authenticity_score: 99.40,
-      kyc_verified: true
-    }]);
-  } catch (err) {
-    console.warn('creator_vaults & users Supabase error:', err);
+      if (!rpcError && (rpcData?.success || rpcData?.id)) {
+        supabasePersisted = true;
+      } else if (rpcError && !rpcError.message?.includes('not find the function') && !rpcError.message?.includes('does not exist')) {
+        console.warn('RPC register notice:', rpcError.message);
+        supabaseErrorDetail = rpcError.message;
+      }
+    } catch (rpcCatch) {
+      console.warn('RPC register catch:', rpcCatch);
+    }
+
+    // Attempt 2: If RPC didn't persist, try direct table operations
+    if (!supabasePersisted) {
+      // 2a. Insert into creator_vaults
+      const { error: cvError } = await client.from('creator_vaults').insert([{
+        id: newVault.id,
+        creator_name: newVault.creator_name,
+        creator_handle: newVault.creator_handle,
+        email: newVault.email,
+        vault_name: newVault.vault_name,
+        key_hash: newVault.key_hash,
+        key_salt: newVault.key_salt,
+        key_prefix: newVault.key_prefix,
+        security_level: newVault.security_level,
+        total_artworks: 0,
+        published_artworks: 0,
+        created_at: newVault.created_at
+      }]);
+
+      if (!cvError) {
+        supabasePersisted = true;
+      } else {
+        console.warn('creator_vaults insert notice:', cvError.message);
+        if (!supabaseErrorDetail) supabaseErrorDetail = cvError.message;
+      }
+
+      // 2b. Insert into public.users (metadata contains email, vault info; avoids schema mismatch on tables without email column)
+      const { error: uError } = await client.from('users').upsert([{
+        id: newVault.id,
+        username: newVault.creator_handle.replace('@', ''),
+        full_name: newVault.creator_name,
+        trust_tier: 'HARDWARE_ATTESTED',
+        authenticity_score: 99.40,
+        kyc_verified: true,
+        metadata: {
+          email: newVault.email,
+          vault_name: newVault.vault_name,
+          key_prefix: newVault.key_prefix,
+          security_level: newVault.security_level
+        }
+      }]);
+
+      if (!uError) {
+        supabasePersisted = true;
+      } else {
+        console.warn('users insert notice:', uError.message);
+        if (!supabaseErrorDetail) supabaseErrorDetail = uError.message;
+      }
+    }
+  } catch (err: any) {
+    console.error('Supabase registration error:', err);
+    supabaseErrorDetail = err?.message || 'Koneksi ke Supabase terputus';
+  }
+
+  // Aturan audit ketat: Jangan tampilkan pendaftaran berhasil jika operasi Supabase gagal!
+  if (!supabasePersisted) {
+    const hint = supabaseErrorDetail?.includes('creator_vaults') || supabaseErrorDetail?.includes('not find the table')
+      ? 'Tabel "creator_vaults" belum dibuat di Supabase. Buka Konsol Admin > Sinkronisasi / Arsitektur SQL lalu jalankan migrasi di Supabase SQL Editor.'
+      : (supabaseErrorDetail || 'Operasi penyimpanan ke Supabase gagal.');
+
+    throw new Error(`Pendaftaran ke Supabase belum berhasil: ${hint}`);
   }
 
   // 4. Immediately unlock this new vault for the creator
@@ -471,7 +530,7 @@ export const lockVault = (): void => {
 };
 
 /**
- * Vecout ('): Menutup seluruh sesi aktif, mengunci kembali semua brankas,
+ * Vecout: Menutup seluruh sesi aktif, mengunci kembali semua brankas,
  * dan membersihkan kredensial sementara dari memori sesi.
  * Data permanen (karya, brankas) tetap aman tersimpan.
  */

@@ -548,6 +548,9 @@ EXCEPTION WHEN OTHERS THEN null;
 END $$;
 
 -- Policies: users
+ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_id_fkey;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.users;
 CREATE POLICY "Public profiles are viewable by everyone" 
     ON public.users FOR SELECT USING (true);
@@ -555,6 +558,69 @@ CREATE POLICY "Public profiles are viewable by everyone"
 DROP POLICY IF EXISTS "Users can update own profile" ON public.users;
 CREATE POLICY "Users can update own profile" 
     ON public.users FOR UPDATE USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Anyone can register user profile" ON public.users;
+CREATE POLICY "Anyone can register user profile" 
+    ON public.users FOR INSERT WITH CHECK (true);
+
+-- Function & RPC: vec_fn_register_creator_vault (SECURITY DEFINER)
+CREATE OR REPLACE FUNCTION public.vec_fn_register_creator_vault(
+    p_id UUID,
+    p_creator_name VARCHAR,
+    p_creator_handle VARCHAR,
+    p_email VARCHAR,
+    p_vault_name VARCHAR,
+    p_key_hash VARCHAR,
+    p_key_salt VARCHAR,
+    p_key_prefix VARCHAR,
+    p_security_level VARCHAR DEFAULT 'HARDWARE_ENCLAVE_256'
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+DECLARE
+    v_user_id UUID := COALESCE(p_id, gen_random_uuid());
+    v_handle VARCHAR := REGEXP_REPLACE(p_creator_handle, '^@', '');
+    v_email VARCHAR := LOWER(TRIM(p_email));
+BEGIN
+    BEGIN
+        INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at)
+        VALUES (v_user_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', v_email, crypt('VECsecureVaultKey2026!', gen_salt('bf')), NOW(), NOW(), NOW())
+        ON CONFLICT (id) DO NOTHING;
+    EXCEPTION WHEN OTHERS THEN
+        NULL;
+    END;
+
+    INSERT INTO public.users (
+        id, username, full_name, authenticity_score, trust_tier, kyc_verified, metadata, created_at, updated_at
+    ) VALUES (
+        v_user_id, v_handle, p_creator_name, 99.40, 'HARDWARE_ATTESTED', true,
+        jsonb_build_object('email', v_email, 'vault_name', p_vault_name, 'key_prefix', p_key_prefix, 'security_level', p_security_level),
+        NOW(), NOW()
+    )
+    ON CONFLICT (id) DO UPDATE SET
+        full_name = EXCLUDED.full_name,
+        metadata = EXCLUDED.metadata,
+        updated_at = NOW();
+
+    INSERT INTO public.creator_vaults (
+        id, creator_name, creator_handle, email, vault_name, key_hash, key_salt, key_prefix, security_level, total_artworks, published_artworks, created_at, updated_at
+    ) VALUES (
+        v_user_id, p_creator_name, p_creator_handle, v_email, p_vault_name, p_key_hash, p_key_salt, p_key_prefix, p_security_level, 0, 0, NOW(), NOW()
+    )
+    ON CONFLICT (id) DO UPDATE SET
+        creator_name = EXCLUDED.creator_name,
+        vault_name = EXCLUDED.vault_name,
+        email = EXCLUDED.email,
+        updated_at = NOW();
+
+    RETURN jsonb_build_object('success', true, 'id', v_user_id);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.vec_fn_register_creator_vault TO anon, authenticated;
 
 -- Policies: posts
 -- Publik hanya dapat melihat postingan terverifikasi

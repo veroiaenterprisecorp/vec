@@ -1,3 +1,5 @@
+import { getActiveSupabaseClient } from './supabase';
+
 export interface RegisteredUser {
   id: string;
   name: string;
@@ -289,20 +291,148 @@ export const GUEST_STATISTICS_DATA: GuestStatistics = {
 
 export function getRegisteredUsers(): RegisteredUser[] {
   try {
-    const raw = localStorage.getItem(REGISTERED_USERS_KEY);
-    if (!raw) {
-      localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(INITIAL_REGISTERED_USERS));
-      return INITIAL_REGISTERED_USERS;
-    }
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(REGISTERED_USERS_KEY) : null;
+    if (!raw) return [];
     return JSON.parse(raw);
   } catch {
-    return INITIAL_REGISTERED_USERS;
+    return [];
+  }
+}
+
+/**
+ * Mengambil data pengguna murni dari basis data Supabase (tabel public.users & public.creator_vaults).
+ * Tidak menggunakan data hardcoded atau contoh.
+ */
+export async function fetchRegisteredUsersFromSupabase(): Promise<{
+  users: RegisteredUser[];
+  error?: string;
+  source: 'supabase_live' | 'local_fallback';
+}> {
+  try {
+    const client = getActiveSupabaseClient();
+    const collectedMap = new Map<string, RegisteredUser>();
+
+    // 1. Query tabel public.users
+    const { data: usersData, error: usersError } = await client
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (usersError) {
+      console.warn('[VEC Admin] Query users table error:', usersError.message);
+    } else if (usersData && usersData.length > 0) {
+      for (const u of usersData) {
+        const meta = (u.metadata && typeof u.metadata === 'object') ? u.metadata : {};
+        const email = meta.email || (u as any).email || `${u.username || 'user'}@vec.enterprise`;
+        
+        let role: RegisteredUser['role'] = 'Verified Creator';
+        if (u.trust_tier === 'ENTERPRISE_TRUSTED' || meta.role?.includes('Owner')) {
+          role = 'Super Admin (Owner)';
+        } else if (u.trust_tier === 'CREATOR_PRO' || meta.role?.includes('Curator')) {
+          role = 'Curator';
+        } else if (u.trust_tier === 'COMMUNITY') {
+          role = 'Standard Artist';
+        }
+
+        collectedMap.set(u.id, {
+          id: u.id,
+          name: u.full_name || u.username || 'Pengguna Terverifikasi',
+          email: email,
+          role: role,
+          c2paVerified: u.kyc_verified || u.trust_tier === 'HARDWARE_ATTESTED',
+          hardwareEnclaveId: u.hardware_attestation_key_id || `TEE-${u.id.slice(0, 8).toUpperCase()}`,
+          storageUsedBytes: meta.storageUsedBytes || 0,
+          storageQuotaBytes: meta.storageQuotaBytes || (5 * 1024 * 1024 * 1024),
+          privatePhotoCount: u.total_verified_captures || 0,
+          registeredAt: u.created_at ? new Date(u.created_at).toISOString().replace('T', ' ').substring(0, 16) + ' UTC' : 'Terdaftar',
+          lastLoginAt: meta.lastLoginAt || 'Aktif di Supabase',
+          status: (meta.status as any) || 'active',
+          vaultId: meta.vault_id || u.id,
+          vaultName: meta.vault_name || `Brankas ${u.full_name || u.username}`,
+          keyPrefix: meta.key_prefix || 'VEC-VK-****',
+          emailConfirmationSent: meta.emailConfirmationSent ?? true,
+          emailConfirmationSentAt: meta.emailConfirmationSentAt || u.created_at
+        });
+      }
+    }
+
+    // 2. Query tabel public.creator_vaults (jika tabel telah dibuat via migrasi)
+    try {
+      const { data: vaultsData, error: vaultsError } = await client
+        .from('creator_vaults')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (vaultsError) {
+        if (!vaultsError.message?.includes('not find the table') && !vaultsError.message?.includes('does not exist')) {
+          console.warn('[VEC Admin] Query creator_vaults notice:', vaultsError.message);
+        }
+      } else if (vaultsData && vaultsData.length > 0) {
+        for (const cv of vaultsData) {
+          const existing = collectedMap.get(cv.id);
+          if (existing) {
+            existing.vaultName = cv.vault_name || existing.vaultName;
+            existing.keyPrefix = cv.key_prefix || existing.keyPrefix;
+            existing.email = cv.email || existing.email;
+            existing.name = cv.creator_name || existing.name;
+          } else {
+            collectedMap.set(cv.id, {
+              id: cv.id,
+              name: cv.creator_name || cv.creator_handle,
+              email: cv.email,
+              role: 'Verified Creator',
+              c2paVerified: true,
+              hardwareEnclaveId: `TEE-${cv.security_level || 'HARDWARE_ENCLAVE_256'}`,
+              storageUsedBytes: 0,
+              storageQuotaBytes: 5 * 1024 * 1024 * 1024,
+              privatePhotoCount: cv.total_artworks || 0,
+              registeredAt: cv.created_at ? new Date(cv.created_at).toISOString().replace('T', ' ').substring(0, 16) + ' UTC' : 'Terdaftar',
+              lastLoginAt: 'Baru saja',
+              status: 'active',
+              vaultId: cv.id,
+              vaultName: cv.vault_name,
+              keyPrefix: cv.key_prefix,
+              emailConfirmationSent: true,
+              emailConfirmationSentAt: cv.created_at
+            });
+          }
+        }
+      }
+    } catch {
+      // creator_vaults mungkin belum dibuat di proyek Supabase pengguna
+    }
+
+    if (collectedMap.size > 0) {
+      const usersList = Array.from(collectedMap.values());
+      saveRegisteredUsers(usersList);
+      return { users: usersList, source: 'supabase_live' };
+    }
+
+    if (usersError) {
+      const cached = getRegisteredUsers();
+      return {
+        users: cached,
+        error: `Supabase: ${usersError.message}`,
+        source: 'local_fallback'
+      };
+    }
+
+    return { users: [], source: 'supabase_live' };
+  } catch (err: any) {
+    console.warn('fetchRegisteredUsersFromSupabase error:', err);
+    return {
+      users: getRegisteredUsers(),
+      error: err?.message || 'Gagal memuat pengguna dari Supabase',
+      source: 'local_fallback'
+    };
   }
 }
 
 export function saveRegisteredUsers(users: RegisteredUser[]): void {
   try {
-    localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
+    }
   } catch (err) {
     console.warn('Gagal menyimpan direktori pengguna:', err);
   }

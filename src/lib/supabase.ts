@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const configuredEnvUrl = import.meta.env.VITE_SUPABASE_URL;
-const configuredEnvAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const configuredEnvUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_URL : '');
+const configuredEnvAnonKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) || (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_ANON_KEY : '');
 
 // Project cruijnhylcdojbilzgwd is the user's project
 export const DEFAULT_SUPABASE_URL = 'https://cruijnhylcdojbilzgwd.supabase.co';
