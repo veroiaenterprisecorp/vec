@@ -20,6 +20,7 @@ import {
   Sliders,
   Filter,
   Camera,
+  Lock,
   User,
   Calendar,
   Cpu,
@@ -464,6 +465,18 @@ export const VecVault: React.FC<VecVaultProps> = ({
             <RefreshCw className="w-3.5 h-3.5 text-rose-400" />
             <span className="hidden sm:inline">Bersihkan Cache</span>
           </button>
+
+          {onNavigateToPrivateVault && (
+            <button
+              onClick={onNavigateToPrivateVault}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono font-bold bg-neutral-900 hover:bg-neutral-800 text-emerald-300 border border-emerald-500/40 transition cursor-pointer"
+              title="Buka Brankas Koleksi Pribadi Anda"
+            >
+              <Lock className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">Brankas Pribadi</span>
+              <span className="sm:hidden">Brankas</span>
+            </button>
+          )}
 
           {onNavigateToStudio && (
             <button

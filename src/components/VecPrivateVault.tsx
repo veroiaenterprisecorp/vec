@@ -440,16 +440,61 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
               </button>
             </form>
 
-            {/* Registration CTA Button */}
-            <div className="pt-4 border-t border-neutral-800/80 flex flex-col sm:flex-row items-center justify-center gap-3">
-              <span className="text-xs text-neutral-400">Belum memiliki Kunci Brankas?</span>
+            {/* Quick Demo Key Helper */}
+            <div className="flex items-center justify-between p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-xs max-w-md mx-auto">
+              <div className="text-left">
+                <span className="text-[10px] text-cyan-400 block font-mono font-semibold">KUNCI MASTER PEMILIK / DEMO:</span>
+                <span className="font-mono text-white text-xs font-bold">VEC-ADMIN-882991</span>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  setInlineKeyInput('VEC-ADMIN-882991');
+                  setIsVerifyingInlineKey(true);
+                  const res = await unlockVaultWithKey('VEC-ADMIN-882991');
+                  if (res.success && res.vault) {
+                    setIsUnlocked(true);
+                    setActiveVault(res.vault);
+                    setInlineKeyInput('');
+                    showToast(res.message);
+                    const fresh = await initVaultAsync();
+                    setItems(fresh);
+                  }
+                  setIsVerifyingInlineKey(false);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition cursor-pointer shadow"
+              >
+                Buka Langsung
+              </button>
+            </div>
+
+            {/* Registration CTA & Cross Navigation Buttons */}
+            <div className="pt-4 border-t border-neutral-800/80 flex flex-wrap items-center justify-center gap-3">
               <button
                 type="button"
                 onClick={() => setShowRegisterModal(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-neutral-900 hover:bg-neutral-800 text-cyan-300 border border-cyan-500/30 hover:border-cyan-400 transition shadow cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition shadow cursor-pointer"
               >
-                <PlusCircle className="w-4 h-4 text-cyan-400" />
+                <PlusCircle className="w-4 h-4" />
                 <span>Daftar Akun & Buat Brankas Baru</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onNavigateToPublicVault}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 transition cursor-pointer"
+              >
+                <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                <span>Lihat Katalog Publik</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onNavigateToStudio}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 transition cursor-pointer"
+              >
+                <Camera className="w-4 h-4 text-cyan-400" />
+                <span>Buka Studio Foto</span>
               </button>
             </div>
 

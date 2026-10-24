@@ -158,6 +158,30 @@ export const VaultKeyUnlockModal: React.FC<VaultKeyUnlockModalProps> = ({
             </button>
           </form>
 
+          {/* Quick Demo Key Helper */}
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-xs">
+            <div>
+              <span className="text-[10px] text-cyan-400 block font-mono">KUNCI MASTER RESMI / DEMO:</span>
+              <span className="font-mono text-white text-xs font-bold">VEC-ADMIN-882991</span>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                setKeyInput('VEC-ADMIN-882991');
+                setIsVerifying(true);
+                const res = await unlockVaultWithKey('VEC-ADMIN-882991');
+                if (res.success && res.vault) {
+                  if (onUnlockSuccess) onUnlockSuccess(res.vault);
+                  onClose();
+                }
+                setIsVerifying(false);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-[11px] transition cursor-pointer shadow"
+            >
+              Gunakan Ini
+            </button>
+          </div>
+
           {/* Quick Register Link */}
           <div className="pt-3 border-t border-neutral-800/80 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
             <span className="text-neutral-400">Belum memiliki Kunci Brankas?</span>

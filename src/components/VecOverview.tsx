@@ -387,6 +387,38 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
           </div>
 
         </div>
+
+        {/* Card 5: Ruang Kontrol Admin & Pengawasan Sistem (Full Width Connector) */}
+        <div 
+          onClick={() => onNavigate('admin-portal')}
+          className="group cursor-pointer bg-gradient-to-r from-emerald-950/30 via-slate-900/60 to-cyan-950/30 hover:bg-slate-900 border border-emerald-500/30 hover:border-emerald-500/60 rounded-2xl p-6 transition duration-300 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl"
+        >
+          <div className="space-y-2 text-center md:text-left">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>KONSOL PENGELOLA UTAMA · VECMASTER PORTAL</span>
+            </div>
+            <h3 className="text-lg sm:text-xl font-bold text-white">
+              Ruang Kontrol Admin: Pengawasan Sistem, Direktori Pengguna & Audit
+            </h3>
+            <p className="text-xs text-neutral-300 max-w-2xl leading-relaxed">
+              Pusat kendali terisolasi untuk mengaudit seluruh pendaftar, memvalidasi persetujuan kurasi galeri, memantau alokasi penyimpanan cloud Supabase, dan mencatat riwayat keamanan sistem secara real-time.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onNavigate('admin-portal');
+            }}
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition shadow-lg shadow-emerald-950/50 cursor-pointer shrink-0"
+          >
+            <ShieldCheck className="w-4 h-4 text-white" />
+            <span>Buka Ruang Kontrol Admin</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
       </section>
 
       {/* ------------------------------------------------------------- */}
@@ -550,6 +582,14 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
             className="px-5 py-3 rounded-xl text-xs sm:text-sm font-medium text-neutral-300 hover:text-white bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 transition cursor-pointer"
           >
             Lihat Katalog Karya
+          </button>
+
+          <button
+            onClick={() => onNavigate('admin-portal')}
+            className="px-5 py-3 rounded-xl text-xs sm:text-sm font-semibold text-emerald-300 hover:text-white bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-500/40 transition cursor-pointer flex items-center gap-1.5"
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>Ruang Kontrol Admin</span>
           </button>
         </div>
       </section>

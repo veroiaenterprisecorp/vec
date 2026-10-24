@@ -544,6 +544,24 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
               </div>
             )}
 
+            {/* Quick Demo Master Key Helper */}
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/80 border border-emerald-500/30 text-xs">
+              <div className="text-left">
+                <span className="text-[10px] text-emerald-400 block font-mono font-semibold">KUNCI MASTER RESMI PEMILIK:</span>
+                <span className="font-mono text-white text-xs font-bold">VEC-ADMIN-882991</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setInputPasscode('VEC-ADMIN-882991');
+                  setLoginError('');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition cursor-pointer shadow"
+              >
+                Gunakan Kunci Ini
+              </button>
+            </div>
+
             <button
               type="submit"
               disabled={isLockedOut || !inputPasscode.trim()}

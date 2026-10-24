@@ -36,10 +36,10 @@ export const VaultRegistrationModal: React.FC<VaultRegistrationModalProps> = ({
   onRegisteredSuccess
 }) => {
   const [step, setStep] = useState<'form' | 'certificate'>('form');
-  const [creatorName, setCreatorName] = useState<string>('');
-  const [creatorHandle, setCreatorHandle] = useState<string>('');
-  const [email, setEmail] = useState<string>('');
-  const [vaultName, setVaultName] = useState<string>('');
+  const [creatorName, setCreatorName] = useState<string>('BK Arifullah');
+  const [creatorHandle, setCreatorHandle] = useState<string>('bk_arifullah');
+  const [email, setEmail] = useState<string>('bk.arifullah@gmail.com');
+  const [vaultName, setVaultName] = useState<string>('Brankas Utama Maestro BK Arifullah');
   const [securityLevel, setSecurityLevel] = useState<'HARDWARE_ENCLAVE_256' | 'MILITARY_C2PA' | 'QUANTUM_RESISTANT'>('HARDWARE_ENCLAVE_256');
   
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);

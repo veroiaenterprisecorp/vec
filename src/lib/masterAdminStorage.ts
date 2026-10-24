@@ -175,6 +175,9 @@ export const INITIAL_REGISTERED_USERS: RegisteredUser[] = [
     name: 'BK Arifullah',
     email: 'bk.arifullah@gmail.com',
     role: 'Super Admin (Owner)',
+    vaultName: 'Brankas Utama Maestro BK Arifullah',
+    keyPrefix: 'VEC-ADMIN-882991 (Master)',
+    emailConfirmationSent: true,
     c2paVerified: true,
     hardwareEnclaveId: 'TEE-SONY-A7RV-ROOT-9921',
     storageUsedBytes: 26004684, // ~24.8 MB
