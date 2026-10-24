@@ -1,13 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Header } from './components/Header';
-import { VecOverview } from './components/VecOverview';
-import { VecVault } from './components/VecVault';
-import { VecStudio } from './components/VecStudio';
-import { VecPrivateVault } from './components/VecPrivateVault';
-import { MasterAdminPortal, AdminPortalTab } from './components/MasterAdminPortal';
 import { VEC_FULL_SQL_SCRIPT } from './data/vecSqlSchema';
 import { VecOfficialLogo } from './components/VecOfficialLogo';
 import { VaultRegistrationModal } from './components/VaultRegistrationModal';
+import type { AdminPortalTab } from './components/MasterAdminPortal';
+
+const VecOverview = lazy(() =>
+  import('./components/VecOverview').then((module) => ({ default: module.VecOverview }))
+);
+const VecVault = lazy(() =>
+  import('./components/VecVault').then((module) => ({ default: module.VecVault }))
+);
+const VecStudio = lazy(() =>
+  import('./components/VecStudio').then((module) => ({ default: module.VecStudio }))
+);
+const VecPrivateVault = lazy(() =>
+  import('./components/VecPrivateVault').then((module) => ({ default: module.VecPrivateVault }))
+);
+const MasterAdminPortal = lazy(() =>
+  import('./components/MasterAdminPortal').then((module) => ({ default: module.MasterAdminPortal }))
+);
 import { Check } from 'lucide-react';
 import { vecoutAll, isVaultUnlocked } from './lib/vaultKeyAuth';
 import { checkAdminSession } from './lib/masterAdminStorage';
@@ -178,49 +190,57 @@ export default function App() {
 
       {/* Main Luxury Content Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'overview' && (
-          <VecOverview 
-            onNavigate={handleNavigate} 
-            onOpenRegisterModal={() => setShowRegisterModal(true)}
-          />
-        )}
+        <Suspense
+          fallback={
+            <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-neutral-800 bg-neutral-950/70 text-sm text-neutral-400">
+              Memuat panel Veroia…
+            </div>
+          }
+        >
+          {activeTab === 'overview' && (
+            <VecOverview 
+              onNavigate={handleNavigate} 
+              onOpenRegisterModal={() => setShowRegisterModal(true)}
+            />
+          )}
 
-        {activeTab === 'vault' && (
-          <VecVault 
-            onNavigateToStudio={() => setActiveTab('studio')}
-            onNavigateToPrivateVault={() => setActiveTab('private-vault')}
-          />
-        )}
+          {activeTab === 'vault' && (
+            <VecVault 
+              onNavigateToStudio={() => setActiveTab('studio')}
+              onNavigateToPrivateVault={() => setActiveTab('private-vault')}
+            />
+          )}
 
-        {activeTab === 'private-vault' && (
-          <VecPrivateVault 
-            onNavigateToStudio={() => setActiveTab('studio')}
-            onNavigateToPublicVault={() => setActiveTab('vault')}
-          />
-        )}
+          {activeTab === 'private-vault' && (
+            <VecPrivateVault 
+              onNavigateToStudio={() => setActiveTab('studio')}
+              onNavigateToPublicVault={() => setActiveTab('vault')}
+            />
+          )}
 
-        {activeTab === 'studio' && (
-          <VecStudio 
-            onNavigateToPrivateVault={() => setActiveTab('private-vault')}
-            onNavigateToPublicVault={() => setActiveTab('vault')}
-          />
-        )}
+          {activeTab === 'studio' && (
+            <VecStudio 
+              onNavigateToPrivateVault={() => setActiveTab('private-vault')}
+              onNavigateToPublicVault={() => setActiveTab('vault')}
+            />
+          )}
 
-        {activeTab === 'admin-portal' && (
-          <MasterAdminPortal
-            initialAdminTab={adminSubTab}
-            onBackToPublicSite={() => {
-              if (typeof window !== 'undefined' && window.history.pushState) {
-                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-                window.history.pushState({ path: cleanUrl }, '', cleanUrl);
-              }
-              setActiveTab('overview');
-            }}
-            onCopyAllSql={handleCopyAllSql}
-            copiedSql={copied}
-            onDownloadSql={handleDownloadSql}
-          />
-        )}
+          {activeTab === 'admin-portal' && (
+            <MasterAdminPortal
+              initialAdminTab={adminSubTab}
+              onBackToPublicSite={() => {
+                if (typeof window !== 'undefined' && window.history.pushState) {
+                  const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                  window.history.pushState({ path: cleanUrl }, '', cleanUrl);
+                }
+                setActiveTab('overview');
+              }}
+              onCopyAllSql={handleCopyAllSql}
+              copiedSql={copied}
+              onDownloadSql={handleDownloadSql}
+            />
+          )}
+        </Suspense>
       </main>
 
       {/* Premium Institutional Footer */}
