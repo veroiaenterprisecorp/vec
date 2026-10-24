@@ -1,4 +1,10 @@
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState } from 'react';
+import { ErdVisualizer } from './ErdVisualizer';
+import { SqlViewer } from './SqlViewer';
+import { NextjsApiViewer } from './NextjsApiViewer';
+import { FlutterAppViewer } from './FlutterAppViewer';
+import { SeedDataGenerator } from './SeedDataGenerator';
+import { ArchitectureDocs } from './ArchitectureDocs';
 import { 
   Database, 
   Terminal, 
@@ -8,16 +14,8 @@ import {
   FileText,
   Download,
   Copy,
-  Check,
-  Loader2
+  Check
 } from 'lucide-react';
-
-const ErdVisualizer = lazy(() => import('./ErdVisualizer').then((m) => ({ default: m.ErdVisualizer })));
-const SqlViewer = lazy(() => import('./SqlViewer').then((m) => ({ default: m.SqlViewer })));
-const NextjsApiViewer = lazy(() => import('./NextjsApiViewer').then((m) => ({ default: m.NextjsApiViewer })));
-const FlutterAppViewer = lazy(() => import('./FlutterAppViewer').then((m) => ({ default: m.FlutterAppViewer })));
-const SeedDataGenerator = lazy(() => import('./SeedDataGenerator').then((m) => ({ default: m.SeedDataGenerator })));
-const ArchitectureDocs = lazy(() => import('./ArchitectureDocs').then((m) => ({ default: m.ArchitectureDocs })));
 
 interface VecArchitectureConsoleProps {
   onCopyAllSql: () => void;
@@ -146,23 +144,14 @@ export const VecArchitectureConsole: React.FC<VecArchitectureConsoleProps> = ({
         </button>
       </div>
 
-      {/* Sub-view Viewport with Suspense */}
+      {/* Sub-view Viewport */}
       <div className="pt-2">
-        <Suspense
-          fallback={
-            <div className="flex items-center justify-center p-12 text-slate-500 font-mono text-xs gap-2">
-              <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
-              <span>Memuat modul spesifikasi...</span>
-            </div>
-          }
-        >
-          {subTab === 'erd' && <ErdVisualizer />}
-          {subTab === 'sql' && <SqlViewer onCopyAll={onCopyAllSql} copied={copiedSql} />}
-          {subTab === 'api' && <NextjsApiViewer />}
-          {subTab === 'flutter' && <FlutterAppViewer />}
-          {subTab === 'seed' && <SeedDataGenerator />}
-          {subTab === 'docs' && <ArchitectureDocs />}
-        </Suspense>
+        {subTab === 'erd' && <ErdVisualizer />}
+        {subTab === 'sql' && <SqlViewer onCopyAll={onCopyAllSql} copied={copiedSql} />}
+        {subTab === 'api' && <NextjsApiViewer />}
+        {subTab === 'flutter' && <FlutterAppViewer />}
+        {subTab === 'seed' && <SeedDataGenerator />}
+        {subTab === 'docs' && <ArchitectureDocs />}
       </div>
 
     </div>

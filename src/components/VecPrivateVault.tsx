@@ -477,6 +477,24 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
                 </div>
               </div>
             )}
+            {/* Permitted Artworks in Vault Guarantee Banner */}
+            <div className="pt-4 border-t border-neutral-800/80 p-4 rounded-2xl bg-cyan-950/30 border border-cyan-500/20 text-left space-y-2">
+              <div className="flex items-center gap-2 text-cyan-300 text-xs font-semibold">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Jaminan Akses: Gambar yang Diizinkan Tetap Tampil di Vault</span>
+              </div>
+              <p className="text-[11px] text-neutral-400 leading-relaxed">
+                Meskipun brankas pribadi Anda sedang terkunci, seluruh karya seni dan foto yang telah Anda izinkan/publikasikan ke galeri publik tetap aktif dan dapat dinikmati oleh publik di Katalog Vault.
+              </p>
+              <button
+                type="button"
+                onClick={onNavigateToPublicVault}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition cursor-pointer"
+              >
+                <span>Lihat Gambar yang Diizinkan di Katalog Vault</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
           </div>
         </div>

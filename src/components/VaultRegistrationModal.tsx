@@ -13,7 +13,11 @@ import {
   ArrowRight,
   User,
   Mail,
-  Fingerprint
+  Fingerprint,
+  Send,
+  ExternalLink,
+  FileText,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   registerNewCreatorVault, 
@@ -45,6 +49,7 @@ export const VaultRegistrationModal: React.FC<VaultRegistrationModalProps> = ({
   const [generatedKey, setGeneratedKey] = useState<string>('');
   const [createdVault, setCreatedVault] = useState<CreatorVault | null>(null);
   const [copiedKey, setCopiedKey] = useState<boolean>(false);
+  const [copiedEmailText, setCopiedEmailText] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -94,6 +99,128 @@ export const VaultRegistrationModal: React.FC<VaultRegistrationModalProps> = ({
     navigator.clipboard.writeText(generatedKey);
     setCopiedKey(true);
     setTimeout(() => setCopiedKey(false), 2000);
+  };
+
+  const getEmailContentText = () => {
+    if (!createdVault || !generatedKey) return '';
+    return `Yth. ${createdVault.creator_name} (@${createdVault.creator_handle}),
+
+Selamat! Pendaftaran Brankas Karya Resmi Anda di Veroia Enterprise Corp (VEC) telah berhasil diproses.
+
+DATA PENDAFTARAN RESMI:
+- Nama Seniman / Kreator : ${createdVault.creator_name}
+- Username / Handle     : @${createdVault.creator_handle}
+- Alamat Email          : ${createdVault.email}
+- Nama Brankas          : ${createdVault.vault_name}
+- ID Brankas (UUID)     : ${createdVault.id}
+- Tingkat Enklave       : ${createdVault.security_level}
+- Ruang Kontrol Admin   : Terkoneksi & Aktif di Konsol Vecmaster
+- Waktu Diterbitkan     : ${createdVault.created_at}
+
+=====================================================================
+KUNCI RAHASIA AKSES BRANKAS KARYA (ZERO-KNOWLEDGE VAULT KEY):
+${generatedKey}
+=====================================================================
+
+PETUNJUK PENGGUNAAN & KEAMANAN:
+1. Kunci di atas digunakan untuk membuka Brankas Koleksi Pribadi Anda di website resmi Veroia Enterprise Corp.
+2. Setiap foto karya yang Anda ambil di Studio Foto dapat Anda simpan secara aman di brankas ini, atau Anda terbitkan ke Katalog Karya publik.
+3. Kunci ini dilindungi dengan enkripsi SHA-256 + salt unik. Basis data VEC tidak pernah menyimpan kunci dalam teks biasa.
+4. Demi keamanan hak cipta Anda, jaga kerahasiaan kunci ini. Jika hilang, brankas tidak dapat dipulihkan demi menjaga integritas karya.
+
+Hormat kami,
+Divisi Keamanan Kriptografi & Kurasi
+Veroia Enterprise Corp (VEC)`;
+  };
+
+  const handleOpenEmailClient = () => {
+    if (!createdVault || !generatedKey) return;
+    const subject = `[VEC SECURITY] Sertifikat Kunci Brankas Resmi: ${createdVault.vault_name}`;
+    const body = getEmailContentText();
+    const mailtoUrl = `mailto:${encodeURIComponent(createdVault.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailtoUrl;
+  };
+
+  const handleCopyEmailText = () => {
+    const text = getEmailContentText();
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedEmailText(true);
+    setTimeout(() => setCopiedEmailText(false), 2000);
+  };
+
+  const handleDownloadEmailHtml = () => {
+    if (!createdVault || !generatedKey) return;
+    const htmlContent = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Konfirmasi Pendaftaran Brankas - Veroia Enterprise Corp</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #020409; color: #e2e8f0; margin: 0; padding: 32px 16px; }
+    .container { max-width: 640px; margin: 0 auto; background: #070d18; border: 1px solid #0891b2; border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7); }
+    .header { background: linear-gradient(180deg, #0f172a 0%, #070d18 100%); padding: 32px 24px; text-align: center; border-bottom: 1px solid #1e293b; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; background: rgba(6,182,212,0.15); color: #22d3ee; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid rgba(6,182,212,0.3); margin-bottom: 12px; }
+    h1 { margin: 0 0 8px 0; font-size: 22px; color: #ffffff; }
+    .subtitle { color: #94a3b8; font-size: 13px; margin: 0; }
+    .content { padding: 32px 24px; line-height: 1.6; font-size: 14px; }
+    .table-data { width: 100%; border-collapse: collapse; margin: 20px 0; background: #020617; border-radius: 8px; overflow: hidden; border: 1px solid #1e293b; }
+    .table-data td { padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #1e293b; }
+    .table-data td.label { color: #94a3b8; width: 38%; font-weight: 600; }
+    .table-data td.val { color: #f8fafc; font-family: monospace; }
+    .key-box { background: #000000; border: 2px dashed #06b6d4; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0; }
+    .key-label { font-size: 11px; font-family: monospace; color: #22d3ee; letter-spacing: 0.05em; margin-bottom: 8px; text-transform: uppercase; }
+    .key-value { font-family: monospace; font-size: 20px; font-weight: 900; color: #67e8f9; letter-spacing: 0.1em; word-break: break-all; }
+    .alert-box { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 14px; font-size: 12px; color: #fde68a; margin-top: 24px; }
+    .footer { background: #020409; padding: 20px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #1e293b; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="badge">KONFIRMASI RESMI PENDAFTARAN</div>
+      <h1>Veroia Enterprise Corp</h1>
+      <p class="subtitle">Sertifikat Hak Akses & Kunci Kriptografis Brankas Karya</p>
+    </div>
+    <div class="content">
+      <p>Yth. <strong>${createdVault.creator_name}</strong>,</p>
+      <p>Pendaftaran akun brankas karya Anda telah berhasil diproses dan terhubung ke Ruang Kontrol Admin serta sistem katalog terenkripsi kami.</p>
+      
+      <table class="table-data">
+        <tr><td class="label">Pemilik</td><td class="val">${createdVault.creator_name} (@${createdVault.creator_handle})</td></tr>
+        <tr><td class="label">Email Pendaftar</td><td class="val">${createdVault.email}</td></tr>
+        <tr><td class="label">Nama Brankas</td><td class="val">${createdVault.vault_name}</td></tr>
+        <tr><td class="label">ID Brankas (UUID)</td><td class="val">${createdVault.id}</td></tr>
+        <tr><td class="label">Enklave Keamanan</td><td class="val">${createdVault.security_level}</td></tr>
+        <tr><td class="label">Waktu Diterbitkan</td><td class="val">${createdVault.created_at}</td></tr>
+        <tr><td class="label">Status Ruang Admin</td><td class="val" style="color: #34d399;">TERHUBUNG & AKTIF</td></tr>
+      </table>
+
+      <div class="key-box">
+        <div class="key-label">KUNCI AKSES BRANKAS PRIBADI (ZERO-KNOWLEDGE):</div>
+        <div class="key-value">${generatedKey}</div>
+      </div>
+
+      <div class="alert-box">
+        <strong>PENTING:</strong> Kunci kriptografis ini tidak pernah disimpan dalam teks biasa di server VEC demi melindungi hak cipta dan privasi Anda. Simpan berkas ini dengan aman.
+      </div>
+    </div>
+    <div class="footer">
+      &copy; 2026 Veroia Enterprise Corp (VEC) · Sistem Keamanan Seni Terenkripsi
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Surat_Konfirmasi_Email_VEC_${createdVault.creator_handle.replace('@', '')}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleDownloadKeyFile = () => {
@@ -371,6 +498,75 @@ PERINGATAN KEAMANAN TINGGI (ZERO-KNOWLEDGE VAULT):
                   >
                     <Download className="w-3.5 h-3.5 text-neutral-400" />
                     <span>Unduh Cadangan (.key)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Live Connectivity: Admin Control Room & Registrant Email */}
+              <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-950/40 via-teal-950/30 to-slate-950 border border-emerald-500/40 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <span>Konfirmasi Terhubung ke Email Pendaftar</span>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      </div>
+                      <div className="text-[11px] text-emerald-300 font-mono">
+                        {createdVault?.email}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-bold uppercase">
+                    Terkoneksi
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Pendaftaran ini telah resmi dicatat di <strong>Ruangan Kontrol Admin Vecmaster</strong> (Direktori Pengguna & Log Audit Keamanan). Anda dapat langsung membuka email client atau mengunduh salinan surat digital di bawah ini:
+                </p>
+
+                {/* Email Action Buttons */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleOpenEmailClient}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white shadow transition cursor-pointer"
+                    title="Buka aplikasi email pendaftar dengan draft sertifikat resmi"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Kirim ke Email Saya</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadEmailHtml}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-cyan-200 border border-cyan-800/60 shadow transition cursor-pointer"
+                    title="Unduh surat konfirmasi berformat HTML lengkap"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Unduh Surat (.html)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyEmailText}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 shadow transition cursor-pointer"
+                    title="Salin seluruh draf isi email ke clipboard"
+                  >
+                    {copiedEmailText ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Teks Disalin!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Salin Isi Email</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

@@ -11,6 +11,11 @@ export interface RegisteredUser {
   registeredAt: string;
   lastLoginAt: string;
   status: 'active' | 'suspended' | 'locked';
+  vaultId?: string;
+  vaultName?: string;
+  keyPrefix?: string;
+  emailConfirmationSent?: boolean;
+  emailConfirmationSentAt?: string;
 }
 
 export interface GuestStatistics {
@@ -332,17 +337,70 @@ export function addNewRegisteredUser(user: Omit<RegisteredUser, 'id' | 'storageU
     privatePhotoCount: 0,
     registeredAt: new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC',
     lastLoginAt: 'Belum pernah login',
-    status: 'active'
+    status: 'active',
+    emailConfirmationSent: user.emailConfirmationSent !== undefined ? user.emailConfirmationSent : true,
+    emailConfirmationSentAt: user.emailConfirmationSentAt || new Date().toISOString()
   };
-  const updated = [newUser, ...users];
+  const updated = [newUser, ...users.filter(u => u.email.toLowerCase() !== newUser.email.toLowerCase())];
   saveRegisteredUsers(updated);
   recordUserActivity(
     'new_user',
     newUser.name,
     newUser.email,
-    `Pendaftaran akun baru dengan peran ${newUser.role} (Alokasi: ${formatBytes(newUser.storageQuotaBytes)})`
+    `Pendaftaran akun baru: ${newUser.name} (${newUser.role}). Email sertifikat terkirim ke: ${newUser.email}`
   );
+  recordAuditLog(
+    'Pendaftaran Akun Baru',
+    'SUCCESS',
+    `Pendaftar baru ${newUser.name} (${newUser.email}). Kunci akses brankas diterbitkan dan dikirimkan.`
+  );
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vec-user-registered', { detail: newUser }));
+    window.dispatchEvent(new Event('storage'));
+  }
   return newUser;
+}
+
+export function resendUserEmailConfirmation(userId: string): { success: boolean; user?: RegisteredUser; message: string } {
+  const users = getRegisteredUsers();
+  const target = users.find(u => u.id === userId);
+  if (!target) {
+    return { success: false, message: 'Pendaftar tidak ditemukan.' };
+  }
+
+  const nowIso = new Date().toISOString();
+  const updatedUser: RegisteredUser = {
+    ...target,
+    emailConfirmationSent: true,
+    emailConfirmationSentAt: nowIso
+  };
+
+  const updatedUsers = users.map(u => u.id === userId ? updatedUser : u);
+  saveRegisteredUsers(updatedUsers);
+
+  recordUserActivity(
+    'status_toggle',
+    target.name,
+    target.email,
+    `Email konfirmasi sertifikat kunci dikirim ulang ke: ${target.email}`
+  );
+
+  recordAuditLog(
+    'Kirim Ulang Email Konfirmasi',
+    'SUCCESS',
+    `Sertifikat kunci brankas dikirim ulang ke ${target.email} (${target.name}) oleh Vecmaster Admin.`
+  );
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vec-user-registered', { detail: updatedUser }));
+    window.dispatchEvent(new Event('storage'));
+  }
+
+  return { 
+    success: true, 
+    user: updatedUser, 
+    message: `Email konfirmasi kunci brankas berhasil dikirim ulang ke ${target.email}` 
+  };
 }
 
 export function checkAdminSession(): boolean {

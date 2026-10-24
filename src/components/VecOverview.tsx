@@ -8,14 +8,17 @@ import {
   Award,
   CheckCircle2,
   Fingerprint,
-  Layers
+  Layers,
+  KeyRound,
+  Mail
 } from 'lucide-react';
 
 interface VecOverviewProps {
   onNavigate: (tab: string) => void;
+  onOpenRegisterModal?: () => void;
 }
 
-export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate }) => {
+export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegisterModal }) => {
   return (
     <div className="space-y-20 py-4 font-sans text-neutral-100">
       
@@ -79,6 +82,17 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate }) => {
                 <Lock className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Brankas Koleksi Pribadi</span>
               </button>
+
+              {onOpenRegisterModal && (
+                <button
+                  onClick={onOpenRegisterModal}
+                  className="inline-flex items-center gap-2 px-4 py-3 rounded-xl text-xs sm:text-sm font-semibold text-cyan-200 hover:text-white bg-cyan-950/70 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 transition cursor-pointer shadow-lg shadow-cyan-950/50"
+                  title="Daftar akun dan terbitkan kunci brankas baru"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Daftar Brankas Baru</span>
+                </button>
+              )}
             </div>
 
             {/* Trust Markers */}
@@ -160,6 +174,52 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate }) => {
           </div>
         </div>
 
+      </section>
+
+      {/* ------------------------------------------------------------- */}
+      {/* REGISTRATION & VAULT IDENTITY CONNECTOR BANNER                */}
+      {/* ------------------------------------------------------------- */}
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#071326] via-[#040a14] to-[#02050b] border border-cyan-500/40 p-6 sm:p-8 lg:p-10 shadow-2xl">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
+          <div className="space-y-3 text-center lg:text-left">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-semibold">
+              <KeyRound className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Sistem Pendaftaran Brankas Terenkripsi Multi-Tenant</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight">
+              Pendaftaran Mandiri: Terhubung Langsung ke Ruang Admin & Email
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-300 max-w-2xl leading-relaxed">
+              Daftarkan brankas karya pribadi Anda dalam satu langkah. Sistem langsung menerbitkan kunci akses kriptografis SHA-256 yang aman, otomatis tersinkronisasi ke <strong>Ruangan Kontrol Admin Vecmaster</strong>, dan mengirimkan salinan sertifikat resmi langsung ke <strong>email pendaftar</strong>.
+            </p>
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-1 text-xs text-neutral-400 font-medium">
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Terhubung Web Resmi VEC
+              </span>
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Tercatat di Kontrol Admin
+              </span>
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Konfirmasi ke Email Pendaftar
+              </span>
+            </div>
+          </div>
+
+          {onOpenRegisterModal && (
+            <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={onOpenRegisterModal}
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-cyan-600 via-cyan-500 to-blue-600 hover:from-cyan-500 hover:to-blue-500 transition shadow-lg shadow-cyan-950/60 cursor-pointer"
+              >
+                <KeyRound className="w-4 h-4" />
+                <span>Daftar Brankas Karya Baru</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* ------------------------------------------------------------- */}
@@ -468,6 +528,16 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate }) => {
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-3 shrink-0">
+          {onOpenRegisterModal && (
+            <button
+              onClick={onOpenRegisterModal}
+              className="px-5 py-3 rounded-xl text-xs sm:text-sm font-semibold text-cyan-200 hover:text-white bg-cyan-950/70 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 transition cursor-pointer shadow-lg shadow-cyan-950/50 flex items-center gap-2"
+            >
+              <KeyRound className="w-4 h-4 text-cyan-400" />
+              <span>Daftar Brankas Baru</span>
+            </button>
+          )}
+
           <button
             onClick={() => onNavigate('studio')}
             className="px-6 py-3 rounded-xl text-xs sm:text-sm font-semibold text-white bg-cyan-600 hover:bg-cyan-500 transition shadow-lg shadow-cyan-950/50 cursor-pointer"

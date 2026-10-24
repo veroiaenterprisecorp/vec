@@ -3,7 +3,8 @@ import { supabase } from '../lib/supabase';
 import { 
   initVaultAsync, 
   PrivateVaultItem,
-  purgeAllLocalVaultCache
+  purgeAllLocalVaultCache,
+  getPublicVaultItems
 } from '../lib/userVaultStorage';
 import { 
   ShieldCheck, 
@@ -113,88 +114,125 @@ export const VecVault: React.FC<VecVaultProps> = ({
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [interactions, setInteractions] = useState<InteractionItem[]>([]);
 
-  // Pure Supabase: Sole Source of Truth (No Hybrid)
+  // Siklus Terhubung: Menampilkan seluruh gambar yang diizinkan (Publik/Diterbitkan)
+  // Aturan Mutlak: Meskipun brankas terkunci, karya yang diizinkan HARUS TETAP MUNCUL DI VAULT
   const loadPublishedArtworks = async () => {
     setIsRefreshing(true);
     try {
-      const { data: postsData, error } = await supabase
-        .from('posts')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
+      // 1. Ambil karya berstatus publik / diizinkan dari sistem penyimpanan lokal
+      const localPermitted = getPublicVaultItems();
+      const localArtworks: VaultArtwork[] = localPermitted.map((item) => {
+        let mUrl = item.photoUrl || '';
+        if (mUrl.startsWith('/src/assets/')) {
+          mUrl = mUrl.replace('/src/assets/', '/assets/');
+        }
+        return {
+          id: item.id,
+          title: item.title || 'Tangkapan C2PA Publik',
+          artist: item.creatorName || 'VEC Master Curator',
+          artistRole: `Kreator • ${item.vaultName || 'Brankas Karya'}`,
+          medium: 'Sensor CMOS RAW Attested',
+          dimensions: item.resolution || '1920 × 1080 piksel',
+          photoUrl: mUrl,
+          authenticityScore: 99.40,
+          digest: item.digest || 'hash',
+          c2paSignature: item.c2paSignature || 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
+          deviceInfo: item.deviceInfo || 'VEC Hardware Sensor Enclave',
+          curationNumber: `VEC-SDB-${(item.id || '001').slice(0, 4).toUpperCase()}`,
+          description: item.description 
+            ? item.description 
+            : `Karya seni terverifikasi C2PA resmi dari ${item.vaultName || 'Brankas Karya'}.`,
+          isUserUploaded: true,
+          publishedAt: item.captureDate || 'Terverifikasi',
+          storageTarget: item.storageTarget || 'cloud_supabase',
+          cloudBucket: item.cloudBucket || 'vec-captures'
+        };
+      });
 
-      if (error) {
-        console.warn('Supabase catalog query error:', error.message);
-        setArtworks([]);
-        setSelectedArtworkId('');
-        return;
+      // 2. Ambil karya publik dari Supabase cloud jika terhubung
+      let remoteArtworks: VaultArtwork[] = [];
+      try {
+        const { data: postsData, error } = await supabase
+          .from('posts')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (!error && postsData && postsData.length > 0) {
+          remoteArtworks = postsData
+            .filter((post: any) => {
+              if (post.is_destroyed === true || post.destroyed_at) return false;
+              const telemetry = post.sensor_telemetry || {};
+              const isExplicitPrivate = telemetry.is_private === true;
+              const isExplicitPublished = post.is_published === true || telemetry.is_published === true;
+              
+              if (isExplicitPrivate || !isExplicitPublished) return false;
+
+              const d = (post.c2pa_manifest_hash || post.raw_capture_digest || '').trim().toLowerCase();
+              const t = (post.title || '').trim().toLowerCase();
+              const u = (post.media_url || '').trim();
+              const pid = post.id;
+              const curation = `VEC-SDB-${(post.id || '').slice(0, 4).toUpperCase()}`;
+
+              return !isArtworkPermanentlyDestroyed({
+                id: pid,
+                digest: d,
+                title: t,
+                photoUrl: u,
+                curationNumber: curation
+              });
+            })
+            .map((post: any) => {
+              let mUrl = post.media_url || '';
+              if (mUrl.startsWith('/src/assets/')) {
+                mUrl = mUrl.replace('/src/assets/', '/assets/');
+              }
+              const telemetry = post.sensor_telemetry || {};
+              const creatorName = telemetry.creator_name || post.author_name || 'Kolektor Terverifikasi';
+              const vaultName = telemetry.vault_name || 'Brankas Karya';
+
+              return {
+                id: post.id,
+                title: post.title || 'Tangkapan C2PA Publik',
+                artist: creatorName,
+                artistRole: `Kreator • ${vaultName}`,
+                medium: 'Sensor CMOS RAW Attested',
+                dimensions: telemetry.resolution || '1920 × 1080 piksel',
+                photoUrl: mUrl,
+                authenticityScore: Number(post.authenticity_confidence || 99.40),
+                digest: post.c2pa_manifest_hash || post.raw_capture_digest || 'hash',
+                c2paSignature: post.hardware_tee_signature || 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
+                deviceInfo: `${post.camera_make || 'Sony'} ${post.camera_model || 'Alpha C2PA'}`,
+                curationNumber: `VEC-SDB-${post.id.slice(0, 4).toUpperCase()}`,
+                description: post.caption 
+                  ? `${post.caption} (Diterbitkan resmi dari ${vaultName})`
+                  : `Karya seni terverifikasi C2PA diterbitkan dari ${vaultName} oleh ${creatorName}.`,
+                isUserUploaded: true,
+                publishedAt: new Date(post.created_at).toLocaleDateString('id-ID'),
+                storageTarget: 'cloud_supabase',
+                cloudBucket: 'vec-captures'
+              };
+            });
+        }
+      } catch (err) {
+        console.warn('Supabase catalog fetch note:', err);
       }
 
-      if (!postsData || postsData.length === 0) {
-        setArtworks([]);
-        setSelectedArtworkId('');
-        return;
-      }
+      // 3. Gabungkan karya lokal yang diizinkan dan karya remote Supabase tanpa duplikasi
+      const map = new Map<string, VaultArtwork>();
+      remoteArtworks.forEach((a) => map.set(a.id, a));
+      localArtworks.forEach((a) => {
+        if (!map.has(a.id)) {
+          map.set(a.id, a);
+        }
+      });
 
-      const publishedList: VaultArtwork[] = postsData
-        .filter((post: any) => {
-          if (post.is_destroyed === true || post.destroyed_at) return false;
-          
-          // Siklus Inti: Katalog Karya HANYA menampilkan karya yang telah di-PUBLISH dari brankas karya
-          const telemetry = post.sensor_telemetry || {};
-          const isExplicitPrivate = telemetry.is_private === true;
-          const isExplicitPublished = post.is_published === true || telemetry.is_published === true;
-          
-          if (isExplicitPrivate || !isExplicitPublished) return false;
-
-          const d = (post.c2pa_manifest_hash || post.raw_capture_digest || '').trim().toLowerCase();
-          const t = (post.title || '').trim().toLowerCase();
-          const u = (post.media_url || '').trim();
-          const pid = post.id;
-          const curation = `VEC-SDB-${(post.id || '').slice(0, 4).toUpperCase()}`;
-
-          if (isArtworkPermanentlyDestroyed({
-            id: pid,
-            digest: d,
-            title: t,
-            photoUrl: u,
-            curationNumber: curation
-          })) {
-            return false;
-          }
-          return true;
-        })
-        .map((post: any) => {
-          let mUrl = post.media_url || '';
-          if (mUrl.startsWith('/src/assets/')) {
-            mUrl = mUrl.replace('/src/assets/', '/assets/');
-          }
-          const telemetry = post.sensor_telemetry || {};
-          const creatorName = telemetry.creator_name || post.author_name || 'Kolektor Terverifikasi';
-          const vaultName = telemetry.vault_name || 'Brankas Karya';
-
-          return {
-            id: post.id,
-            title: post.title || 'Tangkapan C2PA Publik',
-            artist: creatorName,
-            artistRole: `Kreator • ${vaultName}`,
-            medium: 'Sensor CMOS RAW Attested',
-            dimensions: telemetry.resolution || '1920 × 1080 piksel',
-            photoUrl: mUrl,
-            authenticityScore: Number(post.authenticity_confidence || 99.40),
-            digest: post.c2pa_manifest_hash || post.raw_capture_digest || 'hash',
-            c2paSignature: post.hardware_tee_signature || 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
-            deviceInfo: `${post.camera_make || 'Sony'} ${post.camera_model || 'Alpha C2PA'}`,
-            curationNumber: `VEC-SDB-${post.id.slice(0, 4).toUpperCase()}`,
-            description: post.caption 
-              ? `${post.caption} (Diterbitkan resmi dari ${vaultName})`
-              : `Karya seni terverifikasi C2PA diterbitkan dari ${vaultName} oleh ${creatorName}.`,
-            isUserUploaded: true,
-            publishedAt: new Date(post.created_at).toLocaleDateString('id-ID'),
-            storageTarget: 'cloud_supabase',
-            cloudBucket: 'vec-captures'
-          };
-        });
+      const publishedList = Array.from(map.values()).filter((a) => !isArtworkPermanentlyDestroyed({
+        id: a.id,
+        digest: a.digest,
+        title: a.title,
+        photoUrl: a.photoUrl
+      }));
 
       setArtworks(publishedList);
       if (publishedList.length > 0) {
@@ -205,9 +243,7 @@ export const VecVault: React.FC<VecVaultProps> = ({
         setSelectedArtworkId('');
       }
     } catch (e) {
-      console.warn('Error loading published artworks from Supabase:', e);
-      setArtworks([]);
-      setSelectedArtworkId('');
+      console.warn('Error loading published artworks:', e);
     } finally {
       setIsRefreshing(false);
     }
@@ -271,11 +307,16 @@ export const VecVault: React.FC<VecVaultProps> = ({
       }
       loadPublishedArtworks();
     };
+
     window.addEventListener('vec-vault-updated', handleStorageChange);
+    window.addEventListener('vec-vault-lock-state-changed', handleStorageChange);
+    window.addEventListener('vec-lock-state-changed', handleStorageChange);
     window.addEventListener('vec-artwork-destroyed', handleDestroyed);
     window.addEventListener('storage', handleStorageChange);
     return () => {
       window.removeEventListener('vec-vault-updated', handleStorageChange);
+      window.removeEventListener('vec-vault-lock-state-changed', handleStorageChange);
+      window.removeEventListener('vec-lock-state-changed', handleStorageChange);
       window.removeEventListener('vec-artwork-destroyed', handleDestroyed);
       window.removeEventListener('storage', handleStorageChange);
     };

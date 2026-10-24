@@ -1,4 +1,4 @@
-import { getSupabaseUrl, getSupabaseAnonKey, getActiveSupabaseClient, getSupabaseConfigOrigin } from './supabase';
+import { getSupabaseUrl, getSupabaseAnonKey, getActiveSupabaseClient } from './supabase';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { PrivateVaultItem, updateVaultItemCloudStatus, deletePrivateVaultItem } from './userVaultStorage';
 
@@ -141,7 +141,7 @@ export const checkSupabaseConnection = async (): Promise<{
   advice?: string;
 }> => {
   const url = getSupabaseUrl();
-  const configOrigin = getSupabaseConfigOrigin();
+  const configOrigin = (await import('./supabase')).getSupabaseConfigOrigin();
   const client = getActiveSupabaseClient();
   const bucketName = getStorageBucketName();
 

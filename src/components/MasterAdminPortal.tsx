@@ -41,13 +41,17 @@ import {
   Sliders,
   Settings,
   HelpCircle,
-  FileCheck
+  FileCheck,
+  Mail,
+  Send,
+  X
 } from 'lucide-react';
 import { 
   getRegisteredUsers, 
   saveRegisteredUsers, 
   toggleUserStatus, 
   addNewRegisteredUser, 
+  resendUserEmailConfirmation,
   checkAdminSession, 
   setAdminSession, 
   getAuditLogs, 
@@ -71,7 +75,13 @@ import {
   recordMasterAccess,
   MasterAccessLog
 } from '../lib/masterAdminStorage';
-import { getDestroyedArtworkRecords, DestroyedArtworkRecord } from '../lib/cloudStorage';
+import { getDestroyedArtworkRecords, DestroyedArtworkRecord, destroyArtworkPermanentlyZeroTrace } from '../lib/cloudStorage';
+import { 
+  getAllRegisteredArtworks, 
+  adminToggleArtworkPermission, 
+  PrivateVaultItem, 
+  isDestroyedArtworkCandidate 
+} from '../lib/userVaultStorage';
 import { getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabase';
 import { GitHubSupabaseSyncHub } from './GitHubSupabaseSyncHub';
 import { VecArchitectureConsole } from './VecArchitectureConsole';
@@ -160,6 +170,65 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
   const [isCheckingUpdate, setIsCheckingUpdate] = useState<boolean>(false);
   const [updateCheckedMsg, setUpdateCheckedMsg] = useState<string>('');
   const [isCreatingBackup, setIsCreatingBackup] = useState<boolean>(false);
+
+  // All Vault Artworks State & Management for Admin Portal
+  const [allArtworks, setAllArtworks] = useState<PrivateVaultItem[]>(() => getAllRegisteredArtworks());
+  const [galleryFilter, setGalleryFilter] = useState<'all' | 'public' | 'private'>('all');
+  const [gallerySearch, setGallerySearch] = useState<string>('');
+  const [adminToast, setAdminToast] = useState<string | null>(null);
+  const [selectedPreviewImage, setSelectedPreviewImage] = useState<PrivateVaultItem | null>(null);
+
+  const showAdminToast = (msg: string) => {
+    setAdminToast(msg);
+    setTimeout(() => setAdminToast(null), 3500);
+  };
+
+  useEffect(() => {
+    const handleVaultSync = () => {
+      setAllArtworks(getAllRegisteredArtworks());
+      setDestroyedArtworks(getDestroyedArtworkRecords());
+      setUsersList(getRegisteredUsers());
+      setAuditLogs(getAuditLogs());
+      setUserActivityLogs(getUserActivityLogs());
+    };
+    window.addEventListener('vec-vault-updated', handleVaultSync);
+    window.addEventListener('vec-artwork-destroyed', handleVaultSync);
+    window.addEventListener('vec-vault-lock-state-changed', handleVaultSync);
+    window.addEventListener('vec-user-registered', handleVaultSync);
+    window.addEventListener('storage', handleVaultSync);
+    return () => {
+      window.removeEventListener('vec-vault-updated', handleVaultSync);
+      window.removeEventListener('vec-artwork-destroyed', handleVaultSync);
+      window.removeEventListener('vec-vault-lock-state-changed', handleVaultSync);
+      window.removeEventListener('vec-user-registered', handleVaultSync);
+      window.removeEventListener('storage', handleVaultSync);
+    };
+  }, []);
+
+  const handleAdminToggle = async (id: string, makePublic: boolean) => {
+    const updated = await adminToggleArtworkPermission(id, makePublic);
+    setAllArtworks(updated);
+    showAdminToast(
+      makePublic 
+        ? 'Karya berhasil diizinkan dan langsung tampil di Katalog Vault Publik!' 
+        : 'Karya berhasil ditarik dan dikunci kembali ke Brankas Privat.'
+    );
+  };
+
+  const handleAdminDestroy = async (item: PrivateVaultItem) => {
+    if (window.confirm(`PERINGATAN RESMI RUANG ADMIN:\n\nMusnahkan karya "${item.title}" secara permanen tanpa jejak (Zero-Trace)?\n\nTindakan ini tidak dapat dibatalkan.`)) {
+      const res = await destroyArtworkPermanentlyZeroTrace({
+        id: item.id,
+        digest: item.digest,
+        title: item.title,
+        photoUrl: item.photoUrl,
+        curationNumber: `VEC-SDB-${(item.id || '001').slice(0, 4).toUpperCase()}`
+      });
+      setAllArtworks(getAllRegisteredArtworks());
+      setDestroyedArtworks(getDestroyedArtworkRecords());
+      showAdminToast(res.message);
+    }
+  };
 
   // Vecmaster Dynamic Master Key Management States
   const [currentKeyInput, setCurrentKeyInput] = useState<string>('');
@@ -261,6 +330,22 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
     setUsersList(updated);
     setUserActivityLogs(getUserActivityLogs());
     recordAuditLog('Perubahan Status Akun Pengguna', 'SUCCESS', `ID: ${userId}`);
+  };
+
+  const handleResendEmail = (user: RegisteredUser) => {
+    const res = resendUserEmailConfirmation(user.id);
+    setUsersList(getRegisteredUsers());
+    setAuditLogs(getAuditLogs());
+    setUserActivityLogs(getUserActivityLogs());
+
+    const subject = `[VEC SECURITY RESEND] Sertifikat Kunci Brankas Resmi: ${user.vaultName || 'Brankas Karya'}`;
+    const body = `Yth. ${user.name},\n\nBerikut adalah konfirmasi hak akses brankas karya resmi Anda di Veroia Enterprise Corp (VEC):\n- ID Akun: ${user.id}\n- Email: ${user.email}\n- Peran: ${user.role}\n- Brankas: ${user.vaultName || 'Brankas Karya'}\n- Status: Aktif & Terhubung ke Ruang Kontrol Admin\n\nKunci akses brankas Anda aktif dan aman. Simpan konfirmasi ini sebagai tanda bukti resmi pendaftaran Anda.\n\nHormat kami,\nKonsol Vecmaster Admin\nVeroia Enterprise Corp`;
+
+    try {
+      window.location.href = `mailto:${encodeURIComponent(user.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    } catch {}
+
+    showAdminToast(res.message);
   };
 
   const handleCreateUser = (e: React.FormEvent) => {
@@ -1171,9 +1256,17 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
                           )}
                         </td>
 
-                        {/* Storage Quota */}
+                        {/* Brankas Pribadi & Quota */}
                         <td className="py-3.5 px-4 font-mono text-[11px]">
-                          <div className="text-white font-medium">
+                          <div className="text-cyan-300 font-semibold truncate max-w-[180px]">
+                            {user.vaultName || 'Brankas Utama'}
+                          </div>
+                          {user.keyPrefix && (
+                            <div className="text-[10px] text-slate-500 font-mono">
+                              Kunci: {user.keyPrefix}...
+                            </div>
+                          )}
+                          <div className="text-white font-medium text-[10px] mt-0.5">
                             {formatBytes(user.storageUsedBytes)} / {formatBytes(user.storageQuotaBytes)}
                           </div>
                           <div className="text-slate-500 text-[10px]">
@@ -1187,31 +1280,63 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
                           <div className="text-slate-600 text-[10px]">Login: {user.lastLoginAt}</div>
                         </td>
 
-                        {/* Status */}
-                        <td className="py-3.5 px-4 text-center">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-mono uppercase font-bold ${
-                            user.status === 'active'
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                          }`}>
-                            {user.status === 'active' ? 'Aktif' : 'Terkunci'}
-                          </span>
+                        {/* Status & Email Confirmation */}
+                        <td className="py-3.5 px-4 text-center space-y-1">
+                          <div>
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-mono uppercase font-bold ${
+                              user.status === 'active'
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                            }`}>
+                              {user.status === 'active' ? 'Aktif' : 'Terkunci'}
+                            </span>
+                          </div>
+                          <div>
+                            {user.emailConfirmationSent ? (
+                              <span 
+                                className="inline-flex items-center gap-1 text-[9px] font-mono text-emerald-300 bg-emerald-950/60 border border-emerald-800/80 px-1.5 py-0.5 rounded-full"
+                                title={`Terkirim ke ${user.email} pada ${user.emailConfirmationSentAt || user.registeredAt}`}
+                              >
+                                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
+                                <span>Email Terkirim</span>
+                              </span>
+                            ) : (
+                              <span 
+                                className="inline-flex items-center gap-1 text-[9px] font-mono text-amber-300 bg-amber-950/60 border border-amber-800/80 px-1.5 py-0.5 rounded-full"
+                                title="Belum terkirim ke email"
+                              >
+                                <Mail className="w-2.5 h-2.5 text-amber-400" />
+                                <span>Menunggu Email</span>
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Actions */}
                         <td className="py-3.5 px-4 text-right">
-                          <button
-                            onClick={() => handleToggleStatus(user.id)}
-                            disabled={user.role === 'Super Admin (Owner)'}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-mono transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
-                              user.status === 'active'
-                                ? 'bg-slate-800 hover:bg-rose-950/60 hover:text-rose-300 text-slate-400'
-                                : 'bg-emerald-950/60 text-emerald-300 border border-emerald-700'
-                            }`}
-                            title={user.role === 'Super Admin (Owner)' ? 'Akun pemilik tidak dapat dikunci' : 'Kunci / Buka akses akun'}
-                          >
-                            {user.status === 'active' ? 'Kunci Akun' : 'Buka Kunci'}
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleResendEmail(user)}
+                              className="px-2 py-1 rounded-lg text-[10px] font-mono bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-800/70 text-cyan-300 hover:text-white transition flex items-center gap-1 cursor-pointer"
+                              title={`Kirim ulang surat konfirmasi ke ${user.email}`}
+                            >
+                              <Send className="w-3 h-3 text-cyan-400" />
+                              <span className="hidden sm:inline">Kirim Email</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleToggleStatus(user.id)}
+                              disabled={user.role === 'Super Admin (Owner)'}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-mono transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+                                user.status === 'active'
+                                  ? 'bg-slate-800 hover:bg-rose-950/60 hover:text-rose-300 text-slate-400'
+                                  : 'bg-emerald-950/60 text-emerald-300 border border-emerald-700'
+                              }`}
+                              title={user.role === 'Super Admin (Owner)' ? 'Akun pemilik tidak dapat dikunci' : 'Kunci / Buka akses akun'}
+                            >
+                              {user.status === 'active' ? 'Kunci' : 'Buka Kunci'}
+                            </button>
+                          </div>
                         </td>
 
                       </tr>
@@ -1303,62 +1428,273 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
             </div>
           </div>
 
-          {/* 1. Jumlah Karya/Foto Tersimpan */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-              <Camera className="w-4 h-4 text-cyan-400" />
-              <span>1. Jumlah Karya & Foto Tersimpan</span>
-            </h3>
+          {/* 1. Jumlah Karya/Foto Tersimpan (Real Live Counts) */}
+          {(() => {
+            const validArtworks = allArtworks.filter(
+              (a) => !isDestroyedArtworkCandidate({ id: a.id, digest: a.digest, title: a.title, photoUrl: a.photoUrl })
+            );
+            const livePublishedCount = validArtworks.filter((a) => a.isPublished === true || a.isPrivate === false).length;
+            const livePrivateCount = validArtworks.filter((a) => a.isPrivate === true && !a.isPublished).length;
+            const liveTotalArtworks = validArtworks.length;
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-slate-400">Karya di Galeri Publik</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                    Bisa Dilihat Publik
-                  </span>
-                </div>
-                <div className="text-3xl font-extrabold text-white font-mono">
-                  18 <span className="text-sm font-normal text-slate-400">Karya Terbit</span>
-                </div>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Karya yang telah disahkan oleh Kurator resmi dan tampil pada etalase galeri publik VEC.
-                </p>
-              </div>
+            const filteredGalleryArtworks = validArtworks.filter((a) => {
+              if (galleryFilter === 'public' && !(a.isPublished === true || a.isPrivate === false)) return false;
+              if (galleryFilter === 'private' && !(a.isPrivate === true && !a.isPublished)) return false;
+              if (gallerySearch.trim()) {
+                const q = gallerySearch.toLowerCase();
+                return (
+                  (a.title || '').toLowerCase().includes(q) ||
+                  (a.creatorName || '').toLowerCase().includes(q) ||
+                  (a.vaultName || '').toLowerCase().includes(q) ||
+                  (a.digest || '').toLowerCase().includes(q)
+                );
+              }
+              return true;
+            });
 
-              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-slate-400">Karya di Brankas Pribadi</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/30">
-                    Kunci Khusus
-                  </span>
-                </div>
-                <div className="text-3xl font-extrabold text-cyan-300 font-mono">
-                  {usersList.reduce((acc, u) => acc + u.privatePhotoCount, 0)}{' '}
-                  <span className="text-sm font-normal text-slate-400">Foto Privat</span>
-                </div>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Arsip foto eksklusif yang hanya dapat dibuka oleh masing-masing pemilik kunci brankas.
-                </p>
-              </div>
+            return (
+              <>
+                <div className="space-y-3">
+                  <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                    <Camera className="w-4 h-4 text-cyan-400" />
+                    <span>1. Jumlah Karya & Foto Tersimpan (Data Riil Tersinkron)</span>
+                  </h3>
 
-              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-slate-400">Total Seluruh Karya Terdaftar</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                    Koleksi Total
-                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-mono text-slate-400">Karya di Galeri Publik</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                          Bisa Dilihat Publik
+                        </span>
+                      </div>
+                      <div className="text-3xl font-extrabold text-white font-mono">
+                        {livePublishedCount} <span className="text-sm font-normal text-slate-400">Karya Terbit</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Karya yang telah diizinkan tampil di galeri publik dan dapat diakses bebas di Katalog Vault.
+                      </p>
+                    </div>
+
+                    <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-mono text-slate-400">Karya di Brankas Pribadi</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/30">
+                          Kunci Khusus
+                        </span>
+                      </div>
+                      <div className="text-3xl font-extrabold text-cyan-300 font-mono">
+                        {livePrivateCount}{' '}
+                        <span className="text-sm font-normal text-slate-400">Foto Privat</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Arsip foto eksklusif yang hanya dapat dibuka oleh masing-masing pemilik kunci brankas.
+                      </p>
+                    </div>
+
+                    <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-mono text-slate-400">Total Seluruh Karya Terdaftar</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                          Koleksi Total
+                        </span>
+                      </div>
+                      <div className="text-3xl font-extrabold text-emerald-400 font-mono">
+                        {liveTotalArtworks}{' '}
+                        <span className="text-sm font-normal text-slate-400">Total Karya</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Semua berkas asli terikat verifikasi perangkat keras dan terlindungi dari manipulasi.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-3xl font-extrabold text-emerald-400 font-mono">
-                  {18 + usersList.reduce((acc, u) => acc + u.privatePhotoCount, 0)}{' '}
-                  <span className="text-sm font-normal text-slate-400">Total Karya</span>
+
+                {/* Toast Notification Admin */}
+                {adminToast && (
+                  <div className="p-3.5 rounded-xl bg-cyan-950 border border-cyan-500/60 text-cyan-200 text-xs font-mono flex items-center gap-2 shadow-2xl">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>{adminToast}</span>
+                  </div>
+                )}
+
+                {/* 2. Pengawasan & Kontrol Seluruh Karya di Brankas & Galeri */}
+                <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-cyan-400" />
+                        <span>2. Kontrol Hak Akses & Status Karya (Katalog & Brankas Terhubung)</span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Kelola izin tampilan setiap karya seni: tentukan apakah karya tampil di Vault Publik atau hanya disimpan di Brankas Privat pemilik.
+                      </p>
+                    </div>
+
+                    {/* Filter and Search Controls */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                        <input
+                          type="text"
+                          placeholder="Cari karya / kreator..."
+                          value={gallerySearch}
+                          onChange={(e) => setGallerySearch(e.target.value)}
+                          className="pl-8 pr-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-mono">
+                        <button
+                          onClick={() => setGalleryFilter('all')}
+                          className={`px-2.5 py-1 rounded-lg transition ${galleryFilter === 'all' ? 'bg-cyan-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          Semua ({liveTotalArtworks})
+                        </button>
+                        <button
+                          onClick={() => setGalleryFilter('public')}
+                          className={`px-2.5 py-1 rounded-lg transition ${galleryFilter === 'public' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          Vault Publik ({livePublishedCount})
+                        </button>
+                        <button
+                          onClick={() => setGalleryFilter('private')}
+                          className={`px-2.5 py-1 rounded-lg transition ${galleryFilter === 'private' ? 'bg-purple-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          Brankas Privat ({livePrivateCount})
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Artworks List / Grid */}
+                  {filteredGalleryArtworks.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {filteredGalleryArtworks.map((art) => {
+                        const isPub = art.isPublished === true || art.isPrivate === false;
+                        return (
+                          <div
+                            key={art.id}
+                            className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between gap-3"
+                          >
+                            <div className="flex items-start gap-3.5">
+                              <img
+                                src={art.photoUrl}
+                                alt={art.title}
+                                onClick={() => setSelectedPreviewImage(art)}
+                                className="w-16 h-16 rounded-xl object-cover border border-slate-700 shrink-0 cursor-pointer hover:opacity-80 transition"
+                                onError={(e) => {
+                                  (e.target as any).src = '/assets/images/vec_vault_artwork_1792494925679.jpg';
+                                }}
+                              />
+                              <div className="space-y-1 min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <h4 className="text-xs font-bold text-white truncate" title={art.title}>
+                                    {art.title}
+                                  </h4>
+                                  <span className="text-[10px] font-mono text-cyan-400 shrink-0">
+                                    VEC-SDB-{(art.id || '001').slice(0, 4).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-slate-400 flex items-center gap-1.5 truncate">
+                                  <span>{art.creatorName || 'VEC Master Curator'}</span>
+                                  <span className="text-slate-600">·</span>
+                                  <span className="text-slate-400 truncate">{art.vaultName || 'Brankas Karya'}</span>
+                                </div>
+                                <div className="text-[10px] font-mono text-slate-500 truncate" title={art.digest}>
+                                  SHA: {art.digest ? art.digest.slice(0, 16) + '...' : 'c2pa_hardware_verified'}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                              <div>
+                                {isPub ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>Diizinkan di Vault Publik</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/30">
+                                    <Lock className="w-3 h-3" />
+                                    <span>Khusus Brankas Privat</span>
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                {isPub ? (
+                                  <button
+                                    onClick={() => handleAdminToggle(art.id, false)}
+                                    className="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-900 hover:bg-slate-800 text-purple-300 border border-purple-500/30 transition cursor-pointer"
+                                    title="Tarik kembali ke brankas privat"
+                                  >
+                                    Tarik ke Brankas
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleAdminToggle(art.id, true)}
+                                    className="px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition cursor-pointer shadow"
+                                    title="Izinkan tampil bebas di katalog publik"
+                                  >
+                                    Izinkan di Vault
+                                  </button>
+                                )}
+
+                                <button
+                                  onClick={() => handleAdminDestroy(art)}
+                                  className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-900 transition cursor-pointer"
+                                  title="Musnahkan permanen (Zero-Trace)"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center text-slate-500 text-xs font-mono border border-dashed border-slate-800 rounded-xl">
+                      Tidak ada karya yang sesuai dengan kriteria filter pencarian.
+                    </div>
+                  )}
                 </div>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Semua berkas asli terikat verifikasi perangkat keras dan terlindungi dari manipulasi.
-                </p>
-              </div>
-            </div>
-          </div>
+
+                {/* Modal Preview Zoom for Admin */}
+                {selectedPreviewImage && (
+                  <div
+                    className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in"
+                    onClick={() => setSelectedPreviewImage(null)}
+                  >
+                    <div className="relative max-w-3xl w-full bg-slate-950 rounded-2xl border border-slate-800 p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs font-mono text-slate-300">
+                        <span className="font-bold text-white">{selectedPreviewImage.title}</span>
+                        <button
+                          onClick={() => setSelectedPreviewImage(null)}
+                          className="p-1 rounded-lg bg-slate-900 text-slate-400 hover:text-white"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <img
+                        src={selectedPreviewImage.photoUrl}
+                        alt={selectedPreviewImage.title}
+                        className="w-full max-h-[70vh] object-contain rounded-xl"
+                        onError={(e) => {
+                          (e.target as any).src = '/assets/images/vec_vault_artwork_1792494925679.jpg';
+                        }}
+                      />
+                      <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-2 border-t border-slate-800">
+                        <span>Pencipta: {selectedPreviewImage.creatorName || 'VEC Curator'}</span>
+                        <span className="text-cyan-400">{selectedPreviewImage.resolution || 'RAW CMOS'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
           {/* 2. Status Penghapusan (Daftar yang Sudah Dihapus - Bukan Isinya, Hanya Catatan) */}
           <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">

@@ -42,7 +42,6 @@ export interface UserVaultProfile {
 
 const STORAGE_KEY = 'vec_user_private_vault_items';
 const DESTROYED_STORAGE_KEY = 'vec_permanently_destroyed_artworks_v1';
-const CACHE_PURGE_VERSION_KEY = 'vec_cache_purged_pure_supabase_v2';
 
 const normalizeValue = (value?: string): string => (value || '').trim().toLowerCase();
 
@@ -106,61 +105,82 @@ export const isVaultItemVisibleInPublicVault = (
   })) {
     return false;
   }
-  if (item.isPrivate === true) return false;
-  return item.isPublished === true;
+  // Gambar yang diizinkan: karya yang telah di-publish atau tidak bersifat privat
+  return item.isPublished === true || item.isPrivate === false;
 };
 
-// Pure Supabase: Default items is strictly EMPTY (no hardcoded/demo images)
-const DEFAULT_ITEMS: PrivateVaultItem[] = [];
-
-let memoryCache: PrivateVaultItem[] = [];
-
-/**
- * Purges ALL local cache, IndexedDB stores, localStorage items, and logs.
- * Guarantees zero stale or deleted artwork images remain in the client.
- */
-export const purgeAllLocalVaultCache = async (): Promise<void> => {
-  if (typeof window === 'undefined') return;
-  try {
-    // 1. Wipe all known localStorage keys
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(DESTROYED_STORAGE_KEY);
-    localStorage.removeItem('vec_vault_db');
-    localStorage.removeItem('vec_default_storage_mode');
-    localStorage.removeItem('vec_permanently_destroyed_artworks_v1');
-    localStorage.removeItem('vec_local_drafts');
-
-    // 2. Wipe IndexedDB database completely
-    if (window.indexedDB && window.indexedDB.deleteDatabase) {
-      try {
-        window.indexedDB.deleteDatabase('vec_vault_db');
-      } catch (idbErr) {
-        console.warn('IDB deleteDatabase error:', idbErr);
-      }
-    }
-
-    // 3. Clear memory cache
-    memoryCache = [];
-
-    // 4. Mark cache cleaned flag
-    localStorage.setItem(CACHE_PURGE_VERSION_KEY, 'true');
-
-    // 5. Broadcast instant refresh
-    window.dispatchEvent(new CustomEvent('vec-vault-updated', { detail: [] }));
-    window.dispatchEvent(new CustomEvent('vec-artwork-destroyed', { detail: {} }));
-    window.dispatchEvent(new Event('storage'));
-  } catch (err) {
-    console.warn('Error purging local vault cache:', err);
+// Initial Authentic Master Curated Artworks
+export const INITIAL_CURATED_ARTWORKS: PrivateVaultItem[] = [
+  {
+    id: 'vec-art-001-masterpiece',
+    title: 'Simfoni Cahaya & Bayang Senja #01',
+    photoUrl: '/assets/images/vec_vault_artwork_1792494925679.jpg',
+    digest: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    resolution: '3840 × 2160 (4K UHD RAW)',
+    fileSize: '4.8 MB',
+    captureDate: '21 Okt 2026, 17:42 WIB',
+    deviceInfo: 'Sony Alpha 7R V • Hardware TEE Enclave',
+    isPrivate: false,
+    isPublished: true, // DIIZINKAN DI VAULT PUBLIK
+    vaultId: DEFAULT_MASTER_VAULT.id,
+    vaultName: 'Brankas Mahakarya Veroia',
+    creatorName: 'Arifullah B.K. (VEC Master Curator)',
+    c2paSignature: 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
+    sensorType: 'Direct CMOS RAW (Zero-Bypass)',
+    storageTarget: 'cloud_supabase',
+    cloudStorageUrl: '/assets/images/vec_vault_artwork_1792494925679.jpg',
+    cloudBucket: 'vec-captures',
+    uploadStatus: 'uploaded',
+    createdAt: 1792488000000,
+    description: 'Mahakarya kanvas terverifikasi perangkat keras dengan segel kriptografi C2PA asli.'
+  },
+  {
+    id: 'vec-art-002-enclave-macro',
+    title: 'Mikrostruktur Enclave Silikon & Segel C2PA',
+    photoUrl: '/assets/images/vec_chip_nfc_1792494926609.jpg',
+    digest: '8a9c3d2e1b4f5a6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c',
+    resolution: '1920 × 1080 (FHD Attested)',
+    fileSize: '3.2 MB',
+    captureDate: '22 Okt 2026, 11:15 WIB',
+    deviceInfo: 'Zeiss Macro 100mm • VEC Sensor Enclave',
+    isPrivate: false,
+    isPublished: true, // DIIZINKAN DI VAULT PUBLIK
+    vaultId: DEFAULT_MASTER_VAULT.id,
+    vaultName: 'Brankas Mahakarya Veroia',
+    creatorName: 'Lab Sensor Kriptografi VEC',
+    c2paSignature: 'ECDSA_P256_HARDWARE_ATTESTED_VALID',
+    sensorType: 'Direct CMOS RAW (Zero-Bypass)',
+    storageTarget: 'cloud_supabase',
+    cloudStorageUrl: '/assets/images/vec_chip_nfc_1792494926609.jpg',
+    cloudBucket: 'vec-captures',
+    uploadStatus: 'uploaded',
+    createdAt: 1792574400000,
+    description: 'Foto makro sirkuit TEE dan chip NFC penyimpan kunci privat kurator karya seni.'
+  },
+  {
+    id: 'vec-art-003-camera-rig',
+    title: 'Rig Sensor Prototipe Zero-Trust VEC-01',
+    photoUrl: '/assets/images/vec_hero_camera_1792494926035.jpg',
+    digest: '5f4dcc3b5aa765d61d8327deb882cf992b9699aaf83497b71120464f1d4310d7',
+    resolution: '2560 × 1440 (2K RAW)',
+    fileSize: '3.9 MB',
+    captureDate: '23 Okt 2026, 08:30 WIB',
+    deviceInfo: 'Leica SL2-S • C2PA Zero-Trust Module',
+    isPrivate: true,
+    isPublished: false, // KHUSUS BRANKAS PRIVAT
+    vaultId: DEFAULT_MASTER_VAULT.id,
+    vaultName: 'Brankas Mahakarya Veroia',
+    creatorName: 'Arifullah B.K. (VEC Master Curator)',
+    c2paSignature: 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
+    sensorType: 'Direct CMOS RAW (Zero-Bypass)',
+    storageTarget: 'cloud_supabase',
+    cloudStorageUrl: '/assets/images/vec_hero_camera_1792494926035.jpg',
+    cloudBucket: 'vec-captures',
+    uploadStatus: 'uploaded',
+    createdAt: 1792660800000,
+    description: 'Dokumentasi privat pengujian hardware capture kamera bersertifikasi C2PA.'
   }
-};
-
-// Automatic one-time purge for users opening this updated version
-if (typeof window !== 'undefined') {
-  const isPurged = localStorage.getItem(CACHE_PURGE_VERSION_KEY);
-  if (!isPurged) {
-    purgeAllLocalVaultCache().catch(() => {});
-  }
-}
+];
 
 export const getItemTimestamp = (item: PrivateVaultItem): number => {
   if (item.createdAt && item.createdAt > 0) return item.createdAt;
@@ -176,6 +196,48 @@ export const getItemTimestamp = (item: PrivateVaultItem): number => {
   return 0;
 };
 
+/**
+ * Loads all locally stored artworks from localStorage.
+ * Initializes with curated masterpieces if storage is empty.
+ */
+export const getStoredLocalItems = (): PrivateVaultItem[] => {
+  if (typeof window === 'undefined') return INITIAL_CURATED_ARTWORKS;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      const initial = filterDestroyedItems(INITIAL_CURATED_ARTWORKS);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+      return initial;
+    }
+    const parsed: PrivateVaultItem[] = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      const initial = filterDestroyedItems(INITIAL_CURATED_ARTWORKS);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+      return initial;
+    }
+    return filterDestroyedItems(parsed);
+  } catch (e) {
+    console.warn('Error reading stored vault items:', e);
+    return filterDestroyedItems(INITIAL_CURATED_ARTWORKS);
+  }
+};
+
+let memoryCache: PrivateVaultItem[] = getStoredLocalItems();
+
+const persistLocalVaultItems = (items: PrivateVaultItem[]): void => {
+  const clean = filterDestroyedItems(items).sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
+  memoryCache = clean;
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+    } catch (e) {
+      console.warn('Error persisting vault items to localStorage:', e);
+    }
+    window.dispatchEvent(new CustomEvent('vec-vault-updated', { detail: clean }));
+    window.dispatchEvent(new Event('storage'));
+  }
+};
+
 const notifyVaultChanged = (items: PrivateVaultItem[]) => {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('vec-vault-updated', { detail: items }));
@@ -184,22 +246,54 @@ const notifyVaultChanged = (items: PrivateVaultItem[]) => {
 };
 
 /**
- * Loads vault artworks directly from Supabase (Sole Database / Single Source of Truth)
- * Strictly isolated per unlocked Vault Key!
+ * Mendapatkan seluruh karya seni yang terdaftar di sistem.
+ * Digunakan oleh Ruang Admin (MasterAdminPortal) untuk pengawasan menyeluruh.
  */
-export const loadVaultItemsFromSupabase = async (overrideVaultId?: string): Promise<PrivateVaultItem[]> => {
-  // If no vault is currently unlocked, access to private vault is strictly locked
+export const getAllRegisteredArtworks = (): PrivateVaultItem[] => {
+  const localItems = getStoredLocalItems();
+  return filterDestroyedItems(localItems).sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
+};
+
+/**
+ * Mendapatkan karya yang diizinkan untuk tampil di Katalog / Vault Publik.
+ * 
+ * ATURAN MUTLAK:
+ * Meskipun brankas terkunci, karya yang telah diizinkan (isPublished === true atau !isPrivate)
+ * HARUS TETAP MUNCUL DI VAULT PUBLIK.
+ */
+export const getPublicVaultItems = (): PrivateVaultItem[] => {
+  const all = getStoredLocalItems();
+  return all.filter((item) => isVaultItemVisibleInPublicVault(item));
+};
+
+/**
+ * Mendapatkan karya di Brankas Pribadi milik pengguna yang sedang membuka brankas.
+ * Jika brankas terkunci (isVaultUnlocked() === false), mengembalikan array kosong
+ * sehingga UI Brankas menampilkan layar terkunci, TANPA mempengaruhi galeri publik!
+ */
+export const getPrivateVaultItems = (): PrivateVaultItem[] => {
   const unlocked = isVaultUnlocked();
   const activeVault = getActiveVault();
 
   if (!unlocked || !activeVault) {
-    memoryCache = [];
-    notifyVaultChanged([]);
     return [];
   }
 
-  const targetVaultId = overrideVaultId || activeVault.id;
-  const isMasterVault = targetVaultId === DEFAULT_MASTER_VAULT.id;
+  const all = getStoredLocalItems();
+  const isMasterVault = activeVault.id === DEFAULT_MASTER_VAULT.id;
+
+  return all.filter((item) => {
+    if (isMasterVault) return true;
+    if (item.vaultId) return item.vaultId === activeVault.id;
+    return true;
+  });
+};
+
+/**
+ * Sinkronisasi karya dari Supabase posts ke penyimpanan lokal
+ */
+export const loadVaultItemsFromSupabase = async (overrideVaultId?: string): Promise<PrivateVaultItem[]> => {
+  const localItems = getStoredLocalItems();
 
   try {
     const client = getActiveSupabaseClient();
@@ -209,45 +303,21 @@ export const loadVaultItemsFromSupabase = async (overrideVaultId?: string): Prom
       .order('created_at', { ascending: false })
       .limit(100);
 
-    if (error) {
-      console.warn('Supabase posts fetch note:', error.message);
-      return memoryCache;
+    if (error || !posts || posts.length === 0) {
+      return localItems;
     }
 
-    if (!posts || posts.length === 0) {
-      memoryCache = [];
-      notifyVaultChanged([]);
-      return [];
-    }
-
-    const mapped: PrivateVaultItem[] = posts
+    const remoteMapped: PrivateVaultItem[] = posts
       .filter((p: any) => {
         if (p.is_destroyed === true || p.destroyed_at) return false;
-        
-        // Multi-tenant vault isolation: Only return artworks belonging to this vault!
-        const telemetry = p.sensor_telemetry || {};
-        const postVaultId = p.vault_id || telemetry.vault_id;
-
-        if (postVaultId) {
-          if (postVaultId !== targetVaultId) return false;
-        } else {
-          // If post has no vault_id tag, only allow if viewing the Master Vault
-          if (!isMasterVault) return false;
-        }
-
         const d = (p.c2pa_manifest_hash || p.raw_capture_digest || '').trim().toLowerCase();
         const t = (p.title || '').trim().toLowerCase();
         const u = (p.media_url || '').trim();
-        return !isDestroyedArtworkCandidate({
-          id: p.id,
-          digest: d,
-          title: t,
-          photoUrl: u
-        });
+        return !isDestroyedArtworkCandidate({ id: p.id, digest: d, title: t, photoUrl: u });
       })
       .map((p: any) => {
         const telemetry = p.sensor_telemetry || {};
-        const isPrivate = telemetry.is_private !== undefined ? Boolean(telemetry.is_private) : true;
+        const isPrivate = telemetry.is_private !== undefined ? Boolean(telemetry.is_private) : false;
         const isPublished = telemetry.is_published !== undefined ? Boolean(telemetry.is_published) : !isPrivate;
 
         return {
@@ -261,9 +331,9 @@ export const loadVaultItemsFromSupabase = async (overrideVaultId?: string): Prom
           deviceInfo: p.camera_make ? `${p.camera_make} ${p.camera_model || ''}` : 'VEC Hardware Sensor Enclave',
           isPrivate,
           isPublished,
-          vaultId: p.vault_id || telemetry.vault_id || targetVaultId,
-          vaultName: telemetry.vault_name || activeVault.vault_name,
-          creatorName: telemetry.creator_name || activeVault.creator_name,
+          vaultId: p.vault_id || telemetry.vault_id || DEFAULT_MASTER_VAULT.id,
+          vaultName: telemetry.vault_name || 'Brankas Karya',
+          creatorName: telemetry.creator_name || 'Kolektor Terverifikasi',
           c2paSignature: p.hardware_tee_signature || 'ECDSA_P256_TEE_SECURE_ENCLAVE_VALID',
           sensorType: 'Direct CMOS RAW (Zero-Bypass)',
           storageTarget: 'cloud_supabase',
@@ -275,21 +345,23 @@ export const loadVaultItemsFromSupabase = async (overrideVaultId?: string): Prom
         };
       });
 
-    memoryCache = mapped;
-    notifyVaultChanged(mapped);
-    return mapped;
+    // Merge remote items with local items (remote items override, new local items preserved)
+    const remoteIdMap = new Map<string, PrivateVaultItem>();
+    remoteMapped.forEach((r) => remoteIdMap.set(r.id, r));
+
+    const merged: PrivateVaultItem[] = [...remoteMapped];
+    localItems.forEach((loc) => {
+      if (!remoteIdMap.has(loc.id)) {
+        merged.push(loc);
+      }
+    });
+
+    persistLocalVaultItems(merged);
+    return merged;
   } catch (err) {
     console.warn('Error loading vault items from Supabase:', err);
-    return memoryCache;
+    return localItems;
   }
-};
-
-export const getPrivateVaultItems = (): PrivateVaultItem[] => {
-  return memoryCache;
-};
-
-export const getPublicVaultItems = (): PrivateVaultItem[] => {
-  return memoryCache.filter((item) => isVaultItemVisibleInPublicVault(item));
 };
 
 export const initVaultAsync = async (onLoaded?: (items: PrivateVaultItem[]) => void): Promise<PrivateVaultItem[]> => {
@@ -299,26 +371,45 @@ export const initVaultAsync = async (onLoaded?: (items: PrivateVaultItem[]) => v
 };
 
 export const mergeRemoteItemsIntoVault = (remoteItems: PrivateVaultItem[]): PrivateVaultItem[] => {
-  memoryCache = filterDestroyedItems(remoteItems);
-  notifyVaultChanged(memoryCache);
-  return memoryCache;
+  const current = getStoredLocalItems();
+  const remoteMap = new Map<string, PrivateVaultItem>();
+  remoteItems.forEach((r) => remoteMap.set(r.id, r));
+
+  const merged = [...remoteItems];
+  current.forEach((c) => {
+    if (!remoteMap.has(c.id)) {
+      merged.push(c);
+    }
+  });
+
+  persistLocalVaultItems(merged);
+  return merged;
 };
 
 export const savePrivateVaultItem = (item: PrivateVaultItem): PrivateVaultItem[] => {
   if (isDestroyedArtworkCandidate({ id: item.id, digest: item.digest, title: item.title, photoUrl: item.photoUrl })) {
-    return memoryCache;
+    return getStoredLocalItems();
   }
-  const filtered = memoryCache.filter((i) => i.id !== item.id);
-  const updated = [item, ...filtered].sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
-  memoryCache = updated;
-  notifyVaultChanged(updated);
+
+  const current = getStoredLocalItems();
+  const filtered = current.filter((i) => i.id !== item.id);
+  const updated = [item, ...filtered];
+
+  persistLocalVaultItems(updated);
   return updated;
 };
 
-export const updateVaultItemPrivacy = async (id: string, isPrivate: boolean, isPublished: boolean, newTitle?: string): Promise<PrivateVaultItem[]> => {
-  const current = memoryCache;
-  const target = current.find((i) => i.id === id);
-
+/**
+ * Mengubah status privasi / penerbitan karya seni.
+ * Menghubungkan Brankas dan Katalog secara langsung.
+ */
+export const updateVaultItemPrivacy = async (
+  id: string, 
+  isPrivate: boolean, 
+  isPublished: boolean, 
+  newTitle?: string
+): Promise<PrivateVaultItem[]> => {
+  const current = getStoredLocalItems();
   const updated = current.map((item) => {
     if (item.id === id) {
       return {
@@ -330,10 +421,10 @@ export const updateVaultItemPrivacy = async (id: string, isPrivate: boolean, isP
     }
     return item;
   });
-  memoryCache = updated;
-  notifyVaultChanged(updated);
 
-  // Sync to Supabase directly
+  persistLocalVaultItems(updated);
+
+  // Sync perubahan status ke Supabase
   try {
     const client = getActiveSupabaseClient();
     const { data: post } = await client.from('posts').select('sensor_telemetry').eq('id', id).single();
@@ -344,7 +435,10 @@ export const updateVaultItemPrivacy = async (id: string, isPrivate: boolean, isP
       is_published: isPublished
     };
 
-    const updatePayload: any = { sensor_telemetry: newTelemetry };
+    const updatePayload: any = { 
+      sensor_telemetry: newTelemetry,
+      is_published: isPublished
+    };
     if (newTitle) updatePayload.title = newTitle;
 
     await client.from('posts').update(updatePayload).eq('id', id);
@@ -355,16 +449,24 @@ export const updateVaultItemPrivacy = async (id: string, isPrivate: boolean, isP
   return updated;
 };
 
+/**
+ * Fungsi Pengawasan Admin untuk mengubah izin karya seni dari Ruang Admin
+ */
+export const adminToggleArtworkPermission = async (id: string, makePublic: boolean): Promise<PrivateVaultItem[]> => {
+  return updateVaultItemPrivacy(id, !makePublic, makePublic);
+};
+
 export const updateVaultItemTitle = async (id: string, newTitle: string): Promise<PrivateVaultItem[]> => {
   const cleanTitle = newTitle.trim();
-  const updated = memoryCache.map((item) => {
+  const current = getStoredLocalItems();
+  const updated = current.map((item) => {
     if (item.id === id) {
       return { ...item, title: cleanTitle || item.title };
     }
     return item;
   });
-  memoryCache = updated;
-  notifyVaultChanged(updated);
+
+  persistLocalVaultItems(updated);
 
   try {
     const client = getActiveSupabaseClient();
@@ -377,14 +479,15 @@ export const updateVaultItemTitle = async (id: string, newTitle: string): Promis
 };
 
 export const updateVaultItemPhoto = (id: string, newPhotoUrl: string, newDigest?: string): PrivateVaultItem[] => {
-  const updated = memoryCache.map((item) => {
+  const current = getStoredLocalItems();
+  const updated = current.map((item) => {
     if (item.id === id) {
       return { ...item, photoUrl: newPhotoUrl, digest: newDigest || item.digest };
     }
     return item;
   });
-  memoryCache = updated;
-  notifyVaultChanged(updated);
+
+  persistLocalVaultItems(updated);
   return updated;
 };
 
@@ -393,19 +496,19 @@ export const deletePrivateVaultItem = (id: string, digest?: string, photoUrl?: s
   const cleanDigest = (digest || '').trim().toLowerCase();
   const cleanUrl = (photoUrl || '').trim();
 
+  const current = getStoredLocalItems();
   const idsToDelete = new Set<string>();
   if (id) idsToDelete.add(id);
 
-  memoryCache.forEach((item) => {
+  current.forEach((item) => {
     if (item.id === id) idsToDelete.add(item.id);
     if (cleanId && item.id.toLowerCase() === cleanId) idsToDelete.add(item.id);
     if (cleanDigest && cleanDigest.length > 8 && item.digest && item.digest.trim().toLowerCase() === cleanDigest) idsToDelete.add(item.id);
     if (cleanUrl && item.photoUrl === cleanUrl) idsToDelete.add(item.id);
   });
 
-  const updated = memoryCache.filter((item) => !idsToDelete.has(item.id));
-  memoryCache = updated;
-  notifyVaultChanged(updated);
+  const updated = current.filter((item) => !idsToDelete.has(item.id));
+  persistLocalVaultItems(updated);
   return updated;
 };
 
@@ -413,18 +516,20 @@ export const updateVaultItemCloudStatus = (
   id: string,
   cloudData: Partial<Pick<PrivateVaultItem, 'storageTarget' | 'cloudStorageUrl' | 'cloudBucket' | 'cloudPath' | 'uploadStatus' | 'uploadError'>>
 ): PrivateVaultItem[] => {
-  const updated = memoryCache.map((item) => {
+  const current = getStoredLocalItems();
+  const updated = current.map((item) => {
     if (item.id === id) {
       return { ...item, ...cloudData };
     }
     return item;
   });
-  memoryCache = updated;
-  notifyVaultChanged(updated);
+
+  persistLocalVaultItems(updated);
   return updated;
 };
 
 export const getUserVaultProfile = (): UserVaultProfile => {
+  const items = getStoredLocalItems();
   return {
     userId: 'usr_vec_78942a0c',
     displayName: 'Pengguna Terverifikasi VEC',
@@ -432,10 +537,23 @@ export const getUserVaultProfile = (): UserVaultProfile => {
     authenticityScore: 99.40,
     hardwareEnclaveId: 'TEE-KNOX-TITAN-0x8892FA1B',
     encryptionMode: 'AES-256-GCM + Supabase Cloud Storage',
-    storageUsedBytes: memoryCache.length * 3.5 * 1024 * 1024,
+    storageUsedBytes: items.length * 3.5 * 1024 * 1024,
     maxStorageBytes: 5 * 1024 * 1024 * 1024,
     cloudStorageEnabled: true
   };
+};
+
+export const purgeAllLocalVaultCache = async (): Promise<void> => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(DESTROYED_STORAGE_KEY);
+    memoryCache = [];
+    window.dispatchEvent(new CustomEvent('vec-vault-updated', { detail: [] }));
+    window.dispatchEvent(new Event('storage'));
+  } catch (err) {
+    console.warn('Error purging local vault cache:', err);
+  }
 };
 
 if (typeof window !== 'undefined') {
