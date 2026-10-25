@@ -25,11 +25,11 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
       {/* ------------------------------------------------------------- */}
       {/* HERO SECTION - ELEGANT ART ATTESTATION                        */}
       {/* ------------------------------------------------------------- */}
-      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-b from-neutral-900 via-[#030611] to-[#020409] border border-neutral-800/90 p-4 sm:p-8 lg:p-14 shadow-2xl min-w-0 w-full">
+      <section className="vec-hero-section relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-b from-neutral-900 via-[#030611] to-[#020409] border border-neutral-800/90 p-4 sm:p-8 lg:p-14 shadow-2xl min-w-0 w-full">
         
         {/* Ambient Subtle Radial Glow */}
-        <div className="absolute top-0 right-1/4 w-[400px] sm:w-[500px] h-[400px] sm:h-[500px] bg-cyan-500/5 rounded-full blur-3xl pointer-events-none -z-0"></div>
-        <div className="absolute bottom-0 left-10 w-[350px] sm:w-[450px] h-[350px] sm:h-[450px] bg-blue-600/5 rounded-full blur-3xl pointer-events-none -z-0"></div>
+        <div className="vec-ambient-glow absolute top-0 right-1/4 w-[400px] sm:w-[500px] h-[400px] sm:h-[500px] bg-cyan-500/5 rounded-full blur-3xl pointer-events-none -z-0"></div>
+        <div className="vec-ambient-glow absolute bottom-0 left-10 w-[350px] sm:w-[450px] h-[350px] sm:h-[450px] bg-blue-600/5 rounded-full blur-3xl pointer-events-none -z-0"></div>
 
         <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center min-w-0">
           
@@ -37,7 +37,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
           <div className="lg:col-span-7 space-y-5 sm:space-y-7 min-w-0">
             
             {/* Lead-in Badges */}
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-neutral-400 font-medium">
+            <div className="vec-hero-breadcrumb flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-neutral-400 font-medium">
               <span className="text-cyan-400 font-semibold uppercase tracking-wider">Keaslian Terjamin</span>
               <span aria-hidden="true" className="text-neutral-600">·</span>
               <span>Sertifikasi Standar Global</span>
@@ -48,12 +48,12 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
             </div>
 
             {/* Display Headline */}
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-white leading-[1.15] break-words" style={{ textWrap: 'balance' }}>
+            <h1 className="vec-hero-title text-2xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-white leading-[1.15] break-words" style={{ textWrap: 'balance' }}>
               Autentikasi Karya Seni & Dokumentasi Asli Tanpa Kompromi
             </h1>
 
             {/* Prose */}
-            <p className="text-xs sm:text-base text-neutral-300 leading-relaxed max-w-2xl font-normal break-words">
+            <p className="vec-hero-prose text-xs sm:text-base text-neutral-300 leading-relaxed max-w-2xl font-normal break-words">
               Platform perlindungan keaslian karya seni untuk Veroia Enterprise Corp yang menghubungkan pengambilan foto asli langsung dari kamera, segel fisik anti-pemalsuan pada kanvas karya, dan perlindungan privasi ke sistem penyimpanan aman.
             </p>
 
@@ -96,7 +96,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
             </div>
 
             {/* Trust Markers */}
-            <div className="pt-3 sm:pt-4 border-t border-neutral-800/80 flex flex-wrap items-center gap-4 sm:gap-6 text-xs text-neutral-400">
+            <div className="vec-hero-trust pt-3 sm:pt-4 border-t border-neutral-800/80 flex flex-wrap items-center gap-4 sm:gap-6 text-xs text-neutral-400">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>Dukungan Kamera Profesional Terverifikasi</span>
@@ -111,7 +111,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
 
           {/* Right Column: Hero Visual Showcase */}
           <div className="lg:col-span-5 relative w-full min-w-0">
-            <div className="relative rounded-2xl overflow-hidden border border-neutral-700/80 bg-neutral-950 shadow-2xl group w-full">
+            <div className="vec-hero-photo-wrap relative rounded-2xl overflow-hidden border border-neutral-700/80 bg-neutral-950 shadow-2xl group w-full">
               <img
                 src="/assets/images/vec_hero_camera_1792494926035.jpg"
                 alt="Verifikasi Kamera Veroia Enterprise"
@@ -125,17 +125,17 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
 
               {/* Verified Overlay Badge - Fully Responsive with wrapping */}
               <div className="absolute top-3 sm:top-4 left-3 sm:left-4 right-3 sm:right-4 flex flex-wrap items-center justify-between gap-1.5 z-10">
-                <div className="bg-black/85 backdrop-blur-md px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-cyan-500/40 text-[11px] sm:text-xs font-medium text-cyan-300 flex items-center gap-1.5 max-w-[75%] truncate shadow">
+                <div className="vec-hero-badge bg-black/85 backdrop-blur-md px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-cyan-500/40 text-[11px] sm:text-xs font-medium text-cyan-300 flex items-center gap-1.5 max-w-[75%] truncate shadow">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                   <span className="truncate">Terverifikasi Kamera Asli</span>
                 </div>
-                <div className="bg-black/85 backdrop-blur-md px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-neutral-700 text-[10px] sm:text-[11px] font-medium text-neutral-300 shrink-0 shadow">
+                <div className="vec-hero-badge-sub bg-black/85 backdrop-blur-md px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-neutral-700 text-[10px] sm:text-[11px] font-medium text-neutral-300 shrink-0 shadow">
                   Foto Asli
                 </div>
               </div>
 
               {/* Certificate Card at Bottom */}
-              <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-4 bg-neutral-900/90 backdrop-blur-md p-3 sm:p-3.5 rounded-xl border border-neutral-800 text-xs space-y-1.5 shadow-lg">
+              <div className="vec-hero-cert-card absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-4 bg-neutral-900/90 backdrop-blur-md p-3 sm:p-3.5 rounded-xl border border-neutral-800 text-xs space-y-1.5 shadow-lg">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-neutral-400 text-[11px] truncate">Tanda Keaslian Resmi:</span>
                   <span className="text-emerald-400 font-bold text-[11px] shrink-0">ASLI & SAH</span>
@@ -156,19 +156,19 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
 
         {/* 4-Column KPI Strip */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 mt-8 sm:mt-10 pt-6 sm:pt-8 border-t border-neutral-800/80">
-          <div className="p-3 sm:p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80 min-w-0">
+          <div className="vec-kpi-card p-3 sm:p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80 min-w-0">
             <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white tabular-nums truncate">99.4%</div>
             <div className="text-[11px] sm:text-xs text-neutral-400 mt-1 break-words">Akurasi Verifikasi Keaslian</div>
           </div>
-          <div className="p-3 sm:p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80 min-w-0">
+          <div className="vec-kpi-card p-3 sm:p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80 min-w-0">
             <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-cyan-400 truncate">Resmi</div>
             <div className="text-[11px] sm:text-xs text-neutral-400 mt-1 break-words">Standar Verifikasi Global</div>
           </div>
-          <div className="p-3 sm:p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80 min-w-0">
+          <div className="vec-kpi-card p-3 sm:p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80 min-w-0">
             <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-amber-400 truncate">Aman</div>
             <div className="text-[11px] sm:text-xs text-neutral-400 mt-1 break-words">Segel Pengaman Fisik</div>
           </div>
-          <div className="p-3 sm:p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80 min-w-0">
+          <div className="vec-kpi-card p-3 sm:p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80 min-w-0">
             <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 truncate">Cloud</div>
             <div className="text-[11px] sm:text-xs text-neutral-400 mt-1 break-words">Penyimpanan Terproteksi</div>
           </div>
@@ -180,28 +180,28 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
       {/* ------------------------------------------------------------- */}
       {/* REGISTRATION & VAULT IDENTITY CONNECTOR BANNER                */}
       {/* ------------------------------------------------------------- */}
-      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#071326] via-[#040a14] to-[#02050b] border border-cyan-500/40 p-4 sm:p-8 lg:p-10 shadow-2xl min-w-0 w-full">
-        <div className="absolute top-0 right-0 w-72 sm:w-96 h-72 sm:h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <section className="vec-registration-banner relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#071326] via-[#040a14] to-[#02050b] border border-cyan-500/40 p-4 sm:p-8 lg:p-10 shadow-2xl min-w-0 w-full">
+        <div className="vec-ambient-glow absolute top-0 right-0 w-72 sm:w-96 h-72 sm:h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
         <div className="relative z-10 flex flex-col lg:flex-row items-center lg:items-start justify-between gap-6 sm:gap-8 min-w-0">
           <div className="space-y-3 text-center lg:text-left min-w-0 w-full">
-            <div className="inline-flex max-w-full items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-semibold">
+            <div className="vec-banner-badge inline-flex max-w-full items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-semibold">
               <KeyRound className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
               <span className="truncate">Sistem Pendaftaran Brankas Terenkripsi Multi-Tenant</span>
             </div>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight break-words">
+            <h2 className="vec-banner-title text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight break-words">
               Pendaftaran Mandiri: Terhubung Langsung ke Ruang Admin & Email
             </h2>
-            <p className="text-xs sm:text-sm text-neutral-300 max-w-2xl leading-relaxed break-words">
+            <p className="vec-banner-desc text-xs sm:text-sm text-neutral-300 max-w-2xl leading-relaxed break-words">
               Daftarkan brankas karya pribadi Anda dalam satu langkah. Sistem langsung menerbitkan kunci akses kriptografis SHA-256 yang aman, otomatis tersinkronisasi ke <strong>Ruangan Kontrol Admin Vecmaster</strong>, dan mengirimkan salinan sertifikat resmi langsung ke <strong>email pendaftar</strong>.
             </p>
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2.5 sm:gap-4 pt-1 text-xs text-neutral-400 font-medium">
-              <span className="flex items-center gap-1.5 text-emerald-400">
+              <span className="vec-banner-feature flex items-center gap-1.5 text-emerald-400">
                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Terhubung Web Resmi VEC
               </span>
-              <span className="flex items-center gap-1.5 text-emerald-400">
+              <span className="vec-banner-feature flex items-center gap-1.5 text-emerald-400">
                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Tercatat di Kontrol Admin
               </span>
-              <span className="flex items-center gap-1.5 text-emerald-400">
+              <span className="vec-banner-feature flex items-center gap-1.5 text-emerald-400">
                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Konfirmasi ke Email Pendaftar
               </span>
             </div>
@@ -245,7 +245,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
           {/* Card 1: Pengambilan Foto Langsung */}
           <div 
             onClick={() => onNavigate('studio')}
-            className="group cursor-pointer bg-neutral-900/60 hover:bg-neutral-900 border border-neutral-800 hover:border-cyan-500/50 rounded-2xl p-6 transition duration-300 flex flex-col justify-between space-y-5 shadow-lg"
+            className="vec-pillar-card group cursor-pointer bg-neutral-900/60 hover:bg-neutral-900 border border-neutral-800 hover:border-cyan-500/50 rounded-2xl p-6 transition duration-300 flex flex-col justify-between space-y-5 shadow-lg"
           >
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -281,7 +281,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
           {/* Card 2: Pameran Karya Utama */}
           <div 
             onClick={() => onNavigate('vault')}
-            className="group cursor-pointer bg-neutral-900/60 hover:bg-neutral-900 border border-neutral-800 hover:border-emerald-500/50 rounded-2xl p-6 transition duration-300 flex flex-col justify-between space-y-5 shadow-lg"
+            className="vec-pillar-card group cursor-pointer bg-neutral-900/60 hover:bg-neutral-900 border border-neutral-800 hover:border-emerald-500/50 rounded-2xl p-6 transition duration-300 flex flex-col justify-between space-y-5 shadow-lg"
           >
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -317,7 +317,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
           {/* Card 3: Brankas Koleksi Pribadi */}
           <div 
             onClick={() => onNavigate('private-vault')}
-            className="group cursor-pointer bg-neutral-900/60 hover:bg-neutral-900 border border-neutral-800 hover:border-amber-500/50 rounded-2xl p-6 transition duration-300 flex flex-col justify-between space-y-5 shadow-lg"
+            className="vec-pillar-card group cursor-pointer bg-neutral-900/60 hover:bg-neutral-900 border border-neutral-800 hover:border-amber-500/50 rounded-2xl p-6 transition duration-300 flex flex-col justify-between space-y-5 shadow-lg"
           >
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -336,7 +336,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800/80 text-xs space-y-2">
+            <div className="vec-pillar-inner-box p-4 rounded-xl bg-neutral-950 border border-neutral-800/80 text-xs space-y-2">
               <div className="flex justify-between text-neutral-400">
                 <span>Penyimpanan Aman:</span>
                 <span className="text-emerald-400 font-medium">Di Perangkat & Cloud Terproteksi</span>
@@ -355,7 +355,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
           {/* Card 4: Standar Galeri & Lelang */}
           <div 
             onClick={() => onNavigate('vault')}
-            className="group cursor-pointer bg-neutral-900/60 hover:bg-neutral-900 border border-neutral-800 hover:border-purple-500/50 rounded-2xl p-6 transition duration-300 flex flex-col justify-between space-y-5 shadow-lg"
+            className="vec-pillar-card group cursor-pointer bg-neutral-900/60 hover:bg-neutral-900 border border-neutral-800 hover:border-purple-500/50 rounded-2xl p-6 transition duration-300 flex flex-col justify-between space-y-5 shadow-lg"
           >
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -393,10 +393,10 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
         {/* Card 5: Ruang Kontrol Admin & Pengawasan Sistem (Full Width Connector) */}
         <div 
           onClick={() => onNavigate('admin-portal')}
-          className="group cursor-pointer bg-gradient-to-r from-emerald-950/30 via-slate-900/60 to-cyan-950/30 hover:bg-slate-900 border border-emerald-500/30 hover:border-emerald-500/60 rounded-2xl p-4 sm:p-6 transition duration-300 flex flex-col md:flex-row items-center md:items-center justify-between gap-4 sm:gap-6 shadow-xl min-w-0"
+          className="vec-admin-banner group cursor-pointer bg-gradient-to-r from-emerald-950/30 via-slate-900/60 to-cyan-950/30 hover:bg-slate-900 border border-emerald-500/30 hover:border-emerald-500/60 rounded-2xl p-4 sm:p-6 transition duration-300 flex flex-col md:flex-row items-center md:items-center justify-between gap-4 sm:gap-6 shadow-xl min-w-0"
         >
           <div className="space-y-2 text-center md:text-left min-w-0 w-full">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+            <div className="vec-admin-badge inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
               <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">KONSOL PENGELOLA UTAMA · VECMASTER PORTAL</span>
             </div>
@@ -414,7 +414,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
               e.stopPropagation();
               onNavigate('admin-portal');
             }}
-            className="w-full md:w-auto justify-center inline-flex items-center gap-2 px-5 py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition shadow-lg shadow-emerald-950/50 cursor-pointer shrink-0"
+            className="vec-admin-btn w-full md:w-auto justify-center inline-flex items-center gap-2 px-5 py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition shadow-lg shadow-emerald-950/50 cursor-pointer shrink-0"
           >
             <ShieldCheck className="w-4 h-4 text-white shrink-0" />
             <span>Buka Ruang Kontrol Admin</span>
@@ -448,7 +448,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
           {/* Showcase Item 1 */}
           <div 
             onClick={() => onNavigate('vault')}
-            className="group cursor-pointer rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900/40 hover:border-neutral-700 transition duration-300 flex flex-col min-w-0"
+            className="vec-showcase-card group cursor-pointer rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900/40 hover:border-neutral-700 transition duration-300 flex flex-col min-w-0"
           >
             <div className="relative h-44 sm:h-48 overflow-hidden">
               <img
@@ -461,7 +461,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
                 ASLI & RESMI
               </div>
             </div>
-            <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
+            <div className="vec-showcase-panel p-4 space-y-2 flex-1 flex flex-col justify-between">
               <div>
                 <h4 className="font-semibold text-white group-hover:text-cyan-300 transition text-sm">
                   Cahaya di Balik Obsidian
@@ -470,7 +470,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
                   Dokumentasi resmi karya seni dengan bukti keaslian kamera yang terverifikasi.
                 </p>
               </div>
-              <div className="pt-2 border-t border-neutral-800 flex items-center justify-between text-[11px] text-neutral-400">
+              <div className="vec-showcase-meta pt-2 border-t border-neutral-800 flex items-center justify-between text-[11px] text-neutral-400">
                 <span>Tingkat Keaslian:</span>
                 <span className="text-emerald-400 font-bold">99.40%</span>
               </div>
@@ -480,7 +480,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
           {/* Showcase Item 2 */}
           <div 
             onClick={() => onNavigate('vault')}
-            className="group cursor-pointer rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900/40 hover:border-neutral-700 transition duration-300 flex flex-col min-w-0"
+            className="vec-showcase-card group cursor-pointer rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900/40 hover:border-neutral-700 transition duration-300 flex flex-col min-w-0"
           >
             <div className="relative h-44 sm:h-48 overflow-hidden">
               <img
@@ -493,7 +493,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
                 KAMERA RESMI
               </div>
             </div>
-            <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
+            <div className="vec-showcase-panel p-4 space-y-2 flex-1 flex flex-col justify-between">
               <div>
                 <h4 className="font-semibold text-white group-hover:text-cyan-300 transition text-sm">
                   Detail Segel Pengaman Kanvas
@@ -502,7 +502,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
                   Dokumentasi makro segel pengaman fisik yang tertanam pada permukaan kanvas linen murni.
                 </p>
               </div>
-              <div className="pt-2 border-t border-neutral-800 flex items-center justify-between text-[11px] text-neutral-400">
+              <div className="vec-showcase-meta pt-2 border-t border-neutral-800 flex items-center justify-between text-[11px] text-neutral-400">
                 <span>Tingkat Keaslian:</span>
                 <span className="text-emerald-400 font-bold">99.80%</span>
               </div>
@@ -512,7 +512,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
           {/* Showcase Item 3 */}
           <div 
             onClick={() => onNavigate('vault')}
-            className="group cursor-pointer rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900/40 hover:border-neutral-700 transition duration-300 flex flex-col min-w-0 sm:col-span-2 lg:col-span-1"
+            className="vec-showcase-card group cursor-pointer rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900/40 hover:border-neutral-700 transition duration-300 flex flex-col min-w-0 sm:col-span-2 lg:col-span-1"
           >
             <div className="relative h-44 sm:h-48 overflow-hidden">
               <img
@@ -525,7 +525,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
                 REKAMAN SUARA
               </div>
             </div>
-            <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
+            <div className="vec-showcase-panel p-4 space-y-2 flex-1 flex flex-col justify-between">
               <div>
                 <h4 className="font-semibold text-white group-hover:text-cyan-300 transition text-sm">
                   Ulasan Kurator Berpengalaman
@@ -534,7 +534,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
                   Ulasan audio resmi dari kurator master yang mengonfirmasi nilai dan keaslian karya.
                 </p>
               </div>
-              <div className="pt-2 border-t border-neutral-800 flex items-center justify-between text-[11px] text-neutral-400">
+              <div className="vec-showcase-meta pt-2 border-t border-neutral-800 flex items-center justify-between text-[11px] text-neutral-400">
                 <span>Status Bukti:</span>
                 <span className="text-purple-400 font-bold">TERVERIFIKASI</span>
               </div>
@@ -547,16 +547,16 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
       {/* ------------------------------------------------------------- */}
       {/* ACTION BANNER                                                 */}
       {/* ------------------------------------------------------------- */}
-      <section className="bg-gradient-to-r from-neutral-900 via-neutral-950 to-neutral-900 border border-neutral-800 rounded-2xl sm:rounded-3xl p-5 sm:p-8 lg:p-10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl min-w-0 w-full">
+      <section className="vec-cta-banner bg-gradient-to-r from-neutral-900 via-neutral-950 to-neutral-900 border border-neutral-800 rounded-2xl sm:rounded-3xl p-5 sm:p-8 lg:p-10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl min-w-0 w-full">
         <div className="space-y-2 text-center md:text-left min-w-0 w-full">
-          <div className="text-xs font-semibold text-cyan-400 flex items-center justify-center md:justify-start gap-1.5">
+          <div className="vec-cta-badge text-xs font-semibold text-cyan-400 flex items-center justify-center md:justify-start gap-1.5">
             <Fingerprint className="w-4 h-4 text-cyan-400 shrink-0" />
             <span>STANDAR KEASLIAN RESMI VEROIA</span>
           </div>
-          <h3 className="text-lg sm:text-2xl font-bold text-white tracking-tight break-words">
+          <h3 className="vec-cta-title text-lg sm:text-2xl font-bold text-white tracking-tight break-words">
             Mulai Ambil Foto Terverifikasi Asli
           </h3>
-          <p className="text-xs sm:text-sm text-neutral-400 max-w-xl break-words">
+          <p className="vec-cta-desc text-xs sm:text-sm text-neutral-400 max-w-xl break-words">
             Gunakan kamera kami untuk mengambil foto asli dengan bukti keaslian digital dan sertifikat resmi yang langsung tersimpan aman.
           </p>
         </div>

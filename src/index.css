@@ -72,26 +72,367 @@ html.light #root {
   background-color: #f8fafc;
 }
 
-/* 1. Page Shell & Headers */
+/* 1. Page Shell & Root Containers */
 html.light .app-shell,
 html.light [class*="min-h-screen bg-[#020409]"] {
   background-color: #f8fafc !important;
   color: #0f172a !important;
 }
 
+/* 2. Header and Navigation */
 html.light header {
-  background-color: rgba(255, 255, 255, 0.94) !important;
+  background-color: rgba(255, 255, 255, 0.95) !important;
   border-color: #e2e8f0 !important;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
 }
 
+html.light header nav button {
+  color: #475569 !important;
+}
+
+html.light header nav button:hover {
+  color: #0f172a !important;
+}
+
+html.light header nav button.text-white {
+  color: #0891b2 !important;
+  border-bottom-color: #0891b2 !important;
+  font-weight: 600 !important;
+}
+
+html.light .header-mobile-strip {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light .header-mobile-strip button {
+  color: #475569 !important;
+}
+
+html.light .header-mobile-strip button.bg-neutral-800,
+html.light .header-mobile-strip button.text-white {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* 3. Footer */
 html.light footer {
-  background-color: #f1f5f9 !important;
+  background-color: #f8fafc !important;
   border-color: #e2e8f0 !important;
   color: #475569 !important;
 }
 
-/* 2. Surfaces & Cards */
+html.light footer .text-white {
+  color: #0f172a !important;
+}
+
+html.light footer .bg-neutral-900 {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light footer button {
+  color: #64748b !important;
+}
+html.light footer button:hover {
+  color: #0f172a !important;
+}
+
+/* 4. A. HERO UTAMA (.vec-hero-section) */
+html.light .vec-hero-section {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%) !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .vec-hero-section .vec-ambient-glow {
+  display: none !important;
+}
+
+html.light .vec-hero-title {
+  color: #0f172a !important;
+}
+
+html.light .vec-hero-prose {
+  color: #334155 !important;
+}
+
+html.light .vec-hero-breadcrumb {
+  color: #64748b !important;
+}
+
+html.light .vec-hero-breadcrumb .text-cyan-400 {
+  color: #0891b2 !important;
+  font-weight: 700 !important;
+}
+
+html.light .vec-hero-trust {
+  border-color: #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+html.light .vec-hero-photo-wrap {
+  border-color: #cbd5e1 !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12) !important;
+}
+
+html.light .vec-hero-badge {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #0891b2 !important;
+  color: #0891b2 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+html.light .vec-hero-badge-sub {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+html.light .vec-hero-cert-card {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12) !important;
+}
+
+html.light .vec-hero-cert-card span,
+html.light .vec-hero-cert-card div {
+  color: #334155 !important;
+}
+
+html.light .vec-hero-cert-card .text-emerald-400 {
+  color: #047857 !important;
+  font-weight: 700 !important;
+}
+
+html.light .vec-hero-cert-card .text-cyan-300 {
+  color: #0284c7 !important;
+  font-weight: 600 !important;
+}
+
+html.light .vec-hero-cert-card .border-neutral-800 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .vec-kpi-card {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .vec-kpi-card .text-white {
+  color: #0f172a !important;
+}
+
+html.light .vec-kpi-card .text-neutral-400 {
+  color: #64748b !important;
+}
+
+html.light .vec-kpi-card .text-cyan-400 {
+  color: #0891b2 !important;
+  font-weight: 700 !important;
+}
+
+html.light .vec-kpi-card .text-amber-400 {
+  color: #d97706 !important;
+  font-weight: 700 !important;
+}
+
+html.light .vec-kpi-card .text-emerald-400 {
+  color: #059669 !important;
+  font-weight: 700 !important;
+}
+
+/* 5. B. BANNER PENDAFTARAN BRANKAS (.vec-registration-banner) */
+html.light .vec-registration-banner {
+  background: linear-gradient(135deg, #ffffff 0%, #f0fdfa 55%, #e0f2fe 100%) !important;
+  border-color: #38bdf8 !important;
+  box-shadow: 0 10px 25px -5px rgba(14, 165, 233, 0.12) !important;
+}
+
+html.light .vec-registration-banner .vec-ambient-glow {
+  display: none !important;
+}
+
+html.light .vec-banner-badge {
+  background-color: #e0f2fe !important;
+  border-color: #7dd3fc !important;
+  color: #0369a1 !important;
+  font-weight: 700 !important;
+}
+
+html.light .vec-banner-title {
+  color: #0f172a !important;
+}
+
+html.light .vec-banner-desc {
+  color: #334155 !important;
+}
+
+html.light .vec-banner-desc strong {
+  color: #0369a1 !important;
+  font-weight: 700 !important;
+}
+
+html.light .vec-banner-feature {
+  color: #047857 !important;
+  font-weight: 600 !important;
+}
+
+/* 6. C. EMPAT PILAR PERLINDUNGAN (.vec-pillar-card) */
+html.light .vec-pillar-card {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .vec-pillar-card:hover {
+  border-color: #0891b2 !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .vec-pillar-card h3 {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+html.light .vec-pillar-card p {
+  color: #475569 !important;
+}
+
+html.light .vec-pillar-card [class*="bg-cyan-500/10"],
+html.light .vec-pillar-card [class*="bg-emerald-500/10"],
+html.light .vec-pillar-card [class*="bg-amber-500/10"],
+html.light .vec-pillar-card [class*="bg-purple-500/10"] {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light .vec-pillar-inner-box {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light .vec-pillar-inner-box span.text-neutral-400 {
+  color: #64748b !important;
+}
+
+html.light .vec-pillar-inner-box .text-emerald-400 {
+  color: #047857 !important;
+  font-weight: 600 !important;
+}
+
+html.light .vec-pillar-inner-box .text-amber-300 {
+  color: #d97706 !important;
+  font-weight: 600 !important;
+}
+
+html.light .vec-pillar-inner-box .text-cyan-300 {
+  color: #0284c7 !important;
+  font-weight: 600 !important;
+}
+
+/* 7. D. BANNER KONTROL ADMIN (.vec-admin-banner) */
+html.light .vec-admin-banner {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 50%, #ecfeff 100%) !important;
+  border-color: #86efac !important;
+  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.08) !important;
+}
+
+html.light .vec-admin-badge {
+  background-color: #dcfce7 !important;
+  border-color: #86efac !important;
+  color: #15803d !important;
+  font-weight: 700 !important;
+}
+
+html.light .vec-admin-title {
+  color: #0f172a !important;
+}
+
+html.light .vec-admin-desc {
+  color: #334155 !important;
+}
+
+html.light .vec-admin-btn {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3) !important;
+}
+
+/* 8. E. KARTU KOLEKSI KARYA (.vec-showcase-card) */
+html.light .vec-showcase-card {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .vec-showcase-card:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .vec-showcase-panel {
+  background-color: #ffffff !important;
+}
+
+html.light .vec-showcase-card h4 {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+html.light .vec-showcase-card h4:hover {
+  color: #0891b2 !important;
+}
+
+html.light .vec-showcase-card p {
+  color: #475569 !important;
+}
+
+html.light .vec-showcase-meta {
+  border-color: #f1f5f9 !important;
+  color: #64748b !important;
+}
+
+html.light .vec-showcase-meta .text-emerald-400 {
+  color: #047857 !important;
+  font-weight: 700 !important;
+}
+
+html.light .vec-showcase-meta .text-purple-400 {
+  color: #7e22ce !important;
+  font-weight: 700 !important;
+}
+
+html.light .vec-showcase-card [class*="bg-black/80"] {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 9. F. BANNER AJAKAN DI BAGIAN BAWAH (.vec-cta-banner) */
+html.light .vec-cta-banner {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%) !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .vec-cta-badge {
+  color: #0891b2 !important;
+  font-weight: 700 !important;
+}
+
+html.light .vec-cta-title {
+  color: #0f172a !important;
+}
+
+html.light .vec-cta-desc {
+  color: #475569 !important;
+}
+
+/* 10. Universal Surfaces & Cards across Vault, Private Vault, Studio & MasterAdminPortal */
+html.light [class*="bg-slate-900"],
+html.light [class*="bg-neutral-900"],
 html.light [class*="bg-[#050C1E]"],
 html.light [class*="bg-[#070d18]"],
 html.light [class*="bg-[#030712]"],
@@ -100,60 +441,49 @@ html.light [class*="bg-[#09111e]"],
 html.light [class*="bg-[#03060d]"],
 html.light [class*="bg-[#0A1628]"],
 html.light [class*="bg-[#030612]"],
-html.light .bg-slate-900,
-html.light .bg-neutral-900,
-html.light .bg-slate-900\/90,
-html.light .bg-slate-900\/80,
-html.light .bg-slate-900\/70,
-html.light .bg-slate-900\/60,
-html.light .bg-neutral-900\/90,
-html.light .bg-neutral-900\/80,
-html.light .bg-neutral-900\/70,
-html.light .bg-neutral-900\/60 {
+html.light [class*="bg-[#091326]"],
+html.light [class*="bg-[#050B18]"],
+html.light [class*="bg-[#02050E]"],
+html.light [class*="bg-[#071326]"] {
   background-color: #ffffff !important;
   border-color: #e2e8f0 !important;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
 }
 
-html.light .bg-slate-950,
-html.light .bg-neutral-950,
-html.light .bg-slate-950\/90,
-html.light .bg-slate-950\/80,
-html.light .bg-slate-950\/70,
-html.light .bg-slate-950\/60,
-html.light .bg-neutral-950\/90,
-html.light .bg-neutral-950\/80,
-html.light .bg-neutral-950\/70 {
+html.light [class*="bg-slate-950"],
+html.light [class*="bg-neutral-950"] {
   background-color: #f8fafc !important;
   border-color: #e2e8f0 !important;
 }
 
-/* 3. Section Gradients */
+html.light [class*="bg-gradient-to-r"][class*="from-neutral-900"],
 html.light [class*="bg-gradient-to-r"][class*="from-slate-900"],
-html.light [class*="bg-gradient-to-r"][class*="from-[#050C1E]"],
-html.light [class*="bg-gradient-to-r"][class*="from-neutral-950"],
-html.light [class*="bg-gradient-to-b"][class*="from-[#070d18]"],
-html.light [class*="bg-gradient-to-b"][class*="from-[#09111e]"] {
-  background-image: linear-gradient(135deg, #ffffff 0%, #f0fdfa 60%, #ecfeff 100%) !important;
+html.light [class*="bg-gradient-to-b"][class*="from-[#091326]"],
+html.light [class*="bg-gradient-to-b"][class*="from-neutral-900"] {
+  background-image: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
   border-color: #cbd5e1 !important;
 }
 
 html.light [class*="from-emerald-950"] {
-  background-image: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 100%) !important;
-  border-color: #a7f3d0 !important;
+  background-image: linear-gradient(135deg, #f0fdf4 0%, #ffffff 50%, #ecfeff 100%) !important;
+  border-color: #86efac !important;
 }
 
 html.light [class*="from-cyan-950"] {
-  background-image: linear-gradient(135deg, #ecfeff 0%, #f0f9ff 100%) !important;
-  border-color: #a5f3fc !important;
+  background-image: linear-gradient(135deg, #ecfeff 0%, #ffffff 50%, #f0f9ff 100%) !important;
+  border-color: #7dd3fc !important;
+}
+
+html.light [class*="from-amber-950"] {
+  background-image: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%) !important;
+  border-color: #fde68a !important;
 }
 
 html.light [class*="from-rose-950"] {
-  background-image: linear-gradient(135deg, #fff1f2 0%, #fff5f5 100%) !important;
+  background-image: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%) !important;
   border-color: #fecdd3 !important;
 }
 
-/* 4. Typography Contrast Enhancement */
+/* 11. Typography Contrast Rules */
 html.light .text-white,
 html.light .text-slate-100,
 html.light .text-neutral-100 {
@@ -180,7 +510,7 @@ html.light .text-neutral-500 {
   color: #64748b !important;
 }
 
-/* Accents in Light Mode (Darkened for 4.5:1 WCAG AA contrast against light surfaces) */
+/* 12. Accents with High WCAG Contrast */
 html.light .text-cyan-400,
 html.light .text-cyan-300,
 html.light .text-cyan-200 {
@@ -207,86 +537,65 @@ html.light .text-purple-300 {
   color: #7e22ce !important;
 }
 
-/* 5. Status Badges, Pills & Callouts */
-html.light .bg-cyan-950,
-html.light .bg-cyan-950\/80,
-html.light .bg-cyan-950\/60,
-html.light .bg-cyan-950\/40,
-html.light .bg-cyan-950\/30,
-html.light .bg-cyan-500\/20,
-html.light .bg-cyan-500\/15,
-html.light .bg-cyan-500\/10 {
+/* 13. Status Badges, Pills & Ghost Buttons */
+html.light [class*="bg-cyan-950"],
+html.light [class*="bg-cyan-500/15"],
+html.light [class*="bg-cyan-500/10"],
+html.light [class*="bg-cyan-500/20"] {
   background-color: #ecfeff !important;
   color: #0e7490 !important;
   border-color: #a5f3fc !important;
 }
 
-html.light .bg-emerald-950,
-html.light .bg-emerald-950\/80,
-html.light .bg-emerald-950\/60,
-html.light .bg-emerald-950\/40,
-html.light .bg-emerald-950\/30,
-html.light .bg-emerald-500\/20,
-html.light .bg-emerald-500\/10 {
+html.light [class*="bg-emerald-950"],
+html.light [class*="bg-emerald-500/15"],
+html.light [class*="bg-emerald-500/10"],
+html.light [class*="bg-emerald-500/20"] {
   background-color: #ecfdf5 !important;
   color: #047857 !important;
   border-color: #a7f3d0 !important;
 }
 
-html.light .bg-amber-950,
-html.light .bg-amber-950\/80,
-html.light .bg-amber-950\/70,
-html.light .bg-amber-950\/60,
-html.light .bg-amber-950\/40,
-html.light .bg-amber-500\/20,
-html.light .bg-amber-500\/10 {
+html.light [class*="bg-amber-950"],
+html.light [class*="bg-amber-500/15"],
+html.light [class*="bg-amber-500/10"],
+html.light [class*="bg-amber-500/20"] {
   background-color: #fffbeb !important;
   color: #b45309 !important;
   border-color: #fde68a !important;
 }
 
-html.light .bg-rose-950,
-html.light .bg-rose-950\/80,
-html.light .bg-rose-950\/70,
-html.light .bg-rose-950\/60,
-html.light .bg-rose-950\/50,
-html.light .bg-rose-950\/40,
-html.light .bg-rose-500\/20,
-html.light .bg-rose-500\/10 {
+html.light [class*="bg-rose-950"],
+html.light [class*="bg-rose-500/15"],
+html.light [class*="bg-rose-500/10"],
+html.light [class*="bg-rose-500/20"] {
   background-color: #fff1f2 !important;
   color: #be123c !important;
   border-color: #fecdd3 !important;
 }
 
-html.light .bg-purple-950,
-html.light .bg-purple-950\/80,
-html.light .bg-purple-950\/60,
-html.light .bg-purple-950\/40,
-html.light .bg-purple-500\/20,
-html.light .bg-purple-500\/10 {
+html.light [class*="bg-purple-950"],
+html.light [class*="bg-purple-500/15"],
+html.light [class*="bg-purple-500/10"],
+html.light [class*="bg-purple-500/20"] {
   background-color: #faf5ff !important;
   color: #7e22ce !important;
   border-color: #e9d5ff !important;
 }
 
-/* 6. Universal Light Borders */
+/* 14. Universal Light Borders */
 html.light .border-slate-800,
 html.light .border-neutral-800,
-html.light .border-slate-800\/80,
-html.light .border-neutral-800\/80,
-html.light .border-slate-800\/60,
-html.light .border-neutral-850,
-html.light .border-neutral-900,
 html.light .border-slate-700,
 html.light .border-neutral-700,
-html.light .border-neutral-700\/80,
+html.light .border-neutral-850,
+html.light .border-neutral-900,
 html.light .divide-slate-800,
-html.light .divide-neutral-800,
-html.light .divide-slate-800\/60 {
+html.light .divide-neutral-800 {
   border-color: #e2e8f0 !important;
 }
 
-/* 7. Inputs, Textareas, and Dropdowns */
+/* 15. Inputs, Textareas, and Dropdowns */
 html.light input[type="text"],
 html.light input[type="email"],
 html.light input[type="password"],
@@ -311,7 +620,7 @@ html.light select:focus {
   box-shadow: 0 0 0 2px rgba(8, 145, 178, 0.15) !important;
 }
 
-/* 8. Neutral Buttons in Light Mode */
+/* 16. Neutral Buttons in Light Mode */
 html.light button.bg-neutral-900,
 html.light button.bg-slate-900,
 html.light button.bg-neutral-800,
@@ -319,7 +628,7 @@ html.light button.bg-slate-800 {
   background-color: #ffffff !important;
   border-color: #cbd5e1 !important;
   color: #1e293b !important;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
 }
 
 html.light button.bg-neutral-900:hover,
@@ -328,20 +637,18 @@ html.light button.bg-neutral-800:hover,
 html.light button.bg-slate-800:hover {
   background-color: #f1f5f9 !important;
   border-color: #94a3b8 !important;
+  color: #0f172a !important;
 }
 
-/* 9. Preserve High-Contrast White Text on Primary Action Buttons */
+/* 17. PRESERVE WHITE TEXT ON PRIMARY/COLORED ACTION BUTTONS */
 html.light .bg-cyan-600,
 html.light .bg-cyan-500,
 html.light .bg-emerald-600,
 html.light .bg-emerald-500,
-html.light .bg-emerald-700,
 html.light .bg-rose-600,
 html.light .bg-rose-500,
-html.light .bg-indigo-600,
-html.light .bg-indigo-500,
-html.light .bg-teal-600,
-html.light .bg-purple-600 {
+html.light .bg-blue-600,
+html.light [class*="bg-gradient-to-r"][class*="from-cyan-600"] {
   color: #ffffff !important;
 }
 
@@ -349,31 +656,28 @@ html.light .bg-cyan-600 *,
 html.light .bg-cyan-500 *,
 html.light .bg-emerald-600 *,
 html.light .bg-emerald-500 *,
-html.light .bg-emerald-700 *,
 html.light .bg-rose-600 *,
 html.light .bg-rose-500 *,
-html.light .bg-indigo-600 *,
-html.light .bg-indigo-500 *,
-html.light .bg-teal-600 *,
-html.light .bg-purple-600 * {
+html.light .bg-blue-600 *,
+html.light [class*="bg-gradient-to-r"][class*="from-cyan-600"] * {
   color: #ffffff !important;
 }
 
-/* 10. Modals & Dialogs */
+/* 18. Modals & Dialogs */
 html.light .fixed.inset-0[class*="bg-black"] {
   background-color: rgba(15, 23, 42, 0.65) !important;
   backdrop-filter: blur(8px) !important;
 }
 
-html.light .fixed.inset-0 [class*="bg-[#050C1E]"],
-html.light .fixed.inset-0 [class*="from-[#070d18]"],
-html.light .fixed.inset-0 [class*="from-[#09111e]"] {
+html.light .fixed.inset-0 [class*="bg-[#0"],
+html.light .fixed.inset-0 [class*="bg-slate-900"],
+html.light .fixed.inset-0 [class*="bg-neutral-900"] {
   background-color: #ffffff !important;
   border-color: #e2e8f0 !important;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
 }
 
-/* 11. Code and Terminal Blocks */
+/* 19. Code and Terminal Blocks */
 html.light pre {
   background-color: #0b1120 !important;
   color: #e2e8f0 !important;
@@ -382,13 +686,13 @@ html.light pre {
 
 html.light pre code,
 html.light pre span {
-  color: inherit;
+  color: inherit !important;
 }
 
-/* 12. Toast notifications */
+/* 20. Toast notifications */
 html.light .fixed.bottom-6 {
   background-color: #ffffff !important;
-  border-color: #06b6d4 !important;
+  border-color: #0891b2 !important;
   color: #0f172a !important;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
 }

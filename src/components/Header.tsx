@@ -337,7 +337,7 @@ export const Header: React.FC<HeaderProps> = ({
       )}
 
       {/* Mobile Responsive Navigation Strip (Quick Horizontal Tap Bar) */}
-      <div className="lg:hidden w-full overflow-x-auto scrollbar-none px-2.5 sm:px-4 py-1.5 border-t border-neutral-900/90 bg-neutral-950/90 flex items-center gap-1.5 text-xs">
+      <div className="header-mobile-strip lg:hidden w-full overflow-x-auto scrollbar-none px-2.5 sm:px-4 py-1.5 border-t border-neutral-900/90 bg-neutral-950/90 flex items-center gap-1.5 text-xs">
         <button
           onClick={() => handleTabClick('overview')}
           className={`px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition-colors ${
