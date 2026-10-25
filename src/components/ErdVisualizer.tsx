@@ -49,7 +49,7 @@ export const ErdVisualizer: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 w-full">
       {/* Top Architecture Overview Card */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-900/90 to-cyan-950/40 border border-slate-800 rounded-2xl p-5">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -183,7 +183,7 @@ export const ErdVisualizer: React.FC = () => {
         </div>
 
         {/* Columns Grid / Table */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto scrollbar-none max-w-full">
           <table className="w-full text-left text-xs font-mono">
             <thead className="bg-slate-950/40 text-slate-400 border-b border-slate-800 text-[11px]">
               <tr>

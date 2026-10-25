@@ -608,8 +608,8 @@ export const VecVault: React.FC<VecVaultProps> = ({
           </div>
 
           {activeArtwork && (
-            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl grid grid-cols-1 lg:grid-cols-12">
-              <div className="lg:col-span-5 relative h-72 sm:h-96 lg:h-auto min-h-[340px] bg-black">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl grid grid-cols-1 lg:grid-cols-12 min-w-0">
+              <div className="lg:col-span-5 relative h-64 sm:h-80 lg:h-auto min-h-[280px] sm:min-h-[340px] bg-black min-w-0">
                 <img
                   src={activeArtwork.photoUrl}
                   alt={activeArtwork.title}
@@ -626,40 +626,41 @@ export const VecVault: React.FC<VecVaultProps> = ({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-slate-900/90 pointer-events-none"></div>
 
-                <div className="absolute top-4 left-4 flex flex-wrap gap-2">
-                  <div className="bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-xl border border-emerald-500/40 text-xs font-mono text-emerald-300 flex items-center gap-1.5 shadow-lg">
-                    <Award className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{activeArtwork.curationNumber}</span>
+                {/* Unified Responsive Top Overlay */}
+                <div className="absolute top-2.5 sm:top-3 left-2.5 sm:left-3 right-2.5 sm:right-3 flex flex-wrap items-center justify-between gap-1.5 z-10">
+                  <div className="flex flex-wrap items-center gap-1.5 max-w-[75%]">
+                    <div className="bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-xl border border-emerald-500/40 text-[11px] font-mono text-emerald-300 flex items-center gap-1.5 shadow-lg">
+                      <Award className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>{activeArtwork.curationNumber}</span>
+                    </div>
+
+                    {activeArtwork.isUserUploaded && (
+                      <div className="bg-emerald-600/90 backdrop-blur-md px-2 py-0.5 rounded-xl text-[10px] font-mono font-bold text-white shadow-lg truncate">
+                        ✓ Diterbitkan
+                      </div>
+                    )}
                   </div>
 
-                  {activeArtwork.isUserUploaded && (
-                    <div className="bg-emerald-600/90 backdrop-blur-md px-3 py-1.5 rounded-xl text-xs font-mono font-bold text-white shadow-lg">
-                      ✓ Diterbitkan dari Brankas Anda
-                    </div>
-                  )}
-                </div>
-
-                <div className="absolute top-4 right-4 z-10">
                   <button
                     onClick={() => {
                       setViewerZoomLevel(1);
                       setIsViewerModalOpen(true);
                     }}
-                    className="px-3 py-1.5 rounded-xl bg-black/80 hover:bg-slate-900 text-cyan-300 hover:text-white border border-cyan-500/40 text-xs font-mono flex items-center gap-1.5 transition shadow-lg cursor-pointer"
+                    className="px-2.5 py-1 rounded-xl bg-black/85 hover:bg-slate-900 text-cyan-300 hover:text-white border border-cyan-500/40 text-[11px] font-mono flex items-center gap-1 transition shadow-lg cursor-pointer shrink-0"
                     title="Buka penampil gambar resolusi penuh & zoom"
                   >
-                    <Maximize2 className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Teliti Piksel / Zoom</span>
+                    <Maximize2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                    <span>Zoom</span>
                   </button>
                 </div>
 
-                <div className="absolute bottom-4 left-4 right-4 text-[11px] font-mono text-slate-300 bg-black/70 backdrop-blur-md p-2 rounded-xl border border-slate-800 flex items-center justify-between gap-2">
+                <div className="absolute bottom-2.5 sm:bottom-3 left-2.5 sm:left-3 right-2.5 sm:right-3 text-[10px] sm:text-[11px] font-mono text-slate-300 bg-black/75 backdrop-blur-md p-2 rounded-xl border border-slate-800 flex items-center justify-between gap-2 min-w-0">
                   <span className="truncate">Sensor: {activeArtwork.deviceInfo}</span>
-                  <span className="text-emerald-400 shrink-0 font-bold">100% C2PA RAW</span>
+                  <span className="text-emerald-400 shrink-0 font-bold">100% C2PA</span>
                 </div>
               </div>
 
-              <div className="lg:col-span-7 p-6 sm:p-8 flex flex-col justify-between space-y-6">
+              <div className="lg:col-span-7 p-4 sm:p-6 lg:p-8 flex flex-col justify-between space-y-4 sm:space-y-6 min-w-0">
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-xs font-mono text-slate-400 flex-wrap">
                     <span className="text-cyan-400 font-bold">{activeArtwork.artist}</span>

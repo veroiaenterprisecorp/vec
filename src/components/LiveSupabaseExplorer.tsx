@@ -249,7 +249,7 @@ export const LiveSupabaseExplorer: React.FC = () => {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 w-full">
       {/* Privacy & Security Notice Banner */}
       <div className="bg-slate-900/90 border border-emerald-500/30 rounded-2xl p-5 backdrop-blur-sm shadow-xl shadow-black/40">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
@@ -395,10 +395,10 @@ export const LiveSupabaseExplorer: React.FC = () => {
       {isConnected ? (
         <div className="space-y-5">
           {/* Sub-Navigation */}
-          <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto text-xs font-mono">
+          <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto scrollbar-none max-w-full text-xs font-mono">
             <button
               onClick={() => setActiveTab('feed')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
                 activeTab === 'feed'
                   ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-bold'
                   : 'text-slate-400 hover:text-white'

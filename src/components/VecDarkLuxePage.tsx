@@ -211,15 +211,15 @@ export default function VecNextPage() {
       {/* 1. TOP LUXE NAVIGATION BAR WITH OFFICIAL 3D VEC LOGO            */}
       {/* --------------------------------------------------------------- */}
       <header className="border-b border-slate-800/70 bg-[#050C1E]/90 backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-3 min-w-0">
           
           {/* Logo Brand */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-cyan-500/15 border border-cyan-500/30 flex items-center justify-center bg-[#02040A]">
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="w-9 sm:w-10 h-9 sm:h-10 rounded-xl overflow-hidden shadow-lg shadow-cyan-500/15 border border-cyan-500/30 flex items-center justify-center bg-[#02040A] shrink-0">
               <VecOfficialLogo className="w-full h-full" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <span className="text-sm font-bold tracking-tight text-white font-mono">
                   VEROIA
                 </span>
@@ -227,17 +227,17 @@ export default function VecNextPage() {
                   Core
                 </span>
               </div>
-              <div className="text-[11px] text-slate-400 font-mono tracking-tight -mt-0.5">
-                Zero-Trust Provenance Platform
+              <div className="hidden xs:block text-[11px] text-slate-400 font-mono tracking-tight -mt-0.5">
+                Zero-Trust Platform
               </div>
             </div>
           </div>
 
           {/* 2. Compact Minimalist Navigation Tabs */}
-          <nav className="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-slate-800">
+          <nav className="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-slate-800 overflow-x-auto scrollbar-none max-w-full">
             <button
               onClick={() => setActiveMenu('beranda')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition whitespace-nowrap cursor-pointer ${
                 activeMenu === 'beranda'
                   ? 'bg-cyan-500/20 text-cyan-300 font-semibold shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
@@ -247,7 +247,7 @@ export default function VecNextPage() {
             </button>
             <button
               onClick={() => setActiveMenu('kamera')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition whitespace-nowrap cursor-pointer ${
                 activeMenu === 'kamera'
                   ? 'bg-cyan-500/20 text-cyan-300 font-semibold shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
@@ -257,7 +257,7 @@ export default function VecNextPage() {
             </button>
             <button
               onClick={() => setActiveMenu('vault')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition whitespace-nowrap cursor-pointer ${
                 activeMenu === 'vault'
                   ? 'bg-cyan-500/20 text-cyan-300 font-semibold shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
@@ -267,7 +267,7 @@ export default function VecNextPage() {
             </button>
             <button
               onClick={() => setActiveMenu('diskusi')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition whitespace-nowrap cursor-pointer ${
                 activeMenu === 'diskusi'
                   ? 'bg-cyan-500/20 text-cyan-300 font-semibold shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
@@ -278,7 +278,7 @@ export default function VecNextPage() {
           </nav>
 
           {/* Right Status Pill */}
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-2 shrink-0">
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 text-xs font-mono">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
               <span>Skor Keaslian: <strong>99.40</strong></span>
@@ -290,7 +290,7 @@ export default function VecNextPage() {
       {/* --------------------------------------------------------------- */}
       {/* MAIN CONTAINER (DARK LUXE GALLERY)                              */}
       {/* --------------------------------------------------------------- */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-3 sm:px-6 py-6 sm:py-8 space-y-8 min-w-0">
         
         {/* Hero Tagline minimal */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-slate-800/60">

@@ -423,24 +423,24 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
         )}
 
         {/* LOCKED VAULT HIGH SECURITY GATE */}
-        <div className="max-w-2xl mx-auto py-10 px-4">
-          <div className="p-8 rounded-3xl bg-gradient-to-b from-[#091326] via-[#050B18] to-[#02050E] border border-cyan-500/40 shadow-2xl shadow-cyan-950/60 text-center space-y-6 relative overflow-hidden">
+        <div className="max-w-2xl mx-auto py-6 sm:py-10 px-2 sm:px-4 w-full min-w-0">
+          <div className="p-4 sm:p-8 rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#091326] via-[#050B18] to-[#02050E] border border-cyan-500/40 shadow-2xl shadow-cyan-950/60 text-center space-y-5 sm:space-y-6 relative overflow-hidden min-w-0">
             
             {/* Top Security Glow Rings */}
-            <div className="inline-flex p-4 rounded-3xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 shadow-lg shadow-cyan-500/20 relative">
-              <Lock className="w-10 h-10 animate-pulse text-cyan-300" />
-              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 border-2 border-black"></div>
+            <div className="inline-flex p-3 sm:p-4 rounded-2xl sm:rounded-3xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 shadow-lg shadow-cyan-500/20 relative">
+              <Lock className="w-8 h-8 sm:w-10 sm:h-10 animate-pulse text-cyan-300" />
+              <div className="absolute -top-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-red-500 border-2 border-black"></div>
             </div>
 
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-[11px] font-mono text-cyan-300">
-                <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-                <span>KEAMANAN TINGGI • ZERO-KNOWLEDGE ENCLAVE</span>
+            <div className="space-y-2 min-w-0">
+              <div className="inline-flex max-w-full items-center gap-1.5 sm:gap-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-[10px] sm:text-[11px] font-mono text-cyan-300">
+                <ShieldCheck className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span className="truncate">KEAMANAN TINGGI • ZERO-KNOWLEDGE ENCLAVE</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight break-words">
                 Brankas Karya Terkunci
               </h2>
-              <p className="text-xs sm:text-sm text-neutral-300 max-w-lg mx-auto leading-relaxed">
+              <p className="text-xs sm:text-sm text-neutral-300 max-w-lg mx-auto leading-relaxed break-words">
                 Setiap pendaftar memiliki brankas karya terisolasi sendiri di basis data Supabase.
                 Masukkan Kunci Akses Kriptografis Anda untuk membuka brankas, atau daftarkan akun kreator baru.
               </p>
@@ -449,12 +449,12 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
             {inlineKeyError && (
               <div className="p-3 rounded-xl bg-red-950/60 border border-red-500/40 text-red-200 text-xs flex items-center justify-center gap-2 max-w-md mx-auto">
                 <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                <span>{inlineKeyError}</span>
+                <span className="break-words">{inlineKeyError}</span>
               </div>
             )}
 
             {/* Key Input Form */}
-            <form onSubmit={handleInlineUnlock} className="max-w-md mx-auto space-y-3">
+            <form onSubmit={handleInlineUnlock} className="max-w-md mx-auto space-y-3 w-full">
               <div className="relative">
                 <KeyRound className="w-4 h-4 absolute left-3.5 top-3.5 text-cyan-400" />
                 <input
@@ -462,23 +462,23 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
                   placeholder="VEC-VK-XXXX-XXXX-XXXX-XXXX"
                   value={inlineKeyInput}
                   onChange={(e) => setInlineKeyInput(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-black/90 border border-cyan-500/50 focus:border-cyan-400 rounded-xl font-mono text-sm tracking-wider text-cyan-200 placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-cyan-400 shadow-inner"
+                  className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-black/90 border border-cyan-500/50 focus:border-cyan-400 rounded-xl font-mono text-xs sm:text-sm tracking-wider text-cyan-200 placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-cyan-400 shadow-inner"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={isVerifyingInlineKey}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-600 via-cyan-500 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs tracking-wider shadow-lg shadow-cyan-950/60 flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+                className="w-full py-2.5 sm:py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-600 via-cyan-500 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs tracking-wider shadow-lg shadow-cyan-950/60 flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
               >
                 {isVerifyingInlineKey ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Memverifikasi Kunci Kriptografis...</span>
+                    <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                    <span>Memverifikasi Kunci...</span>
                   </>
                 ) : (
                   <>
-                    <Unlock className="w-4 h-4" />
+                    <Unlock className="w-4 h-4 shrink-0" />
                     <span>Buka Kunci Brankas Karya</span>
                   </>
                 )}
@@ -486,10 +486,10 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
             </form>
 
             {/* Quick Demo Key Helper */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-xs max-w-md mx-auto">
-              <div className="text-left">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-xs max-w-md mx-auto w-full">
+              <div className="text-left min-w-0">
                 <span className="text-[10px] text-cyan-400 block font-mono font-semibold">KUNCI MASTER PEMILIK / DEMO:</span>
-                <span className="font-mono text-white text-xs font-bold">VEC-ADMIN-882991</span>
+                <span className="font-mono text-white text-xs font-bold break-all">VEC-ADMIN-882991</span>
               </div>
               <button
                 type="button"
@@ -507,41 +507,42 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
                   }
                   setIsVerifyingInlineKey(false);
                 }}
-                className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition cursor-pointer shadow"
+                className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition cursor-pointer shadow text-center shrink-0"
               >
                 Buka Langsung
               </button>
             </div>
 
             {/* Registration CTA & Cross Navigation Buttons */}
-            <div className="pt-4 border-t border-neutral-800/80 flex flex-wrap items-center justify-center gap-3">
+            <div className="pt-4 border-t border-neutral-800/80 flex flex-wrap items-center justify-center gap-2 sm:gap-3 w-full">
               <button
                 type="button"
                 onClick={() => setShowRegisterModal(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition shadow cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition shadow cursor-pointer"
               >
-                <PlusCircle className="w-4 h-4" />
+                <PlusCircle className="w-4 h-4 shrink-0" />
                 <span>Daftar Akun & Buat Brankas Baru</span>
               </button>
 
               <button
                 type="button"
                 onClick={onNavigateToPublicVault}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 transition cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 transition cursor-pointer"
               >
-                <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                <ShieldCheck className="w-4 h-4 text-cyan-400 shrink-0" />
                 <span>Lihat Katalog Publik</span>
               </button>
 
               <button
                 type="button"
                 onClick={onNavigateToStudio}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 transition cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 transition cursor-pointer"
               >
-                <Camera className="w-4 h-4 text-cyan-400" />
+                <Camera className="w-4 h-4 text-cyan-400 shrink-0" />
                 <span>Buka Studio Foto</span>
               </button>
             </div>
+
 
             {/* List of Registered Vaults on Device */}
             {getCachedRegisteredVaults().length > 0 && (

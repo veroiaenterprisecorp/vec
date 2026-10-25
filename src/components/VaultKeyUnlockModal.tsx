@@ -159,10 +159,10 @@ export const VaultKeyUnlockModal: React.FC<VaultKeyUnlockModalProps> = ({
           </form>
 
           {/* Quick Demo Key Helper */}
-          <div className="flex items-center justify-between p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-xs">
-            <div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-xs min-w-0">
+            <div className="min-w-0">
               <span className="text-[10px] text-cyan-400 block font-mono">KUNCI MASTER RESMI / DEMO:</span>
-              <span className="font-mono text-white text-xs font-bold">VEC-ADMIN-882991</span>
+              <span className="font-mono text-white text-xs font-bold break-all">VEC-ADMIN-882991</span>
             </div>
             <button
               type="button"
@@ -176,7 +176,7 @@ export const VaultKeyUnlockModal: React.FC<VaultKeyUnlockModalProps> = ({
                 }
                 setIsVerifying(false);
               }}
-              className="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-[11px] transition cursor-pointer shadow"
+              className="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-[11px] transition cursor-pointer shadow shrink-0 self-start sm:self-auto"
             >
               Gunakan Ini
             </button>

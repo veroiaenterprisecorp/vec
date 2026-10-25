@@ -189,7 +189,7 @@ export default function App() {
       />
 
       {/* Main Luxury Content Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 min-w-0">
         <Suspense
           fallback={
             <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-neutral-800 bg-neutral-950/70 text-sm text-neutral-400">
@@ -244,20 +244,20 @@ export default function App() {
       </main>
 
       {/* Premium Institutional Footer */}
-      <footer className="border-t border-neutral-900 bg-[#010206] py-10 text-xs font-sans text-neutral-400">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-neutral-900 border border-neutral-800 p-0.5 flex items-center justify-center">
+      <footer className="border-t border-neutral-900 bg-[#010206] py-8 sm:py-10 text-xs font-sans text-neutral-400 w-full">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6 min-w-0">
+          <div className="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-neutral-900 border border-neutral-800 p-0.5 flex items-center justify-center shrink-0">
               <VecOfficialLogo className="w-full h-full" />
             </div>
-            <div>
+            <div className="min-w-0">
               <span className="text-white font-semibold">Veroia Enterprise Corp</span>
-              <span className="mx-2 text-neutral-600">·</span>
-              <span className="text-neutral-400">Verifikasi & Sertifikasi Keaslian Karya Seni</span>
+              <span className="mx-2 text-neutral-600 hidden sm:inline">·</span>
+              <span className="text-neutral-400 block sm:inline mt-0.5 sm:mt-0">Verifikasi & Sertifikasi Keaslian Karya Seni</span>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-5 text-neutral-400">
+          <div className="flex flex-wrap items-center justify-center md:justify-end gap-2.5 sm:gap-5 text-neutral-400 text-center">
             <span>Brankas Aman</span>
             <span aria-hidden="true" className="text-neutral-700">·</span>
             <span>Standar Verifikasi Resmi</span>
@@ -281,6 +281,7 @@ export default function App() {
           </div>
         </div>
       </footer>
+
 
       {/* Global Vault Registration Modal */}
       <VaultRegistrationModal

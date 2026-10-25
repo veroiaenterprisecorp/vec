@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { VecOfficialLogo } from './VecOfficialLogo';
-import { Camera, Lock, Power, KeyRound, ShieldCheck } from 'lucide-react';
+import { Camera, Lock, Power, KeyRound, ShieldCheck, Menu, X } from 'lucide-react';
 import { isVaultUnlocked } from '../lib/vaultKeyAuth';
 
 interface HeaderProps {
@@ -21,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenRegisterModal
 }) => {
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => isVaultUnlocked());
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   useEffect(() => {
     const sync = () => setIsUnlocked(isVaultUnlocked());
@@ -31,28 +32,34 @@ export const Header: React.FC<HeaderProps> = ({
       window.removeEventListener('storage', sync);
     };
   }, []);
+
+  const handleTabClick = (tab: string) => {
+    setActiveTab(tab);
+    setIsMobileMenuOpen(false);
+  };
+
   return (
-    <header className="border-b border-neutral-800/80 bg-[#020409]/95 backdrop-blur-xl sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-8">
+    <header className="border-b border-neutral-800/80 bg-[#020409]/95 backdrop-blur-xl sticky top-0 z-50 w-full">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-18 flex items-center justify-between gap-2 sm:gap-4 lg:gap-6">
         
-        {/* Zone 1: Brand Wordmark (Single Element Lockup) */}
+        {/* Zone 1: Brand Wordmark */}
         <button
-          onClick={() => setActiveTab('overview')}
-          className="flex items-center gap-3 text-left whitespace-nowrap shrink-0 group focus:outline-none cursor-pointer"
+          onClick={() => handleTabClick('overview')}
+          className="flex items-center gap-2 sm:gap-3 text-left shrink-0 group focus:outline-none cursor-pointer min-w-0"
         >
-          <div className="w-8 h-8 rounded-lg overflow-hidden border border-neutral-700/80 bg-neutral-950 p-0.5 flex items-center justify-center transition group-hover:border-cyan-400/80 shadow-sm">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg overflow-hidden border border-neutral-700/80 bg-neutral-950 p-0.5 flex items-center justify-center transition group-hover:border-cyan-400/80 shadow-sm shrink-0">
             <VecOfficialLogo className="w-full h-full" />
           </div>
-          <span className="text-sm font-semibold tracking-[0.20em] text-white font-sans group-hover:text-cyan-300 transition-colors uppercase">
-            Veroia Enterprise
+          <span className="text-xs sm:text-sm font-semibold tracking-[0.15em] sm:tracking-[0.20em] text-white font-sans group-hover:text-cyan-300 transition-colors uppercase truncate">
+            Veroia<span className="hidden sm:inline"> Enterprise</span>
           </span>
         </button>
 
-        {/* Zone 2: Navigation Links (Clean Single-Line Typography) */}
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-neutral-300">
+        {/* Zone 2: Desktop Navigation Links */}
+        <nav className="hidden lg:flex items-center gap-4 xl:gap-7 text-xs xl:text-sm font-medium text-neutral-300 shrink-0">
           <button
-            onClick={() => setActiveTab('overview')}
-            className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer ${
+            onClick={() => handleTabClick('overview')}
+            className={`whitespace-nowrap transition-colors py-1 cursor-pointer ${
               activeTab === 'overview'
                 ? 'text-white border-b-2 border-cyan-400 font-semibold'
                 : 'text-neutral-400 hover:text-white'
@@ -62,8 +69,8 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('vault')}
-            className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer ${
+            onClick={() => handleTabClick('vault')}
+            className={`whitespace-nowrap transition-colors py-1 cursor-pointer ${
               activeTab === 'vault'
                 ? 'text-white border-b-2 border-cyan-400 font-semibold'
                 : 'text-neutral-400 hover:text-white'
@@ -73,8 +80,8 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('private-vault')}
-            className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer flex items-center gap-1.5 ${
+            onClick={() => handleTabClick('private-vault')}
+            className={`whitespace-nowrap transition-colors py-1 cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'private-vault'
                 ? 'text-white border-b-2 border-emerald-400 font-semibold'
                 : 'text-neutral-400 hover:text-white'
@@ -91,8 +98,8 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('studio')}
-            className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer ${
+            onClick={() => handleTabClick('studio')}
+            className={`whitespace-nowrap transition-colors py-1 cursor-pointer ${
               activeTab === 'studio'
                 ? 'text-white border-b-2 border-cyan-400 font-semibold'
                 : 'text-neutral-400 hover:text-white'
@@ -102,8 +109,8 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('admin-portal')}
-            className={`whitespace-nowrap shrink-0 transition-colors py-1 cursor-pointer flex items-center gap-1.5 ${
+            onClick={() => handleTabClick('admin-portal')}
+            className={`whitespace-nowrap transition-colors py-1 cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'admin-portal'
                 ? 'text-white border-b-2 border-emerald-400 font-semibold'
                 : 'text-neutral-400 hover:text-white'
@@ -115,98 +122,204 @@ export const Header: React.FC<HeaderProps> = ({
         </nav>
 
         {/* Zone 3: Primary Action & Vecout */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {onOpenRegisterModal && (
             <button
               onClick={onOpenRegisterModal}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-cyan-200 bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 rounded-lg shadow-sm transition-all duration-200 cursor-pointer"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-cyan-200 bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 rounded-lg shadow-sm transition-all duration-200 cursor-pointer"
               title="Pendaftaran Brankas & Kunci Baru"
             >
-              <KeyRound className="w-3.5 h-3.5 text-cyan-400" />
+              <KeyRound className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
               <span className="whitespace-nowrap">Daftar Brankas</span>
             </button>
           )}
 
           <button
-            onClick={() => setActiveTab('studio')}
-            className="hidden sm:inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 border border-neutral-700/80 hover:border-cyan-500/50 rounded-lg shadow-sm transition-all duration-200 cursor-pointer"
+            onClick={() => handleTabClick('studio')}
+            className="hidden xl:inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 border border-neutral-700/80 hover:border-cyan-500/50 rounded-lg shadow-sm transition-all duration-200 cursor-pointer"
           >
-            <Camera className="w-3.5 h-3.5 text-cyan-400" />
+            <Camera className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
             <span className="whitespace-nowrap">Studio Foto</span>
           </button>
 
+          {/* Vecout Button: Always prominently visible on mobile and desktop */}
           <button
             onClick={onVecout}
-            className="inline-flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold text-rose-300 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/60 hover:border-rose-600 rounded-lg shadow-sm transition-all duration-200 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-rose-300 bg-rose-950/50 hover:bg-rose-900/70 border border-rose-800/70 hover:border-rose-600 rounded-lg shadow-sm transition-all duration-200 cursor-pointer shrink-0"
             title="Vecout: Kunci seluruh brankas dan keluar dari sesi aktif"
           >
-            <Power className="w-3.5 h-3.5 text-rose-400" />
+            <Power className="w-3.5 h-3.5 text-rose-400 shrink-0" />
             <span className="whitespace-nowrap font-medium">Vecout</span>
+          </button>
+
+          {/* Mobile Menu Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="lg:hidden p-2 rounded-lg bg-neutral-900 text-neutral-300 hover:text-white border border-neutral-800 focus:outline-none transition cursor-pointer"
+            aria-label={isMobileMenuOpen ? 'Tutup menu' : 'Buka menu'}
+          >
+            {isMobileMenuOpen ? (
+              <X className="w-4 h-4 text-cyan-400" />
+            ) : (
+              <Menu className="w-4 h-4" />
+            )}
           </button>
         </div>
 
       </div>
 
-      {/* Mobile Responsive Navigation Strip */}
-      <div className="md:hidden flex items-center justify-between gap-1 overflow-x-auto px-4 py-2 border-t border-neutral-900 bg-neutral-950 text-xs">
+      {/* Expandable Mobile Navigation Menu */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden border-t border-neutral-850 bg-[#030612]/98 backdrop-blur-2xl px-4 py-4 space-y-3 shadow-2xl animate-in fade-in duration-150">
+          <div className="grid grid-cols-1 gap-1 text-sm font-medium">
+            <button
+              onClick={() => handleTabClick('overview')}
+              className={`flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors text-left ${
+                activeTab === 'overview'
+                  ? 'bg-cyan-500/15 text-cyan-300 font-semibold border border-cyan-500/30'
+                  : 'text-neutral-300 hover:bg-neutral-900'
+              }`}
+            >
+              <span>Ikhtisar</span>
+              {activeTab === 'overview' && <span className="w-2 h-2 rounded-full bg-cyan-400"></span>}
+            </button>
+
+            <button
+              onClick={() => handleTabClick('vault')}
+              className={`flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors text-left ${
+                activeTab === 'vault'
+                  ? 'bg-cyan-500/15 text-cyan-300 font-semibold border border-cyan-500/30'
+                  : 'text-neutral-300 hover:bg-neutral-900'
+              }`}
+            >
+              <span>Katalog Karya</span>
+              {activeTab === 'vault' && <span className="w-2 h-2 rounded-full bg-cyan-400"></span>}
+            </button>
+
+            <button
+              onClick={() => handleTabClick('private-vault')}
+              className={`flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors text-left ${
+                activeTab === 'private-vault'
+                  ? 'bg-emerald-500/15 text-emerald-300 font-semibold border border-emerald-500/30'
+                  : 'text-neutral-300 hover:bg-neutral-900'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span>Brankas Karya</span>
+                {isUnlocked ? (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Terbuka</span>
+                ) : (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400">Terkunci</span>
+                )}
+              </div>
+              <Lock className={`w-4 h-4 ${isUnlocked ? 'text-emerald-400' : 'text-neutral-500'}`} />
+            </button>
+
+            <button
+              onClick={() => handleTabClick('studio')}
+              className={`flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors text-left ${
+                activeTab === 'studio'
+                  ? 'bg-cyan-500/15 text-cyan-300 font-semibold border border-cyan-500/30'
+                  : 'text-neutral-300 hover:bg-neutral-900'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Camera className="w-4 h-4 text-cyan-400" />
+                <span>Studio Kamera</span>
+              </div>
+              {activeTab === 'studio' && <span className="w-2 h-2 rounded-full bg-cyan-400"></span>}
+            </button>
+
+            <button
+              onClick={() => handleTabClick('admin-portal')}
+              className={`flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors text-left ${
+                activeTab === 'admin-portal'
+                  ? 'bg-emerald-500/15 text-emerald-300 font-semibold border border-emerald-500/30'
+                  : 'text-neutral-300 hover:bg-neutral-900'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Kontrol Admin</span>
+              </div>
+              {activeTab === 'admin-portal' && <span className="w-2 h-2 rounded-full bg-emerald-400"></span>}
+            </button>
+          </div>
+
+          {/* Quick Actions in Mobile Menu */}
+          <div className="pt-2 border-t border-neutral-800/80 flex flex-col gap-2">
+            {onOpenRegisterModal && (
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onOpenRegisterModal();
+                }}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-cyan-200 bg-cyan-950/70 border border-cyan-500/40 hover:bg-cyan-900 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <KeyRound className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Daftar Akun & Brankas Baru</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => handleTabClick('studio')}
+              className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-850 border border-neutral-700 transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Camera className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Buka Studio Foto Kamera</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Responsive Navigation Strip (Quick Horizontal Tap Bar) */}
+      <div className="lg:hidden w-full overflow-x-auto scrollbar-none px-2.5 sm:px-4 py-1.5 border-t border-neutral-900/90 bg-neutral-950/90 flex items-center gap-1.5 text-xs">
         <button
-          onClick={() => setActiveTab('overview')}
-          className={`px-2.5 py-1.5 rounded-md whitespace-nowrap transition-colors ${
-            activeTab === 'overview' ? 'text-white font-semibold bg-neutral-800' : 'text-neutral-400'
+          onClick={() => handleTabClick('overview')}
+          className={`px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition-colors ${
+            activeTab === 'overview' ? 'text-white font-semibold bg-neutral-800 shadow-xs' : 'text-neutral-400 hover:text-white'
           }`}
         >
           Ikhtisar
         </button>
         <button
-          onClick={() => setActiveTab('vault')}
-          className={`px-2.5 py-1.5 rounded-md whitespace-nowrap transition-colors ${
-            activeTab === 'vault' ? 'text-white font-semibold bg-neutral-800' : 'text-neutral-400'
+          onClick={() => handleTabClick('vault')}
+          className={`px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition-colors ${
+            activeTab === 'vault' ? 'text-white font-semibold bg-neutral-800 shadow-xs' : 'text-neutral-400 hover:text-white'
           }`}
         >
           Katalog
         </button>
         <button
-          onClick={() => setActiveTab('private-vault')}
-          className={`px-2.5 py-1.5 rounded-md whitespace-nowrap transition-colors ${
-            activeTab === 'private-vault' ? 'text-white font-semibold bg-neutral-800' : 'text-neutral-400'
+          onClick={() => handleTabClick('private-vault')}
+          className={`px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition-colors flex items-center gap-1.5 ${
+            activeTab === 'private-vault' ? 'text-white font-semibold bg-neutral-800 shadow-xs' : 'text-neutral-400 hover:text-white'
           }`}
         >
-          Brankas
+          <span>Brankas</span>
+          {isUnlocked ? (
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Terbuka"></span>
+          ) : (
+            <Lock className="w-2.5 h-2.5 text-neutral-500" />
+          )}
         </button>
         <button
-          onClick={() => setActiveTab('studio')}
-          className={`px-2.5 py-1.5 rounded-md whitespace-nowrap transition-colors ${
-            activeTab === 'studio' ? 'text-white font-semibold bg-neutral-800' : 'text-neutral-400'
+          onClick={() => handleTabClick('studio')}
+          className={`px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition-colors ${
+            activeTab === 'studio' ? 'text-white font-semibold bg-neutral-800 shadow-xs' : 'text-neutral-400 hover:text-white'
           }`}
         >
           Studio
         </button>
         <button
-          onClick={() => setActiveTab('admin-portal')}
-          className={`px-2.5 py-1.5 rounded-md whitespace-nowrap transition-colors flex items-center gap-1 ${
-            activeTab === 'admin-portal' ? 'text-emerald-300 font-semibold bg-emerald-950/60 border border-emerald-500/40' : 'text-neutral-400'
+          onClick={() => handleTabClick('admin-portal')}
+          className={`px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition-colors flex items-center gap-1 ${
+            activeTab === 'admin-portal' ? 'text-emerald-300 font-semibold bg-emerald-950/60 border border-emerald-500/40 shadow-xs' : 'text-neutral-400 hover:text-white'
           }`}
         >
           <ShieldCheck className="w-3 h-3 text-emerald-400" />
           <span>Admin</span>
-        </button>
-        {onOpenRegisterModal && (
-          <button
-            onClick={onOpenRegisterModal}
-            className="px-2.5 py-1.5 rounded-md whitespace-nowrap text-xs text-cyan-300 bg-cyan-950/60 border border-cyan-800/60 flex items-center gap-1 cursor-pointer"
-            title="Daftar Brankas"
-          >
-            <KeyRound className="w-3 h-3 text-cyan-400" />
-            <span>Daftar</span>
-          </button>
-        )}
-        <button
-          onClick={onVecout}
-          className="px-2.5 py-1.5 rounded-md whitespace-nowrap text-xs text-rose-300 bg-rose-950/50 hover:bg-rose-900/60 border border-rose-800/50 flex items-center gap-1 cursor-pointer"
-          title="Vecout: Kunci Sesi"
-        >
-          <Power className="w-3 h-3 text-rose-400" />
-          <span>Vecout</span>
         </button>
       </div>
 

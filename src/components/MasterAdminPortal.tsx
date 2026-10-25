@@ -658,30 +658,30 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
   // VIEW 2: AUTHENTICATED MASTER FORTRESS PORTAL
   // -------------------------------------------------------------
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 w-full">
 
       {/* Portal Top Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/40 border border-emerald-500/30 shadow-xl backdrop-blur-xl">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/40 border border-emerald-500/30 shadow-xl backdrop-blur-xl min-w-0">
         
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shadow-inner">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shadow-inner shrink-0">
             <ShieldCheck className="w-6 h-6" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-white">Vecmaster — Konsol Pengelola Kunci Master</h1>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-bold uppercase">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-base sm:text-lg font-bold text-white truncate">Vecmaster — Konsol Pengelola Kunci Master</h1>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-bold uppercase shrink-0">
                 Akses Terotorisasi (Vecmaster)
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-400 mt-0.5 truncate">
               Terkunci Rapat · Bebas Pelacakan Publik · Sesi Aman Berenkripsi SHA-256
             </p>
           </div>
         </div>
 
         {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
           <button
             onClick={handleCopySecretUrl}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-mono text-cyan-300 transition cursor-pointer"
@@ -693,7 +693,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
 
           <button
             onClick={handleLockAndExit}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-xs font-semibold text-rose-200 transition cursor-pointer shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-xs font-semibold text-rose-200 transition cursor-pointer shadow-sm"
           >
             <Lock className="w-3.5 h-3.5" />
             <span>Kunci & Keluar ke Web Publik</span>
@@ -703,12 +703,12 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
       </div>
 
       {/* Navigation Sub-Tabs */}
-      <div className="space-y-2 border-b border-slate-800 pb-3">
+      <div className="space-y-2 border-b border-slate-800 pb-3 min-w-0 w-full">
         {/* Core Sections (Prioritas Pengelola) */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none min-w-0 w-full">
           <button
             onClick={() => setAdminTab('monitoring')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
               adminTab === 'monitoring'
                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
@@ -720,7 +720,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
 
           <button
             onClick={() => setAdminTab('users')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
               adminTab === 'users'
                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
@@ -732,7 +732,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
 
           <button
             onClick={() => setAdminTab('gallery')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
               adminTab === 'gallery'
                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
@@ -744,7 +744,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
 
           <button
             onClick={() => setAdminTab('security')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
               adminTab === 'security' || adminTab === 'audit'
                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
@@ -756,7 +756,7 @@ export const MasterAdminPortal: React.FC<MasterAdminPortalProps> = ({
         </div>
 
         {/* Secondary Technical Tools */}
-        <div className="flex items-center gap-1.5 overflow-x-auto text-xs pt-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto text-xs pt-1 scrollbar-none min-w-0 w-full">
           <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider mr-1">Alat Teknis:</span>
 
           <button

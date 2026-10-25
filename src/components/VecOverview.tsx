@@ -20,24 +20,24 @@ interface VecOverviewProps {
 
 export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegisterModal }) => {
   return (
-    <div className="space-y-20 py-4 font-sans text-neutral-100">
+    <div className="space-y-12 sm:space-y-16 lg:space-y-20 py-2 sm:py-4 font-sans text-neutral-100 min-w-0 w-full">
       
       {/* ------------------------------------------------------------- */}
       {/* HERO SECTION - ELEGANT ART ATTESTATION                        */}
       {/* ------------------------------------------------------------- */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-neutral-900 via-[#030611] to-[#020409] border border-neutral-800/90 p-6 sm:p-10 lg:p-14 shadow-2xl">
+      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-b from-neutral-900 via-[#030611] to-[#020409] border border-neutral-800/90 p-4 sm:p-8 lg:p-14 shadow-2xl min-w-0 w-full">
         
         {/* Ambient Subtle Radial Glow */}
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-3xl pointer-events-none -z-0"></div>
-        <div className="absolute bottom-0 left-10 w-[450px] h-[450px] bg-blue-600/5 rounded-full blur-3xl pointer-events-none -z-0"></div>
+        <div className="absolute top-0 right-1/4 w-[400px] sm:w-[500px] h-[400px] sm:h-[500px] bg-cyan-500/5 rounded-full blur-3xl pointer-events-none -z-0"></div>
+        <div className="absolute bottom-0 left-10 w-[350px] sm:w-[450px] h-[350px] sm:h-[450px] bg-blue-600/5 rounded-full blur-3xl pointer-events-none -z-0"></div>
 
-        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center min-w-0">
           
           {/* Left Column: Editorial Value Proposition */}
-          <div className="lg:col-span-7 space-y-7">
+          <div className="lg:col-span-7 space-y-5 sm:space-y-7 min-w-0">
             
             {/* Lead-in Badges */}
-            <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-400 font-medium">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-neutral-400 font-medium">
               <span className="text-cyan-400 font-semibold uppercase tracking-wider">Keaslian Terjamin</span>
               <span aria-hidden="true" className="text-neutral-600">·</span>
               <span>Sertifikasi Standar Global</span>
@@ -48,20 +48,20 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
             </div>
 
             {/* Display Headline */}
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-white leading-[1.12]" style={{ textWrap: 'balance' }}>
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-white leading-[1.15] break-words" style={{ textWrap: 'balance' }}>
               Autentikasi Karya Seni & Dokumentasi Asli Tanpa Kompromi
             </h1>
 
             {/* Prose */}
-            <p className="text-sm sm:text-base text-neutral-300 leading-relaxed max-w-2xl font-normal">
+            <p className="text-xs sm:text-base text-neutral-300 leading-relaxed max-w-2xl font-normal break-words">
               Platform perlindungan keaslian karya seni untuk Veroia Enterprise Corp yang menghubungkan pengambilan foto asli langsung dari kamera, segel fisik anti-pemalsuan pada kanvas karya, dan perlindungan privasi ke sistem penyimpanan aman.
             </p>
 
             {/* Primary Action Buttons */}
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-1 sm:pt-2">
               <button
                 onClick={() => onNavigate('vault')}
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-xs sm:text-sm font-semibold text-white bg-cyan-600 hover:bg-cyan-500 transition shadow-lg shadow-cyan-950/40 cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold text-white bg-cyan-600 hover:bg-cyan-500 transition shadow-lg shadow-cyan-950/40 cursor-pointer"
               >
                 <span>Jelajahi Katalog Karya</span>
                 <ArrowRight className="w-4 h-4" />
@@ -69,7 +69,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
 
               <button
                 onClick={() => onNavigate('studio')}
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-xs sm:text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-800 border border-neutral-700/80 hover:border-cyan-500/50 transition cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-800 border border-neutral-700/80 hover:border-cyan-500/50 transition cursor-pointer"
               >
                 <Camera className="w-4 h-4 text-cyan-400" />
                 <span>Buka Studio Foto</span>
@@ -77,7 +77,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
 
               <button
                 onClick={() => onNavigate('private-vault')}
-                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl text-xs sm:text-sm font-semibold text-neutral-300 hover:text-white bg-neutral-950/60 hover:bg-neutral-900 border border-neutral-800 transition cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold text-neutral-300 hover:text-white bg-neutral-950/60 hover:bg-neutral-900 border border-neutral-800 transition cursor-pointer"
               >
                 <Lock className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Brankas Koleksi Pribadi</span>
@@ -86,7 +86,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
               {onOpenRegisterModal && (
                 <button
                   onClick={onOpenRegisterModal}
-                  className="inline-flex items-center gap-2 px-4 py-3 rounded-xl text-xs sm:text-sm font-semibold text-cyan-200 hover:text-white bg-cyan-950/70 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 transition cursor-pointer shadow-lg shadow-cyan-950/50"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold text-cyan-200 hover:text-white bg-cyan-950/70 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 transition cursor-pointer shadow-lg shadow-cyan-950/50"
                   title="Daftar akun dan terbitkan kunci brankas baru"
                 >
                   <KeyRound className="w-3.5 h-3.5 text-cyan-400" />
@@ -96,7 +96,7 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
             </div>
 
             {/* Trust Markers */}
-            <div className="pt-4 border-t border-neutral-800/80 flex flex-wrap items-center gap-6 text-xs text-neutral-400">
+            <div className="pt-3 sm:pt-4 border-t border-neutral-800/80 flex flex-wrap items-center gap-4 sm:gap-6 text-xs text-neutral-400">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>Dukungan Kamera Profesional Terverifikasi</span>
@@ -110,12 +110,12 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
           </div>
 
           {/* Right Column: Hero Visual Showcase */}
-          <div className="lg:col-span-5 relative">
-            <div className="relative rounded-2xl overflow-hidden border border-neutral-700/80 bg-neutral-950 shadow-2xl group">
+          <div className="lg:col-span-5 relative w-full min-w-0">
+            <div className="relative rounded-2xl overflow-hidden border border-neutral-700/80 bg-neutral-950 shadow-2xl group w-full">
               <img
                 src="/assets/images/vec_hero_camera_1792494926035.jpg"
                 alt="Verifikasi Kamera Veroia Enterprise"
-                className="w-full h-84 sm:h-96 object-cover object-center group-hover:scale-102 transition duration-700"
+                className="w-full h-72 sm:h-88 lg:h-96 object-cover object-center group-hover:scale-102 transition duration-700"
                 referrerPolicy="no-referrer"
                 onError={(e) => {
                   e.currentTarget.style.opacity = '0.3';
@@ -123,29 +123,29 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent"></div>
 
-              {/* Verified Overlay Badge */}
-              <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
-                <div className="bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-cyan-500/40 text-xs font-medium text-cyan-300 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Terverifikasi Dari Kamera Langsung</span>
+              {/* Verified Overlay Badge - Fully Responsive with wrapping */}
+              <div className="absolute top-3 sm:top-4 left-3 sm:left-4 right-3 sm:right-4 flex flex-wrap items-center justify-between gap-1.5 z-10">
+                <div className="bg-black/85 backdrop-blur-md px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-cyan-500/40 text-[11px] sm:text-xs font-medium text-cyan-300 flex items-center gap-1.5 max-w-[75%] truncate shadow">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span className="truncate">Terverifikasi Kamera Asli</span>
                 </div>
-                <div className="bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-neutral-700 text-[11px] font-medium text-neutral-300">
+                <div className="bg-black/85 backdrop-blur-md px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-neutral-700 text-[10px] sm:text-[11px] font-medium text-neutral-300 shrink-0 shadow">
                   Foto Asli
                 </div>
               </div>
 
               {/* Certificate Card at Bottom */}
-              <div className="absolute bottom-4 left-4 right-4 bg-neutral-900/90 backdrop-blur-md p-3.5 rounded-xl border border-neutral-800 text-xs space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-neutral-400 text-[11px]">Tanda Keaslian Resmi:</span>
-                  <span className="text-emerald-400 font-bold text-[11px]">ASLI & SAH</span>
+              <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-4 bg-neutral-900/90 backdrop-blur-md p-3 sm:p-3.5 rounded-xl border border-neutral-800 text-xs space-y-1.5 shadow-lg">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-neutral-400 text-[11px] truncate">Tanda Keaslian Resmi:</span>
+                  <span className="text-emerald-400 font-bold text-[11px] shrink-0">ASLI & SAH</span>
                 </div>
-                <div className="text-[11px] text-cyan-300 truncate font-medium">
+                <div className="text-[11px] text-cyan-300 truncate font-medium font-mono">
                   ID Sertifikat: VEC-CERT-9F86D081
                 </div>
-                <div className="flex items-center justify-between text-[11px] text-neutral-400 pt-1 border-t border-neutral-800">
-                  <span>Keaslian Karya & Foto</span>
-                  <span className="text-emerald-400 font-semibold">Terverifikasi 100%</span>
+                <div className="flex items-center justify-between gap-2 text-[11px] text-neutral-400 pt-1 border-t border-neutral-800">
+                  <span className="truncate">Keaslian Karya & Foto</span>
+                  <span className="text-emerald-400 font-semibold shrink-0">Terverifikasi 100%</span>
                 </div>
               </div>
 
@@ -155,72 +155,74 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
         </div>
 
         {/* 4-Column KPI Strip */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-10 pt-8 border-t border-neutral-800/80">
-          <div className="p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80">
-            <div className="text-2xl sm:text-3xl font-bold text-white tabular-nums">99.4%</div>
-            <div className="text-xs text-neutral-400 mt-1">Akurasi Verifikasi Keaslian</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 mt-8 sm:mt-10 pt-6 sm:pt-8 border-t border-neutral-800/80">
+          <div className="p-3 sm:p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80 min-w-0">
+            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white tabular-nums truncate">99.4%</div>
+            <div className="text-[11px] sm:text-xs text-neutral-400 mt-1 break-words">Akurasi Verifikasi Keaslian</div>
           </div>
-          <div className="p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80">
-            <div className="text-2xl sm:text-3xl font-bold text-cyan-400">Resmi</div>
-            <div className="text-xs text-neutral-400 mt-1">Standar Verifikasi Internasional</div>
+          <div className="p-3 sm:p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80 min-w-0">
+            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-cyan-400 truncate">Resmi</div>
+            <div className="text-[11px] sm:text-xs text-neutral-400 mt-1 break-words">Standar Verifikasi Global</div>
           </div>
-          <div className="p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80">
-            <div className="text-2xl sm:text-3xl font-bold text-amber-400">Aman</div>
-            <div className="text-xs text-neutral-400 mt-1">Segel Pengaman Fisik Karya</div>
+          <div className="p-3 sm:p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80 min-w-0">
+            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-amber-400 truncate">Aman</div>
+            <div className="text-[11px] sm:text-xs text-neutral-400 mt-1 break-words">Segel Pengaman Fisik</div>
           </div>
-          <div className="p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80">
-            <div className="text-2xl sm:text-3xl font-bold text-emerald-400">Cloud</div>
-            <div className="text-xs text-neutral-400 mt-1">Penyimpanan Berkeamanan Tinggi</div>
+          <div className="p-3 sm:p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80 min-w-0">
+            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 truncate">Cloud</div>
+            <div className="text-[11px] sm:text-xs text-neutral-400 mt-1 break-words">Penyimpanan Terproteksi</div>
           </div>
         </div>
 
       </section>
 
+
       {/* ------------------------------------------------------------- */}
       {/* REGISTRATION & VAULT IDENTITY CONNECTOR BANNER                */}
       {/* ------------------------------------------------------------- */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#071326] via-[#040a14] to-[#02050b] border border-cyan-500/40 p-6 sm:p-8 lg:p-10 shadow-2xl">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
-          <div className="space-y-3 text-center lg:text-left">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-semibold">
-              <KeyRound className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Sistem Pendaftaran Brankas Terenkripsi Multi-Tenant</span>
+      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#071326] via-[#040a14] to-[#02050b] border border-cyan-500/40 p-4 sm:p-8 lg:p-10 shadow-2xl min-w-0 w-full">
+        <div className="absolute top-0 right-0 w-72 sm:w-96 h-72 sm:h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="relative z-10 flex flex-col lg:flex-row items-center lg:items-start justify-between gap-6 sm:gap-8 min-w-0">
+          <div className="space-y-3 text-center lg:text-left min-w-0 w-full">
+            <div className="inline-flex max-w-full items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-semibold">
+              <KeyRound className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span className="truncate">Sistem Pendaftaran Brankas Terenkripsi Multi-Tenant</span>
             </div>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight break-words">
               Pendaftaran Mandiri: Terhubung Langsung ke Ruang Admin & Email
             </h2>
-            <p className="text-xs sm:text-sm text-neutral-300 max-w-2xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-neutral-300 max-w-2xl leading-relaxed break-words">
               Daftarkan brankas karya pribadi Anda dalam satu langkah. Sistem langsung menerbitkan kunci akses kriptografis SHA-256 yang aman, otomatis tersinkronisasi ke <strong>Ruangan Kontrol Admin Vecmaster</strong>, dan mengirimkan salinan sertifikat resmi langsung ke <strong>email pendaftar</strong>.
             </p>
-            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-1 text-xs text-neutral-400 font-medium">
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2.5 sm:gap-4 pt-1 text-xs text-neutral-400 font-medium">
               <span className="flex items-center gap-1.5 text-emerald-400">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Terhubung Web Resmi VEC
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Terhubung Web Resmi VEC
               </span>
               <span className="flex items-center gap-1.5 text-emerald-400">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Tercatat di Kontrol Admin
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Tercatat di Kontrol Admin
               </span>
               <span className="flex items-center gap-1.5 text-emerald-400">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Konfirmasi ke Email Pendaftar
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Konfirmasi ke Email Pendaftar
               </span>
             </div>
           </div>
 
           {onOpenRegisterModal && (
-            <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
+            <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0 w-full lg:w-auto">
               <button
                 type="button"
                 onClick={onOpenRegisterModal}
-                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-cyan-600 via-cyan-500 to-blue-600 hover:from-cyan-500 hover:to-blue-500 transition shadow-lg shadow-cyan-950/60 cursor-pointer"
+                className="w-full sm:w-auto justify-center inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-cyan-600 via-cyan-500 to-blue-600 hover:from-cyan-500 hover:to-blue-500 transition shadow-lg shadow-cyan-950/60 cursor-pointer"
               >
-                <KeyRound className="w-4 h-4" />
+                <KeyRound className="w-4 h-4 shrink-0" />
                 <span>Daftar Brankas Karya Baru</span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4 shrink-0" />
               </button>
             </div>
           )}
         </div>
       </section>
+
 
       {/* ------------------------------------------------------------- */}
       {/* FOUR CORE PILLARS SECTION                                     */}
@@ -391,17 +393,17 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
         {/* Card 5: Ruang Kontrol Admin & Pengawasan Sistem (Full Width Connector) */}
         <div 
           onClick={() => onNavigate('admin-portal')}
-          className="group cursor-pointer bg-gradient-to-r from-emerald-950/30 via-slate-900/60 to-cyan-950/30 hover:bg-slate-900 border border-emerald-500/30 hover:border-emerald-500/60 rounded-2xl p-6 transition duration-300 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl"
+          className="group cursor-pointer bg-gradient-to-r from-emerald-950/30 via-slate-900/60 to-cyan-950/30 hover:bg-slate-900 border border-emerald-500/30 hover:border-emerald-500/60 rounded-2xl p-4 sm:p-6 transition duration-300 flex flex-col md:flex-row items-center md:items-center justify-between gap-4 sm:gap-6 shadow-xl min-w-0"
         >
-          <div className="space-y-2 text-center md:text-left">
+          <div className="space-y-2 text-center md:text-left min-w-0 w-full">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>KONSOL PENGELOLA UTAMA · VECMASTER PORTAL</span>
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">KONSOL PENGELOLA UTAMA · VECMASTER PORTAL</span>
             </div>
-            <h3 className="text-lg sm:text-xl font-bold text-white">
+            <h3 className="text-base sm:text-xl font-bold text-white break-words">
               Ruang Kontrol Admin: Pengawasan Sistem, Direktori Pengguna & Audit
             </h3>
-            <p className="text-xs text-neutral-300 max-w-2xl leading-relaxed">
+            <p className="text-xs text-neutral-300 max-w-2xl leading-relaxed break-words">
               Pusat kendali terisolasi untuk mengaudit seluruh pendaftar, memvalidasi persetujuan kurasi galeri, memantau alokasi penyimpanan cloud Supabase, dan mencatat riwayat keamanan sistem secara real-time.
             </p>
           </div>
@@ -412,11 +414,11 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
               e.stopPropagation();
               onNavigate('admin-portal');
             }}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition shadow-lg shadow-emerald-950/50 cursor-pointer shrink-0"
+            className="w-full md:w-auto justify-center inline-flex items-center gap-2 px-5 py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition shadow-lg shadow-emerald-950/50 cursor-pointer shrink-0"
           >
-            <ShieldCheck className="w-4 h-4 text-white" />
+            <ShieldCheck className="w-4 h-4 text-white shrink-0" />
             <span>Buka Ruang Kontrol Admin</span>
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="w-4 h-4 shrink-0" />
           </button>
         </div>
       </section>
@@ -424,31 +426,31 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
       {/* ------------------------------------------------------------- */}
       {/* CURATOR'S SELECTION / RECENT VERIFIED MASTERPIECES PREVIEW   */}
       {/* ------------------------------------------------------------- */}
-      <section className="space-y-6 pt-4">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <section className="space-y-6 pt-2 sm:pt-4 min-w-0 w-full">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
           <div>
             <div className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Koleksi Terpilih</div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-1">
+            <h2 className="text-xl sm:text-3xl font-bold text-white tracking-tight mt-1 break-words">
               Karya Seni Terverifikasi Terbaru
             </h2>
           </div>
           <button
             onClick={() => onNavigate('vault')}
-            className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer transition"
+            className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer transition shrink-0"
           >
             <span>Lihat Semua Koleksi di Katalog</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <ArrowRight className="w-3.5 h-3.5 shrink-0" />
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           
           {/* Showcase Item 1 */}
           <div 
             onClick={() => onNavigate('vault')}
-            className="group cursor-pointer rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900/40 hover:border-neutral-700 transition duration-300 flex flex-col"
+            className="group cursor-pointer rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900/40 hover:border-neutral-700 transition duration-300 flex flex-col min-w-0"
           >
-            <div className="relative h-48 overflow-hidden">
+            <div className="relative h-44 sm:h-48 overflow-hidden">
               <img
                 src="/assets/images/vec_vault_artwork_1792494925679.jpg"
                 alt="Gelap dan Cahaya"
@@ -478,9 +480,9 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
           {/* Showcase Item 2 */}
           <div 
             onClick={() => onNavigate('vault')}
-            className="group cursor-pointer rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900/40 hover:border-neutral-700 transition duration-300 flex flex-col"
+            className="group cursor-pointer rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900/40 hover:border-neutral-700 transition duration-300 flex flex-col min-w-0"
           >
-            <div className="relative h-48 overflow-hidden">
+            <div className="relative h-44 sm:h-48 overflow-hidden">
               <img
                 src="/assets/images/vec_hero_camera_1792494926035.jpg"
                 alt="Segel Pengaman Kanvas"
@@ -510,9 +512,9 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
           {/* Showcase Item 3 */}
           <div 
             onClick={() => onNavigate('vault')}
-            className="group cursor-pointer rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900/40 hover:border-neutral-700 transition duration-300 flex flex-col"
+            className="group cursor-pointer rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900/40 hover:border-neutral-700 transition duration-300 flex flex-col min-w-0 sm:col-span-2 lg:col-span-1"
           >
-            <div className="relative h-48 overflow-hidden">
+            <div className="relative h-44 sm:h-48 overflow-hidden">
               <img
                 src="/assets/images/vec_curator_portrait_1792494927295.jpg"
                 alt="Ulasan Kurator Berpengalaman"
@@ -545,50 +547,50 @@ export const VecOverview: React.FC<VecOverviewProps> = ({ onNavigate, onOpenRegi
       {/* ------------------------------------------------------------- */}
       {/* ACTION BANNER                                                 */}
       {/* ------------------------------------------------------------- */}
-      <section className="bg-gradient-to-r from-neutral-900 via-neutral-950 to-neutral-900 border border-neutral-800 rounded-3xl p-8 sm:p-10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
-        <div className="space-y-2 text-center md:text-left">
+      <section className="bg-gradient-to-r from-neutral-900 via-neutral-950 to-neutral-900 border border-neutral-800 rounded-2xl sm:rounded-3xl p-5 sm:p-8 lg:p-10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl min-w-0 w-full">
+        <div className="space-y-2 text-center md:text-left min-w-0 w-full">
           <div className="text-xs font-semibold text-cyan-400 flex items-center justify-center md:justify-start gap-1.5">
-            <Fingerprint className="w-4 h-4 text-cyan-400" />
+            <Fingerprint className="w-4 h-4 text-cyan-400 shrink-0" />
             <span>STANDAR KEASLIAN RESMI VEROIA</span>
           </div>
-          <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+          <h3 className="text-lg sm:text-2xl font-bold text-white tracking-tight break-words">
             Mulai Ambil Foto Terverifikasi Asli
           </h3>
-          <p className="text-xs sm:text-sm text-neutral-400 max-w-xl">
+          <p className="text-xs sm:text-sm text-neutral-400 max-w-xl break-words">
             Gunakan kamera kami untuk mengambil foto asli dengan bukti keaslian digital dan sertifikat resmi yang langsung tersimpan aman.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center justify-center md:justify-end gap-2.5 sm:gap-3 shrink-0 w-full md:w-auto">
           {onOpenRegisterModal && (
             <button
               onClick={onOpenRegisterModal}
-              className="px-5 py-3 rounded-xl text-xs sm:text-sm font-semibold text-cyan-200 hover:text-white bg-cyan-950/70 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 transition cursor-pointer shadow-lg shadow-cyan-950/50 flex items-center gap-2"
+              className="w-full sm:w-auto justify-center px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold text-cyan-200 hover:text-white bg-cyan-950/70 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 transition cursor-pointer shadow-lg shadow-cyan-950/50 flex items-center gap-2"
             >
-              <KeyRound className="w-4 h-4 text-cyan-400" />
+              <KeyRound className="w-4 h-4 text-cyan-400 shrink-0" />
               <span>Daftar Brankas Baru</span>
             </button>
           )}
 
           <button
             onClick={() => onNavigate('studio')}
-            className="px-6 py-3 rounded-xl text-xs sm:text-sm font-semibold text-white bg-cyan-600 hover:bg-cyan-500 transition shadow-lg shadow-cyan-950/50 cursor-pointer"
+            className="w-full sm:w-auto justify-center px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold text-white bg-cyan-600 hover:bg-cyan-500 transition shadow-lg shadow-cyan-950/50 cursor-pointer"
           >
             Buka Studio Foto
           </button>
           
           <button
             onClick={() => onNavigate('vault')}
-            className="px-5 py-3 rounded-xl text-xs sm:text-sm font-medium text-neutral-300 hover:text-white bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 transition cursor-pointer"
+            className="w-full sm:w-auto justify-center px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-medium text-neutral-300 hover:text-white bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 transition cursor-pointer"
           >
             Lihat Katalog Karya
           </button>
 
           <button
             onClick={() => onNavigate('admin-portal')}
-            className="px-5 py-3 rounded-xl text-xs sm:text-sm font-semibold text-emerald-300 hover:text-white bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-500/40 transition cursor-pointer flex items-center gap-1.5"
+            className="w-full sm:w-auto justify-center px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold text-emerald-300 hover:text-white bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-500/40 transition cursor-pointer flex items-center gap-1.5"
           >
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>Ruang Kontrol Admin</span>
           </button>
         </div>

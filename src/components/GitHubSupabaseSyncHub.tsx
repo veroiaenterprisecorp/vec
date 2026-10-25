@@ -212,7 +212,7 @@ git push -u origin main --force-with-lease`;
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 w-full">
       {/* Top Banner: Real-Time Synchronization Matrix */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden shadow-xl">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
@@ -335,7 +335,7 @@ git push -u origin main --force-with-lease`;
       </div>
 
       {/* Navigation Sub-Tabs for Sync Console */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto text-xs font-mono">
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto scrollbar-none max-w-full text-xs font-mono">
         <button
           onClick={() => setActiveTab('matrix')}
           className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${

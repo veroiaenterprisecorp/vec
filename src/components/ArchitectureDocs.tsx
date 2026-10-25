@@ -12,7 +12,7 @@ import {
 
 export const ArchitectureDocs: React.FC = () => {
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto min-w-0 w-full">
       {/* Hero Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
         <div className="flex items-center gap-2 mb-2">

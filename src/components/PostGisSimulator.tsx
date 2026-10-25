@@ -54,7 +54,7 @@ export const PostGisSimulator: React.FC = () => {
   }, [selectedPreset, fuzzRadius, fuzzSeed]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 w-full">
       {/* Introduction Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -87,8 +87,8 @@ export const PostGisSimulator: React.FC = () => {
         </div>
 
         {/* Preset Selector */}
-        <div className="flex items-center gap-2 mt-4 overflow-x-auto pt-2 text-xs font-mono">
-          <span className="text-slate-400 whitespace-nowrap">Pilih Lokasi Uji:</span>
+        <div className="flex items-center gap-2 mt-4 overflow-x-auto scrollbar-none max-w-full pt-2 text-xs font-mono">
+          <span className="text-slate-400 whitespace-nowrap shrink-0">Pilih Lokasi Uji:</span>
           {PRESETS.map((loc) => (
             <button
               key={loc.name}

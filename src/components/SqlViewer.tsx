@@ -77,7 +77,7 @@ export const SqlViewer: React.FC<SqlViewerProps> = ({ onCopyAll, copied }) => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-w-0 w-full">
       {/* Top Banner / Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex items-start gap-3">
@@ -126,10 +126,10 @@ export const SqlViewer: React.FC<SqlViewerProps> = ({ onCopyAll, copied }) => {
       </div>
 
       {/* Control Toolbar */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 min-w-0">
         {/* Section Filters */}
-        <div className="flex items-center gap-1.5 overflow-x-auto text-xs font-mono">
-          <span className="text-slate-400 flex items-center gap-1 mr-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none max-w-full text-xs font-mono pb-1">
+          <span className="text-slate-400 flex items-center gap-1 mr-1 shrink-0">
             <Filter className="w-3.5 h-3.5" /> Filter:
           </span>
           {[
@@ -146,7 +146,7 @@ export const SqlViewer: React.FC<SqlViewerProps> = ({ onCopyAll, copied }) => {
             <button
               key={tab.id}
               onClick={() => setSelectedSection(tab.id as SectionKey)}
-              className={`px-2.5 py-1 rounded transition whitespace-nowrap ${
+              className={`px-2.5 py-1 rounded transition whitespace-nowrap shrink-0 cursor-pointer ${
                 selectedSection === tab.id
                   ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold shadow-sm'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
@@ -158,15 +158,15 @@ export const SqlViewer: React.FC<SqlViewerProps> = ({ onCopyAll, copied }) => {
         </div>
 
         {/* Search & Copy */}
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 sm:flex-initial">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-500" />
             <input
               type="text"
               placeholder="Cari sintaks SQL..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-slate-950 text-slate-200 text-xs font-mono pl-8 pr-3 py-1.5 rounded-lg border border-slate-800 focus:outline-none focus:border-cyan-500 w-44 sm:w-56"
+              className="bg-slate-950 text-slate-200 text-xs font-mono pl-8 pr-3 py-1.5 rounded-lg border border-slate-800 focus:outline-none focus:border-cyan-500 w-full sm:w-56"
             />
           </div>
 

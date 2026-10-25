@@ -468,7 +468,7 @@ PERINGATAN KEAMANAN TINGGI (ZERO-KNOWLEDGE VAULT):
                 {/* Big Key Display Box */}
                 <div className="mt-4 p-4 rounded-xl bg-black/90 border border-cyan-500/50 shadow-inner flex flex-col items-center justify-center gap-2">
                   <span className="text-[11px] font-mono text-cyan-300/80">KUNCI AKSES BRANKAS ANDA (SIMPAN DENGAN AMAN):</span>
-                  <div className="font-mono text-lg sm:text-2xl font-black tracking-wider text-cyan-300 selection:bg-cyan-500 selection:text-black select-all">
+                  <div className="font-mono text-base sm:text-2xl font-black tracking-wider text-cyan-300 selection:bg-cyan-500 selection:text-black select-all break-all text-center max-w-full px-2">
                     {generatedKey}
                   </div>
                 </div>

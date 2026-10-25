@@ -539,14 +539,14 @@ export const VecStudio: React.FC<VecStudioProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 w-full">
       
       {/* Header Info */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800/80">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-cyan-400">
-            <ShieldCheck className="w-4 h-4 text-cyan-400" />
-            <span>VERIFIKASI RESMI • PENGAMBILAN FOTO ASLI LANGSUNG DARI KAMERA</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800/80 min-w-0">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-[10px] sm:text-xs font-semibold text-cyan-400 break-words">
+            <ShieldCheck className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span className="truncate">VERIFIKASI RESMI • PENGAMBILAN FOTO ASLI LANGSUNG DARI KAMERA</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-1">
             Studio Kamera & Sertifikasi Keaslian
@@ -554,7 +554,7 @@ export const VecStudio: React.FC<VecStudioProps> = ({
         </div>
 
         {/* Camera Control Actions & Upload Option */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           <input
             type="file"
             ref={fileInputRef}
@@ -565,10 +565,10 @@ export const VecStudio: React.FC<VecStudioProps> = ({
 
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 transition shadow-md"
+            className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 transition shadow-md cursor-pointer"
             title="Unggah berkas foto untuk diverifikasi keasliannya"
           >
-            <Upload className="w-3.5 h-3.5 text-cyan-400" />
+            <Upload className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
             <span>Unggah Foto Asli</span>
           </button>
 
@@ -576,27 +576,27 @@ export const VecStudio: React.FC<VecStudioProps> = ({
             <>
               <button
                 onClick={toggleFacingMode}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 transition cursor-pointer"
                 title="Ganti Lensa Depan/Belakang Android"
               >
-                <SwitchCamera className="w-3.5 h-3.5" />
-                <span>{facingMode === 'environment' ? 'Kamera Belakang' : 'Kamera Depan'}</span>
+                <SwitchCamera className="w-3.5 h-3.5 shrink-0" />
+                <span>{facingMode === 'environment' ? 'Lensa Belakang' : 'Lensa Depan'}</span>
               </button>
 
               <button
                 onClick={stopCamera}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-800 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-800 transition cursor-pointer"
               >
-                <VideoOff className="w-3.5 h-3.5" />
-                <span>Matikan Kamera</span>
+                <VideoOff className="w-3.5 h-3.5 shrink-0" />
+                <span>Matikan</span>
               </button>
             </>
           ) : (
             <button
               onClick={() => startCamera('environment')}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition shadow-lg shadow-emerald-950"
+              className="inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-mono font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition shadow-lg shadow-emerald-950 cursor-pointer"
             >
-              <Video className="w-4 h-4" />
+              <Video className="w-4 h-4 shrink-0" />
               <span>Buka Kamera Perangkat Asli</span>
             </button>
           )}
@@ -605,13 +605,13 @@ export const VecStudio: React.FC<VecStudioProps> = ({
 
       {/* VAULT SECURITY & LOCK STATUS BANNER */}
       {!isUnlocked ? (
-        <div className="p-4 bg-gradient-to-r from-cyan-950/60 via-slate-900 to-neutral-950 border border-cyan-500/40 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl animate-in fade-in">
-          <div className="flex items-center gap-3">
+        <div className="p-3.5 sm:p-4 bg-gradient-to-r from-cyan-950/60 via-slate-900 to-neutral-950 border border-cyan-500/40 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl animate-in fade-in min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border bg-cyan-950/80 border-cyan-500/60 text-cyan-400">
               <Sparkles className="w-5 h-5 text-cyan-300" />
             </div>
-            <div>
-              <div className="flex items-center gap-2 text-xs font-bold text-cyan-200">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-cyan-200">
                 <span>MODE ATTESTASI AKTIF & TERHUBUNG</span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                   Kamera Siap Jepret
@@ -656,20 +656,20 @@ export const VecStudio: React.FC<VecStudioProps> = ({
           </div>
         </div>
       ) : activeVault ? (
-        <div className="p-3.5 bg-gradient-to-r from-emerald-950/40 via-cyan-950/30 to-neutral-950 border border-emerald-500/40 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg animate-in fade-in">
-          <div className="flex items-center gap-3">
+        <div className="p-3 sm:p-3.5 bg-gradient-to-r from-emerald-950/40 via-cyan-950/30 to-neutral-950 border border-emerald-500/40 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg animate-in fade-in min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border bg-emerald-950/80 border-emerald-500/50 text-emerald-400">
               <ShieldCheck className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2 text-xs font-bold text-white">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-white">
                 <span>BRANKAS AKTIF TERBUKA:</span>
                 <span className="text-emerald-300 font-semibold">{activeVault.vault_name}</span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                   {activeVault.key_prefix}
                 </span>
               </div>
-              <p className="text-[11px] text-neutral-400 mt-0.5">
+              <p className="text-[11px] text-neutral-400 mt-0.5 leading-relaxed">
                 Pemilik: <span className="text-neutral-200">{activeVault.creator_name}</span> ({activeVault.creator_handle}) • Foto jepretan akan otomatis tersimpan ke brankas pribadi ini.
               </p>
             </div>
@@ -690,24 +690,24 @@ export const VecStudio: React.FC<VecStudioProps> = ({
 
       {/* Alert when shutter is pressed with no camera active */}
       {noCameraAlert && (
-        <div className="p-4 rounded-2xl bg-rose-950/60 border border-rose-500/50 text-xs font-mono text-rose-200 flex items-center justify-between gap-3 shadow-lg">
-          <div className="flex items-center gap-3">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-rose-950/60 border border-rose-500/50 text-xs font-mono text-rose-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
             <CameraOff className="w-5 h-5 text-rose-400 shrink-0" />
-            <div>
+            <div className="min-w-0">
               <span className="font-bold text-white block">Tidak Ada Kamera Aktif:</span>
-              <p className="text-[11px] text-rose-200">{noCameraAlert}</p>
+              <p className="text-[11px] text-rose-200 break-words">{noCameraAlert}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition"
+              className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition cursor-pointer"
             >
               Unggah Foto
             </button>
             <button
               onClick={startSimulationMode}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition"
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition cursor-pointer"
             >
               Mode Simulasi
             </button>
@@ -717,24 +717,24 @@ export const VecStudio: React.FC<VecStudioProps> = ({
 
       {/* Permission / Status Warning if any */}
       {cameraError && (
-        <div className="p-4 rounded-2xl bg-slate-900 border border-amber-500/40 text-xs font-mono text-slate-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900 border border-amber-500/40 text-xs font-mono text-slate-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 min-w-0">
+          <div className="flex items-start gap-3 min-w-0">
             <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-0">
               <span className="font-bold text-white block">Status Perangkat Kamera:</span>
-              <p className="leading-relaxed text-slate-300 text-[11px]">{cameraError}</p>
+              <p className="leading-relaxed text-slate-300 text-[11px] break-words">{cameraError}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition"
+              className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition cursor-pointer"
             >
               Unggah Berkas
             </button>
             <button
               onClick={startSimulationMode}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs transition"
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs transition cursor-pointer"
             >
               Mode Simulasi
             </button>
@@ -743,38 +743,38 @@ export const VecStudio: React.FC<VecStudioProps> = ({
       )}
 
       {/* STORAGE DESTINATION ARCHITECTURE (Pure Supabase - Sole Database) */}
-      <div className="p-3.5 bg-gradient-to-r from-[#050C1E] to-[#0A1628] border border-cyan-500/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border bg-cyan-950/80 border-cyan-500/50 text-cyan-400">
+      <div className="p-3 sm:p-3.5 bg-gradient-to-r from-[#050C1E] to-[#0A1628] border border-cyan-500/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl min-w-0">
+        <div className="flex items-start sm:items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border bg-cyan-950/80 border-cyan-500/50 text-cyan-400 mt-0.5 sm:mt-0">
             <Cloud className="w-5 h-5 animate-pulse" />
           </div>
-          <div>
-            <div className="flex items-center gap-2 text-xs font-mono font-bold text-white">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-mono font-bold text-white">
               <span>Target Penyimpanan Tunggal:</span>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono border bg-cyan-500/20 text-cyan-300 border-cyan-500/40">
-                ☁️ Basis Data Supabase (Single Source of Truth)
+                ☁️ Basis Data Supabase
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-              Seluruh foto & sertifikasi C2PA disimpan murni ke Supabase Cloud Storage (Bucket: "{targetBucket}") dan tabel posts. Tanpa penyimpanan ganda (non-hybrid).
+            <p className="text-[11px] text-slate-400 font-mono mt-0.5 leading-relaxed break-words">
+              Seluruh foto & sertifikasi C2PA disimpan murni ke Supabase Cloud Storage (Bucket: "{targetBucket}") dan tabel posts.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 p-1.5 bg-slate-950/90 rounded-xl border border-cyan-500/30 text-xs shrink-0 text-cyan-300 font-mono">
-          <Check className="w-3.5 h-3.5 text-cyan-400" />
+        <div className="flex items-center gap-2 p-1.5 bg-slate-950/90 rounded-xl border border-cyan-500/30 text-xs shrink-0 text-cyan-300 font-mono self-start sm:self-auto">
+          <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
           <span className="text-[11px] font-bold">100% Terintegrasi Supabase</span>
         </div>
       </div>
 
       {/* Main Viewfinder Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-w-0 w-full">
         
         {/* Left: Viewfinder & Camera Control Column */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-7 space-y-4 min-w-0">
           
           {/* 1. Viewfinder Screen (100% clean photo viewport) */}
-          <div className="bg-[#050C1E] rounded-3xl border border-slate-800 p-5 relative overflow-hidden flex flex-col justify-between h-[420px] shadow-2xl">
+          <div className="bg-[#050C1E] rounded-3xl border border-slate-800 p-3 sm:p-5 relative overflow-hidden flex flex-col justify-between h-[360px] sm:h-[420px] shadow-2xl min-w-0">
             
             {/* Real Video Stream from Device Camera */}
             <div className="absolute inset-0 z-0 bg-slate-950 flex items-center justify-center overflow-hidden">
@@ -790,7 +790,7 @@ export const VecStudio: React.FC<VecStudioProps> = ({
 
               {/* Display when Camera is NOT active */}
               {!isCameraActive && (
-                <div className="relative w-full h-full bg-[#030712] flex flex-col items-center justify-center p-6 text-center">
+                <div className="relative w-full h-full bg-[#030712] flex flex-col items-center justify-center p-4 sm:p-6 text-center">
                   
                   {/* If user uploaded a photo or enabled simulation with image */}
                   {capturedPhotoUrl && (studioMode === 'uploaded' || studioMode === 'simulation') ? (
@@ -806,17 +806,17 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                     </div>
                   ) : (
                     /* Clean Standby Screen clearly stating no camera is active */
-                    <div className="flex flex-col items-center justify-center max-w-md space-y-4 z-10">
-                      <div className="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 shadow-2xl relative">
-                        <CameraOff className="w-8 h-8 text-rose-400" />
+                    <div className="flex flex-col items-center justify-center max-w-md space-y-3 sm:space-y-4 z-10 min-w-0 px-2">
+                      <div className="w-14 sm:w-16 h-14 sm:h-16 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 shadow-2xl relative shrink-0">
+                        <CameraOff className="w-7 sm:w-8 h-7 sm:h-8 text-rose-400" />
                         <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-500 rounded-full border-2 border-[#030712]"></span>
                       </div>
 
-                      <div className="space-y-1.5">
-                        <h3 className="text-base font-bold text-white font-mono tracking-tight">
+                      <div className="space-y-1.5 min-w-0">
+                        <h3 className="text-sm sm:text-base font-bold text-white font-mono tracking-tight">
                           Tidak Ada Kamera Aktif di Perangkat
                         </h3>
-                        <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
+                        <p className="text-[11px] sm:text-xs text-slate-400 leading-relaxed max-w-sm">
                           {hardwareChecked && !hasHardwareCamera
                             ? 'Sistem mendeteksi bahwa tidak ada webcam fisik atau driver kamera aktif pada perangkat ini. Silakan hubungkan kamera atau gunakan opsi unggah berkas.'
                             : 'Sensor kamera perangkat saat ini dalam kondisi mati. Tekan tombol di bawah untuk menyalakan kamera HP / webcam Anda, atau unggah foto manual.'}
@@ -824,29 +824,29 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                       </div>
 
                       {/* Quick Action Buttons inside Viewfinder */}
-                      <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+                      <div className="flex flex-wrap items-center justify-center gap-2 pt-1 sm:pt-2">
                         <button
                           onClick={() => startCamera('environment')}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-mono font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-md"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-mono font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-md cursor-pointer"
                         >
-                          <Video className="w-3.5 h-3.5" />
+                          <Video className="w-3.5 h-3.5 shrink-0" />
                           <span>Nyalakan Kamera</span>
                         </button>
 
                         <button
                           onClick={() => fileInputRef.current?.click()}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-mono font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition shadow-md"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-mono font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition shadow-md cursor-pointer"
                         >
-                          <Upload className="w-3.5 h-3.5" />
-                          <span>Unggah Berkas Foto</span>
+                          <Upload className="w-3.5 h-3.5 shrink-0" />
+                          <span>Unggah Foto</span>
                         </button>
 
                         <button
                           onClick={startSimulationMode}
-                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3 sm:py-2 rounded-xl text-xs font-mono bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer"
                         >
-                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Mode Simulasi</span>
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <span>Simulasi</span>
                         </button>
                       </div>
                     </div>
@@ -856,35 +856,35 @@ export const VecStudio: React.FC<VecStudioProps> = ({
             </div>
 
             {/* Top HUD Badges */}
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-2 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-full border text-xs font-mono shadow-lg">
+            <div className="relative z-10 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 bg-black/80 backdrop-blur-md px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border border-slate-700/80 text-[11px] sm:text-xs font-mono shadow-lg shrink-0">
                 {isCameraActive ? (
                   <>
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                     <span className="text-emerald-300">
-                      {facingMode === 'environment' ? 'Kamera Belakang Aktif' : 'Kamera Depan Aktif'}
+                      {facingMode === 'environment' ? 'Kamera Belakang' : 'Kamera Depan'}
                     </span>
                   </>
                 ) : studioMode === 'uploaded' ? (
                   <>
                     <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-                    <span className="text-cyan-300">Berkas Foto Dimuat</span>
+                    <span className="text-cyan-300">Berkas Dimuat</span>
                   </>
                 ) : studioMode === 'simulation' ? (
                   <>
                     <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                    <span className="text-amber-300">Mode Simulasi Sensor</span>
+                    <span className="text-amber-300">Simulasi Sensor</span>
                   </>
                 ) : (
                   <>
                     <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                    <span className="text-rose-400">Tidak Ada Kamera Aktif</span>
+                    <span className="text-rose-400">Kamera Mati</span>
                   </>
                 )}
               </div>
 
-              <div className="bg-red-950/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-red-800/80 text-[11px] font-mono text-red-300 flex items-center gap-1.5">
-                <Lock className="w-3 h-3 text-red-400" />
+              <div className="bg-red-950/80 backdrop-blur-md px-2 sm:px-2.5 py-1 rounded-full border border-red-800/80 text-[10px] sm:text-[11px] font-mono text-red-300 flex items-center gap-1.5 shrink-0">
+                <Lock className="w-3 h-3 text-red-400 shrink-0" />
                 <span>Zero Gallery Bypass</span>
               </div>
             </div>
@@ -896,12 +896,12 @@ export const VecStudio: React.FC<VecStudioProps> = ({
           </div>
 
         {/* Dedicated Artwork Title Bar (Always visible before & after shutter capture) */}
-        <div className="bg-[#050C1E] border border-cyan-500/40 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+        <div className="bg-[#050C1E] border border-cyan-500/40 rounded-2xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg min-w-0">
           <div className="flex items-center gap-2 text-xs font-mono text-cyan-300 font-bold shrink-0">
-            <Edit3 className="w-4 h-4 text-cyan-400" />
+            <Edit3 className="w-4 h-4 text-cyan-400 shrink-0" />
             <span>Judul Karya Foto:</span>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <input
               type="text"
               placeholder="Ketik judul karya (contoh: Gelap Api, Senja, Macro)..."
@@ -922,10 +922,10 @@ export const VecStudio: React.FC<VecStudioProps> = ({
         </div>
 
         {/* Clean Camera Control Dock (Positioned below the camera screen) */}
-        <div className="bg-[#050C1E] border border-slate-800 rounded-2xl px-6 py-3 flex items-center justify-between shadow-xl">
+        <div className="bg-[#050C1E] border border-slate-800 rounded-2xl px-3.5 sm:px-6 py-3 flex items-center justify-between gap-2 shadow-xl min-w-0">
           {/* Left Info */}
-          <div className="text-[11px] font-mono text-slate-400 space-y-0.5">
-            <span className="text-white font-medium block">
+          <div className="text-[10px] sm:text-[11px] font-mono text-slate-400 space-y-0.5 min-w-0 max-w-[38%] sm:max-w-none">
+            <span className="text-white font-medium block truncate">
               {isCameraActive 
                 ? 'Sensor Kamera Aktif' 
                 : studioMode === 'uploaded' 
@@ -934,19 +934,19 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                 ? 'Simulasi Sensor C2PA' 
                 : 'Tidak Ada Kamera Aktif'}
             </span>
-            <span className={isCameraActive ? 'text-emerald-400' : 'text-slate-400'}>
+            <span className={`block truncate ${isCameraActive ? 'text-emerald-400' : 'text-slate-400'}`}>
               {isCameraActive 
                 ? (facingMode === 'environment' ? 'Lensa Belakang • 1080p' : 'Lensa Depan • 1080p') 
                 : studioMode === 'uploaded'
                 ? 'SHA-256 Validasi'
                 : studioMode === 'simulation'
                 ? 'Mock Sensor Enclave'
-                : 'Driver / Kamera Terputus'}
+                : 'Driver Terputus'}
             </span>
           </div>
 
           {/* Center: Sleek Circular Shutter Button (Compact & Proportional) */}
-          <div className="flex flex-col items-center gap-1">
+          <div className="flex flex-col items-center gap-1 shrink-0">
             <button
               onClick={captureRealPhoto}
               disabled={isCapturing}
@@ -957,7 +957,7 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                   ? 'Tekan untuk mengambil foto otentik C2PA' 
                   : 'Tekan untuk mengambil simulasi sensor & uji C2PA'
               }
-              className={`w-14 h-14 rounded-full border-2 p-1 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg bg-slate-950 group disabled:opacity-60 cursor-pointer ${
+              className={`w-13 sm:w-14 h-13 sm:h-14 rounded-full border-2 p-1 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg bg-slate-950 group disabled:opacity-60 cursor-pointer ${
                 isCapturing 
                   ? 'border-amber-400 shadow-amber-950/50' 
                   : isCameraActive 
@@ -987,11 +987,11 @@ export const VecStudio: React.FC<VecStudioProps> = ({
           </div>
 
           {/* Right Action: Camera Switch or Quick Option */}
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2 shrink-0">
             {isCameraActive ? (
               <button
                 onClick={toggleFacingMode}
-                className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 transition"
+                className="p-2 sm:p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 transition cursor-pointer"
                 title="Ganti Lensa Depan / Belakang"
               >
                 <SwitchCamera className="w-4 h-4" />
@@ -999,7 +999,7 @@ export const VecStudio: React.FC<VecStudioProps> = ({
             ) : (
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-slate-700 transition"
+                className="p-2 sm:p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-slate-700 transition cursor-pointer"
                 title="Unggah Foto dari Perangkat"
               >
                 <Upload className="w-4 h-4" />
@@ -1010,13 +1010,13 @@ export const VecStudio: React.FC<VecStudioProps> = ({
       </div>
 
         {/* Right: C2PA & NFC Provenance Card */}
-        <div className="lg:col-span-5 bg-[#050C1E] rounded-3xl border border-slate-800 p-6 flex flex-col justify-between space-y-5">
-          <div>
+        <div className="lg:col-span-5 bg-[#050C1E] rounded-3xl border border-slate-800 p-4 sm:p-6 flex flex-col justify-between space-y-5 min-w-0">
+          <div className="min-w-0">
             <div className="flex items-center gap-2 mb-2 text-xs font-mono text-emerald-400">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>SERTIFIKASI SILSILAH KRIPTOGRAFIS C2PA</span>
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="truncate">SERTIFIKASI SILSILAH KRIPTOGRAFIS C2PA</span>
             </div>
-            <h3 className="text-lg font-bold text-white">
+            <h3 className="text-base sm:text-lg font-bold text-white">
               Status Keaslian Hardware C2PA
             </h3>
             <p className="text-xs text-slate-400 mt-1 leading-relaxed">
@@ -1025,11 +1025,11 @@ export const VecStudio: React.FC<VecStudioProps> = ({
 
             {/* Captured Preview Thumbnail if available */}
             {capturedPhotoUrl && (
-              <div className="mt-4 p-3.5 rounded-2xl bg-slate-900 border border-cyan-500/40 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
+              <div className="mt-4 p-3 sm:p-3.5 rounded-2xl bg-slate-900 border border-cyan-500/40 space-y-3 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-w-0">
+                  <div className="min-w-0">
                     <span className="text-[11px] font-mono text-cyan-300 font-bold flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                       Foto Asli (Tanpa Kompresi):
                     </span>
                     <span className="text-[10px] text-emerald-400 font-mono block">
@@ -1039,9 +1039,9 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                   <a
                     href={capturedPhotoUrl}
                     download={`VEC-Hardware-Capture-${Date.now()}.jpg`}
-                    className="px-2.5 py-1.5 rounded-lg bg-black/80 hover:bg-black text-[10px] font-mono text-white flex items-center gap-1 border border-slate-700 transition shrink-0"
+                    className="px-2.5 py-1.5 rounded-lg bg-black/80 hover:bg-black text-[10px] font-mono text-white flex items-center justify-center gap-1 border border-slate-700 transition shrink-0 self-start sm:self-auto"
                   >
-                    <Download className="w-3 h-3 text-cyan-400" /> Simpan Asli
+                    <Download className="w-3 h-3 text-cyan-400 shrink-0" /> Simpan Asli
                   </a>
                 </div>
 
@@ -1068,7 +1068,7 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                 {/* Dedicated Enlarging Action Button */}
                 <button
                   onClick={() => { setIsZoomModalOpen(true); setZoomLevel(1); }}
-                  className="w-full py-2 rounded-xl bg-slate-950 hover:bg-slate-850 text-cyan-300 border border-slate-800 hover:border-cyan-500/50 text-xs font-mono font-medium flex items-center justify-center gap-2 transition"
+                  className="w-full py-2 rounded-xl bg-slate-950 hover:bg-slate-850 text-cyan-300 border border-slate-800 hover:border-cyan-500/50 text-xs font-mono font-medium flex items-center justify-center gap-2 transition cursor-pointer"
                 >
                   <Maximize2 className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Perbesar & Teliti Detail (Zoom Penuh)</span>
@@ -1078,7 +1078,7 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                 <div className="pt-2 border-t border-slate-800/80 space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-bold text-white font-mono flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5 text-amber-400" />
+                      <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                       <span>Pengaturan Izin Privasi Foto:</span>
                     </label>
                   </div>
@@ -1105,25 +1105,25 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                           }
                         }
                       }}
-                      className={`py-1.5 px-2 rounded-lg font-mono text-[11px] flex items-center justify-center gap-1.5 transition ${
+                      className={`py-1.5 px-2 rounded-lg font-mono text-[11px] flex items-center justify-center gap-1.5 transition cursor-pointer ${
                         privacyMode === 'private'
                           ? 'bg-emerald-600 text-white font-bold shadow-md'
                           : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      <Lock className="w-3 h-3" />
-                      <span>Privat (Hanya Saya)</span>
+                      <Lock className="w-3 h-3 shrink-0" />
+                      <span>Privat</span>
                     </button>
 
                     <button
                       onClick={() => setPrivacyMode('public')}
-                      className={`py-1.5 px-2 rounded-lg font-mono text-[11px] flex items-center justify-center gap-1.5 transition ${
+                      className={`py-1.5 px-2 rounded-lg font-mono text-[11px] flex items-center justify-center gap-1.5 transition cursor-pointer ${
                         privacyMode === 'public'
                           ? 'bg-cyan-600 text-white font-bold shadow-md'
                           : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      <span>Publikasi ke Vault</span>
+                      <span>Publikasi</span>
                     </button>
                   </div>
 
@@ -1132,19 +1132,19 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                       <p>
                         ✓ <strong>Status Privat Aktif:</strong> Foto ini 100% tersimpan di Brankas Pribadi Anda. Foto ini privat dan belum dipublikasikan ke Live Vault publik.
                       </p>
-                      <div className="flex gap-2 pt-1">
+                      <div className="flex flex-col sm:flex-row gap-2 pt-1">
                         {onNavigateToPrivateVault && (
                           <button
                             onClick={onNavigateToPrivateVault}
-                            className="flex-1 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-bold transition flex items-center justify-center gap-1 text-[11px] cursor-pointer"
+                            className="flex-1 py-1.5 px-2 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-bold transition flex items-center justify-center gap-1 text-[11px] cursor-pointer"
                           >
-                            <ExternalLink className="w-3 h-3" />
+                            <ExternalLink className="w-3 h-3 shrink-0" />
                             <span>Buka di Brankas Pribadi →</span>
                           </button>
                         )}
                         <button
                           onClick={() => setPrivacyMode('public')}
-                          className="flex-1 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center justify-center gap-1 text-[11px] cursor-pointer"
+                          className="flex-1 py-1.5 px-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center justify-center gap-1 text-[11px] cursor-pointer"
                         >
                           <span>Terbitkan ke Live Vault</span>
                         </button>
@@ -1160,7 +1160,7 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                         placeholder="Beri judul karya seni Anda..."
                         value={artworkTitle}
                         onChange={(e) => handleTitleChange(e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-white placeholder-slate-600 text-xs focus:outline-none focus:border-cyan-500"
+                        className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-white placeholder-slate-600 text-xs focus:outline-none focus:border-cyan-500 font-mono"
                       />
                       <button
                         onClick={async () => {
@@ -1190,7 +1190,7 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                           window.dispatchEvent(new Event('storage'));
                         }}
                         disabled={isPublished}
-                        className="w-full py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 disabled:bg-emerald-700 text-white font-bold transition flex items-center justify-center gap-1.5 text-xs cursor-pointer"
+                        className="w-full py-1.5 px-2 rounded bg-cyan-600 hover:bg-cyan-500 disabled:bg-emerald-700 text-white font-bold transition flex items-center justify-center gap-1.5 text-xs cursor-pointer"
                       >
                         {isPublished ? (
                           <>
@@ -1198,7 +1198,7 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                             <span>Karya Berhasil Didaftarkan ke Live Vault & Cloud!</span>
                           </>
                         ) : (
-                          <span>Konfirmasi & Terbitkan ke Live Vault (Semua Perangkat)</span>
+                          <span>Konfirmasi & Terbitkan ke Live Vault</span>
                         )}
                       </button>
 
@@ -1219,30 +1219,30 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                     <div className="space-y-2 pt-1">
                       {/* Live Cloud Upload Progress / Confirmation */}
                       {isUploadingToCloud ? (
-                        <div className="p-3 rounded-xl bg-cyan-950/60 border border-cyan-500/50 flex items-center gap-3 text-[11px] font-mono text-cyan-200 shadow-lg">
+                        <div className="p-3 rounded-xl bg-cyan-950/60 border border-cyan-500/50 flex items-center gap-3 text-[11px] font-mono text-cyan-200 shadow-lg min-w-0">
                           <RefreshCw className="w-4 h-4 animate-spin text-cyan-400 shrink-0" />
-                          <div className="space-y-0.5">
+                          <div className="space-y-0.5 min-w-0">
                             <span className="font-bold text-white block">Sinkronisasi Cloud Supabase:</span>
-                            <p className="text-[10px] text-cyan-300">Mengunggah file biner foto ke bucket "{targetBucket}"...</p>
+                            <p className="text-[10px] text-cyan-300 break-words">Mengunggah file biner foto ke bucket "{targetBucket}"...</p>
                           </div>
                         </div>
                       ) : cloudUploadMessage && storageTarget === 'cloud_supabase' ? (
-                        <div className="p-3 rounded-xl bg-gradient-to-r from-emerald-950/60 to-cyan-950/60 border border-emerald-500/40 space-y-1.5 text-[11px] font-mono shadow-md">
-                          <div className="flex items-center justify-between text-emerald-300 font-bold">
-                            <span className="flex items-center gap-1.5">
-                              <CloudUpload className="w-4 h-4 text-emerald-400" />
-                              <span>Tersimpan di Cloud Storage</span>
+                        <div className="p-3 rounded-xl bg-gradient-to-r from-emerald-950/60 to-cyan-950/60 border border-emerald-500/40 space-y-1.5 text-[11px] font-mono shadow-md min-w-0">
+                          <div className="flex items-center justify-between text-emerald-300 font-bold gap-2">
+                            <span className="flex items-center gap-1.5 min-w-0">
+                              <CloudUpload className="w-4 h-4 text-emerald-400 shrink-0" />
+                              <span className="truncate">Tersimpan di Cloud</span>
                             </span>
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
                               Bucket: {targetBucket}
                             </span>
                           </div>
-                          <p className="text-[10px] text-slate-300 leading-relaxed">
+                          <p className="text-[10px] text-slate-300 leading-relaxed break-words">
                             {cloudUploadMessage}
                           </p>
                           {cloudObjectPath && (
-                            <div className="flex items-center justify-between text-[10px] bg-slate-950/90 px-2 py-1 rounded border border-slate-800 text-cyan-300">
-                              <span className="truncate max-w-[200px]" title={cloudObjectPath}>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[10px] bg-slate-950/90 px-2 py-1 rounded border border-slate-800 text-cyan-300">
+                              <span className="truncate" title={cloudObjectPath}>
                                 Path: {cloudObjectPath}
                               </span>
                               <span className="text-emerald-400 font-bold shrink-0">100% RAW Cloud</span>
@@ -1252,10 +1252,10 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                       ) : null}
 
                       {/* General Vault Storage Badge & Direct Navigation */}
-                      <div className="p-2.5 rounded-xl bg-slate-950 border border-emerald-500/30 flex items-center justify-between gap-3 text-[11px] font-mono">
-                        <div className="flex items-center gap-1.5 text-emerald-300">
+                      <div className="p-2.5 rounded-xl bg-slate-950 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] font-mono min-w-0">
+                        <div className="flex items-center gap-1.5 text-emerald-300 min-w-0">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                          <span>
+                          <span className="truncate">
                             {storageTarget === 'cloud_supabase' 
                               ? 'Foto tersinkron di Cloud & Brankas' 
                               : 'Foto tersimpan di Penyimpanan Lokal'}
@@ -1265,7 +1265,7 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                           {onNavigateToPublicVault && (
                             <button
                               onClick={onNavigateToPublicVault}
-                              className="px-2.5 py-1 rounded-lg bg-cyan-700/80 hover:bg-cyan-600 text-white font-bold transition flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1 rounded-lg bg-cyan-700/80 hover:bg-cyan-600 text-white font-bold transition flex items-center gap-1 cursor-pointer text-[10px]"
                             >
                               <ExternalLink className="w-3 h-3" />
                               <span>Live Vault →</span>
@@ -1274,10 +1274,10 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                           {onNavigateToPrivateVault && (
                             <button
                               onClick={onNavigateToPrivateVault}
-                              className="px-2.5 py-1 rounded-lg bg-emerald-700/80 hover:bg-emerald-600 text-white font-bold transition flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1 rounded-lg bg-emerald-700/80 hover:bg-emerald-600 text-white font-bold transition flex items-center gap-1 cursor-pointer text-[10px]"
                             >
                               <FolderLock className="w-3 h-3" />
-                              <span>Brankas Pribadi →</span>
+                              <span>Brankas →</span>
                             </button>
                           )}
                         </div>
@@ -1289,13 +1289,13 @@ export const VecStudio: React.FC<VecStudioProps> = ({
             )}
 
             {/* Cryptographic Checksum & Properties */}
-            <div className="mt-4 space-y-3 font-mono text-xs">
-              <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800">
+            <div className="mt-4 space-y-3 font-mono text-xs min-w-0">
+              <div className="bg-slate-900/80 p-3 sm:p-3.5 rounded-xl border border-slate-800 min-w-0">
                 <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
                   <span>SHA-256 RAW Checksum:</span>
                   <button
                     onClick={handleCopyHash}
-                    className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                    className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
                   >
                     {copiedRawHash ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copiedRawHash ? 'Disalin' : 'Salin'}</span>
@@ -1306,11 +1306,11 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                 </div>
               </div>
 
-              {/* Location Protection Metadata Card (Moved out of the photo area) */}
-              <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800 space-y-1.5">
+              {/* Location Protection Metadata Card */}
+              <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800 space-y-1.5 min-w-0">
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-slate-400 flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-amber-400" /> Proteksi Geoprivasi Lokasi:
+                    <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" /> Proteksi Geoprivasi Lokasi:
                   </span>
                   <span className="text-emerald-400 font-semibold">Aktif</span>
                 </div>
@@ -1320,13 +1320,13 @@ export const VecStudio: React.FC<VecStudioProps> = ({
                     {(geoCoords.lat + 0.003498).toFixed(4)}, {(geoCoords.lng + 0.004197).toFixed(4)}
                   </span>
                 </div>
-                <div className="text-[10px] text-slate-400">
+                <div className="text-[10px] text-slate-400 leading-relaxed">
                   *Lokasi studio asli dirahasiakan oleh database untuk keamanan seniman.
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 min-w-0">
                   <span className="text-slate-500 block">Modul Perangkat:</span>
                   <span className="text-white font-medium truncate block" title={deviceInfo}>
                     {deviceInfo}
@@ -1340,17 +1340,17 @@ export const VecStudio: React.FC<VecStudioProps> = ({
 
               <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 text-[11px] flex items-center justify-between">
                 <span className="text-slate-400 flex items-center gap-1.5">
-                  <Radio className="w-3.5 h-3.5 text-amber-400" /> Chip Fisik NFC:
+                  <Radio className="w-3.5 h-3.5 text-amber-400 shrink-0" /> Chip Fisik NFC:
                 </span>
                 <span className="text-amber-300 font-mono">NTAG424 DNA Sun Seal</span>
               </div>
             </div>
           </div>
 
-          <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-500">
+          <div className="pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs font-mono text-slate-500">
             <span>Timestamp: {capturedTime}</span>
             <span className="text-emerald-400 flex items-center gap-1 font-semibold">
-              <CheckCircle2 className="w-3.5 h-3.5" /> 100% Otentik
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> 100% Otentik
             </span>
           </div>
         </div>

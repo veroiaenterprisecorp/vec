@@ -138,7 +138,7 @@ export const FlutterAppViewer: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 w-full">
       {/* Top Banner */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -192,7 +192,7 @@ export const FlutterAppViewer: React.FC = () => {
         </div>
 
         {/* File Tabs */}
-        <div className="flex items-center gap-1.5 mt-4 overflow-x-auto text-xs font-mono border-t border-slate-800/80 pt-3">
+        <div className="flex items-center gap-1.5 mt-4 overflow-x-auto scrollbar-none max-w-full text-xs font-mono border-t border-slate-800/80 pt-3">
           {(Object.keys(filesMap) as FlutterFileKey[]).map((key) => {
             const item = filesMap[key];
             const isActive = activeFile === key;
@@ -200,7 +200,7 @@ export const FlutterAppViewer: React.FC = () => {
               <button
                 key={key}
                 onClick={() => setActiveFile(key)}
-                className={`px-3 py-1.5 rounded-lg border transition whitespace-nowrap flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-lg border transition whitespace-nowrap flex items-center gap-1.5 shrink-0 cursor-pointer ${
                   isActive
                     ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 font-bold shadow-sm'
                     : 'bg-slate-950/60 text-slate-400 border-slate-800 hover:bg-slate-900 hover:text-slate-200'
@@ -215,31 +215,31 @@ export const FlutterAppViewer: React.FC = () => {
       </div>
 
       {/* Main Grid: Code Inspector (Left) & Mobile Simulator (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-w-0 w-full">
         {/* Left: Code Viewer */}
-        <div className="lg:col-span-7 space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono text-slate-400 bg-slate-900 px-3.5 py-2 rounded-t-xl border border-b-0 border-slate-800">
-            <span className="font-bold text-slate-200 flex items-center gap-1.5">
-              <Smartphone className="w-3.5 h-3.5 text-cyan-400" />
-              {currentFile.path}
+        <div className="lg:col-span-7 space-y-2 min-w-0">
+          <div className="flex items-center justify-between text-xs font-mono text-slate-400 bg-slate-900 px-3.5 py-2 rounded-t-xl border border-b-0 border-slate-800 min-w-0">
+            <span className="font-bold text-slate-200 flex items-center gap-1.5 truncate">
+              <Smartphone className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span className="truncate">{currentFile.path}</span>
             </span>
-            <span className="text-[11px] text-slate-500">Flutter / Dart</span>
+            <span className="text-[11px] text-slate-500 shrink-0">Flutter / Dart</span>
           </div>
 
-          <div className="border border-slate-800 rounded-b-xl bg-slate-950 overflow-hidden shadow-2xl relative">
+          <div className="border border-slate-800 rounded-b-xl bg-slate-950 overflow-hidden shadow-2xl relative min-w-0">
             <div className="p-3 bg-slate-900/60 border-b border-slate-800 text-xs text-slate-400 flex items-start gap-2">
               <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
               <span>{currentFile.desc}</span>
             </div>
-            <pre className="p-4 font-mono text-xs text-slate-300 overflow-x-auto leading-relaxed max-h-[600px]">
+            <pre className="p-4 font-mono text-xs text-slate-300 overflow-x-auto max-w-full leading-relaxed max-h-[600px]">
               {currentFile.code}
             </pre>
           </div>
         </div>
 
         {/* Right: Interactive Smartphone Device Simulator */}
-        <div className="lg:col-span-5 flex flex-col items-center">
-          <div className="w-full max-w-[340px] bg-slate-950 rounded-[42px] border-4 border-slate-700/80 p-3 shadow-2xl shadow-cyan-950/40 relative">
+        <div className="lg:col-span-5 flex flex-col items-center min-w-0 w-full">
+          <div className="w-full max-w-[340px] mx-auto bg-slate-950 rounded-[36px] sm:rounded-[42px] border-4 border-slate-700/80 p-2 sm:p-3 shadow-2xl shadow-cyan-950/40 relative min-w-0">
             {/* Phone Screen Bezel */}
             <div className="w-full aspect-[9/19] bg-black rounded-[32px] overflow-hidden relative flex flex-col justify-between border border-slate-800">
               
