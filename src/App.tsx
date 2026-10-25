@@ -23,6 +23,7 @@ const MasterAdminPortal = lazy(() =>
 import { Check } from 'lucide-react';
 import { vecoutAll, isVaultUnlocked } from './lib/vaultKeyAuth';
 import { checkAdminSession } from './lib/masterAdminStorage';
+import { ThemeMode, getInitialTheme, applyTheme, toggleTheme } from './lib/theme';
 
 export type AppTab = 'overview' | 'private-vault' | 'vault' | 'studio' | 'admin-portal';
 
@@ -55,6 +56,21 @@ export default function App() {
   const [showToast, setShowToast] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string>('');
   const [showRegisterModal, setShowRegisterModal] = useState<boolean>(false);
+  const [theme, setTheme] = useState<ThemeMode>(() => getInitialTheme());
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
+  useEffect(() => {
+    const handleThemeEvent = (e: any) => {
+      if (e.detail?.theme) {
+        setTheme(e.detail.theme);
+      }
+    };
+    window.addEventListener('vec-theme-changed', handleThemeEvent);
+    return () => window.removeEventListener('vec-theme-changed', handleThemeEvent);
+  }, []);
 
   useEffect(() => {
     const handleUrlCheck = () => {
@@ -171,7 +187,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#020409] text-neutral-100 flex flex-col font-sans selection:bg-cyan-500/25 selection:text-cyan-200">
+    <div className="app-shell min-h-screen bg-[#020409] text-neutral-100 flex flex-col font-sans selection:bg-cyan-500/25 selection:text-cyan-200">
       
       {/* Premium Luxury Header */}
       <Header
@@ -186,6 +202,11 @@ export default function App() {
         onDownloadSql={handleDownloadSql}
         onVecout={handleVecout}
         onOpenRegisterModal={() => setShowRegisterModal(true)}
+        theme={theme}
+        onToggleTheme={() => {
+          const next = toggleTheme(theme);
+          setTheme(next);
+        }}
       />
 
       {/* Main Luxury Content Container */}

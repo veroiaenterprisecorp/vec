@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { VecOfficialLogo } from './VecOfficialLogo';
-import { Camera, Lock, Power, KeyRound, ShieldCheck, Menu, X } from 'lucide-react';
+import { Camera, Lock, Power, KeyRound, ShieldCheck, Menu, X, Sun, Moon } from 'lucide-react';
 import { isVaultUnlocked } from '../lib/vaultKeyAuth';
+import { ThemeMode, getInitialTheme, toggleTheme } from '../lib/theme';
 
 interface HeaderProps {
   activeTab: string;
@@ -12,16 +13,46 @@ interface HeaderProps {
   onDownloadSql?: () => void;
   onVecout?: () => void;
   onOpenRegisterModal?: () => void;
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
   onVecout,
-  onOpenRegisterModal
+  onOpenRegisterModal,
+  theme,
+  onToggleTheme
 }) => {
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => isVaultUnlocked());
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [currentTheme, setCurrentTheme] = useState<ThemeMode>(() => theme || getInitialTheme());
+
+  useEffect(() => {
+    if (theme) {
+      setCurrentTheme(theme);
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    const handleThemeChange = (e: any) => {
+      if (e.detail?.theme) {
+        setCurrentTheme(e.detail.theme);
+      }
+    };
+    window.addEventListener('vec-theme-changed', handleThemeChange);
+    return () => window.removeEventListener('vec-theme-changed', handleThemeChange);
+  }, []);
+
+  const handleToggleTheme = () => {
+    if (onToggleTheme) {
+      onToggleTheme();
+    } else {
+      const next = toggleTheme(currentTheme);
+      setCurrentTheme(next);
+    }
+  };
 
   useEffect(() => {
     const sync = () => setIsUnlocked(isVaultUnlocked());
@@ -140,6 +171,21 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Camera className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
             <span className="whitespace-nowrap">Studio Foto</span>
+          </button>
+
+          {/* Theme Toggle Button */}
+          <button
+            type="button"
+            onClick={handleToggleTheme}
+            className="p-1.5 sm:p-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 hover:border-neutral-700 transition cursor-pointer flex items-center justify-center shrink-0"
+            title={currentTheme === 'light' ? 'Beralih ke Dark Mode (Default)' : 'Beralih ke Light Mode'}
+            aria-label={currentTheme === 'light' ? 'Beralih ke Dark Mode' : 'Beralih ke Light Mode'}
+          >
+            {currentTheme === 'light' ? (
+              <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
+            ) : (
+              <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
+            )}
           </button>
 
           {/* Vecout Button: Always prominently visible on mobile and desktop */}
@@ -268,6 +314,23 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Camera className="w-3.5 h-3.5 text-cyan-400" />
               <span>Buka Studio Foto Kamera</span>
+            </button>
+
+            <button
+              onClick={handleToggleTheme}
+              className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-neutral-300 bg-neutral-900 hover:bg-neutral-850 border border-neutral-700 transition flex items-center justify-between cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                {currentTheme === 'light' ? (
+                  <Sun className="w-3.5 h-3.5 text-amber-500" />
+                ) : (
+                  <Moon className="w-3.5 h-3.5 text-cyan-400" />
+                )}
+                <span>Tema Tampilan</span>
+              </div>
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-neutral-800 text-neutral-300">
+                {currentTheme === 'light' ? 'Light Mode' : 'Dark Mode (Default)'}
+              </span>
             </button>
           </div>
         </div>

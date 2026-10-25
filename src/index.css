@@ -51,3 +51,348 @@
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* ========================================================================= */
+/* VEC SIGMA LIGHT MODE THEME (SELEKTIF & NON-DESTRUKTIF)                    */
+/* Aturan di bawah HANYA aktif saat <html class="light">.                     */
+/* Dark Mode asli (default) tetap 100% utuh tanpa terpengaruh.               */
+/* ========================================================================= */
+
+html.light {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+html.light body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+html.light #root {
+  background-color: #f8fafc;
+}
+
+/* 1. Page Shell & Headers */
+html.light .app-shell,
+html.light [class*="min-h-screen bg-[#020409]"] {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+html.light header {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light footer {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+/* 2. Surfaces & Cards */
+html.light [class*="bg-[#050C1E]"],
+html.light [class*="bg-[#070d18]"],
+html.light [class*="bg-[#030712]"],
+html.light [class*="bg-[#02050c]"],
+html.light [class*="bg-[#09111e]"],
+html.light [class*="bg-[#03060d]"],
+html.light [class*="bg-[#0A1628]"],
+html.light [class*="bg-[#030612]"],
+html.light .bg-slate-900,
+html.light .bg-neutral-900,
+html.light .bg-slate-900\/90,
+html.light .bg-slate-900\/80,
+html.light .bg-slate-900\/70,
+html.light .bg-slate-900\/60,
+html.light .bg-neutral-900\/90,
+html.light .bg-neutral-900\/80,
+html.light .bg-neutral-900\/70,
+html.light .bg-neutral-900\/60 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+}
+
+html.light .bg-slate-950,
+html.light .bg-neutral-950,
+html.light .bg-slate-950\/90,
+html.light .bg-slate-950\/80,
+html.light .bg-slate-950\/70,
+html.light .bg-slate-950\/60,
+html.light .bg-neutral-950\/90,
+html.light .bg-neutral-950\/80,
+html.light .bg-neutral-950\/70 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* 3. Section Gradients */
+html.light [class*="bg-gradient-to-r"][class*="from-slate-900"],
+html.light [class*="bg-gradient-to-r"][class*="from-[#050C1E]"],
+html.light [class*="bg-gradient-to-r"][class*="from-neutral-950"],
+html.light [class*="bg-gradient-to-b"][class*="from-[#070d18]"],
+html.light [class*="bg-gradient-to-b"][class*="from-[#09111e]"] {
+  background-image: linear-gradient(135deg, #ffffff 0%, #f0fdfa 60%, #ecfeff 100%) !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light [class*="from-emerald-950"] {
+  background-image: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 100%) !important;
+  border-color: #a7f3d0 !important;
+}
+
+html.light [class*="from-cyan-950"] {
+  background-image: linear-gradient(135deg, #ecfeff 0%, #f0f9ff 100%) !important;
+  border-color: #a5f3fc !important;
+}
+
+html.light [class*="from-rose-950"] {
+  background-image: linear-gradient(135deg, #fff1f2 0%, #fff5f5 100%) !important;
+  border-color: #fecdd3 !important;
+}
+
+/* 4. Typography Contrast Enhancement */
+html.light .text-white,
+html.light .text-slate-100,
+html.light .text-neutral-100 {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-200,
+html.light .text-neutral-200 {
+  color: #1e293b !important;
+}
+
+html.light .text-slate-300,
+html.light .text-neutral-300 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-400,
+html.light .text-neutral-400 {
+  color: #475569 !important;
+}
+
+html.light .text-slate-500,
+html.light .text-neutral-500 {
+  color: #64748b !important;
+}
+
+/* Accents in Light Mode (Darkened for 4.5:1 WCAG AA contrast against light surfaces) */
+html.light .text-cyan-400,
+html.light .text-cyan-300,
+html.light .text-cyan-200 {
+  color: #0891b2 !important;
+}
+
+html.light .text-emerald-400,
+html.light .text-emerald-300 {
+  color: #047857 !important;
+}
+
+html.light .text-amber-400,
+html.light .text-amber-300 {
+  color: #b45309 !important;
+}
+
+html.light .text-rose-400,
+html.light .text-rose-300 {
+  color: #be123c !important;
+}
+
+html.light .text-purple-400,
+html.light .text-purple-300 {
+  color: #7e22ce !important;
+}
+
+/* 5. Status Badges, Pills & Callouts */
+html.light .bg-cyan-950,
+html.light .bg-cyan-950\/80,
+html.light .bg-cyan-950\/60,
+html.light .bg-cyan-950\/40,
+html.light .bg-cyan-950\/30,
+html.light .bg-cyan-500\/20,
+html.light .bg-cyan-500\/15,
+html.light .bg-cyan-500\/10 {
+  background-color: #ecfeff !important;
+  color: #0e7490 !important;
+  border-color: #a5f3fc !important;
+}
+
+html.light .bg-emerald-950,
+html.light .bg-emerald-950\/80,
+html.light .bg-emerald-950\/60,
+html.light .bg-emerald-950\/40,
+html.light .bg-emerald-950\/30,
+html.light .bg-emerald-500\/20,
+html.light .bg-emerald-500\/10 {
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+}
+
+html.light .bg-amber-950,
+html.light .bg-amber-950\/80,
+html.light .bg-amber-950\/70,
+html.light .bg-amber-950\/60,
+html.light .bg-amber-950\/40,
+html.light .bg-amber-500\/20,
+html.light .bg-amber-500\/10 {
+  background-color: #fffbeb !important;
+  color: #b45309 !important;
+  border-color: #fde68a !important;
+}
+
+html.light .bg-rose-950,
+html.light .bg-rose-950\/80,
+html.light .bg-rose-950\/70,
+html.light .bg-rose-950\/60,
+html.light .bg-rose-950\/50,
+html.light .bg-rose-950\/40,
+html.light .bg-rose-500\/20,
+html.light .bg-rose-500\/10 {
+  background-color: #fff1f2 !important;
+  color: #be123c !important;
+  border-color: #fecdd3 !important;
+}
+
+html.light .bg-purple-950,
+html.light .bg-purple-950\/80,
+html.light .bg-purple-950\/60,
+html.light .bg-purple-950\/40,
+html.light .bg-purple-500\/20,
+html.light .bg-purple-500\/10 {
+  background-color: #faf5ff !important;
+  color: #7e22ce !important;
+  border-color: #e9d5ff !important;
+}
+
+/* 6. Universal Light Borders */
+html.light .border-slate-800,
+html.light .border-neutral-800,
+html.light .border-slate-800\/80,
+html.light .border-neutral-800\/80,
+html.light .border-slate-800\/60,
+html.light .border-neutral-850,
+html.light .border-neutral-900,
+html.light .border-slate-700,
+html.light .border-neutral-700,
+html.light .border-neutral-700\/80,
+html.light .divide-slate-800,
+html.light .divide-neutral-800,
+html.light .divide-slate-800\/60 {
+  border-color: #e2e8f0 !important;
+}
+
+/* 7. Inputs, Textareas, and Dropdowns */
+html.light input[type="text"],
+html.light input[type="email"],
+html.light input[type="password"],
+html.light textarea,
+html.light select {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.light input:focus,
+html.light textarea:focus,
+html.light select:focus {
+  border-color: #0891b2 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(8, 145, 178, 0.15) !important;
+}
+
+/* 8. Neutral Buttons in Light Mode */
+html.light button.bg-neutral-900,
+html.light button.bg-slate-900,
+html.light button.bg-neutral-800,
+html.light button.bg-slate-800 {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+html.light button.bg-neutral-900:hover,
+html.light button.bg-slate-900:hover,
+html.light button.bg-neutral-800:hover,
+html.light button.bg-slate-800:hover {
+  background-color: #f1f5f9 !important;
+  border-color: #94a3b8 !important;
+}
+
+/* 9. Preserve High-Contrast White Text on Primary Action Buttons */
+html.light .bg-cyan-600,
+html.light .bg-cyan-500,
+html.light .bg-emerald-600,
+html.light .bg-emerald-500,
+html.light .bg-emerald-700,
+html.light .bg-rose-600,
+html.light .bg-rose-500,
+html.light .bg-indigo-600,
+html.light .bg-indigo-500,
+html.light .bg-teal-600,
+html.light .bg-purple-600 {
+  color: #ffffff !important;
+}
+
+html.light .bg-cyan-600 *,
+html.light .bg-cyan-500 *,
+html.light .bg-emerald-600 *,
+html.light .bg-emerald-500 *,
+html.light .bg-emerald-700 *,
+html.light .bg-rose-600 *,
+html.light .bg-rose-500 *,
+html.light .bg-indigo-600 *,
+html.light .bg-indigo-500 *,
+html.light .bg-teal-600 *,
+html.light .bg-purple-600 * {
+  color: #ffffff !important;
+}
+
+/* 10. Modals & Dialogs */
+html.light .fixed.inset-0[class*="bg-black"] {
+  background-color: rgba(15, 23, 42, 0.65) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+html.light .fixed.inset-0 [class*="bg-[#050C1E]"],
+html.light .fixed.inset-0 [class*="from-[#070d18]"],
+html.light .fixed.inset-0 [class*="from-[#09111e]"] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* 11. Code and Terminal Blocks */
+html.light pre {
+  background-color: #0b1120 !important;
+  color: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light pre code,
+html.light pre span {
+  color: inherit;
+}
+
+/* 12. Toast notifications */
+html.light .fixed.bottom-6 {
+  background-color: #ffffff !important;
+  border-color: #06b6d4 !important;
+  color: #0f172a !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+}
+
+html.light .fixed.bottom-6 span {
+  color: #0f172a !important;
+}
