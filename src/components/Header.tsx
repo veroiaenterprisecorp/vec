@@ -187,8 +187,8 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <input
             type="text"
-            aria-label="Cari karya atau kreator"
-            placeholder="Cari karya atau kreator..."
+            aria-label="Cari Karya Atau Nama Seniman"
+            placeholder="Cari Karya Atau Nama Seniman..."
             value={localSearchText}
             onChange={(e) => setLocalSearchText(e.target.value)}
             className="w-full bg-neutral-900/90 hover:bg-neutral-900 text-white placeholder-neutral-500 text-xs pl-8 pr-7 py-1.5 rounded-lg border border-neutral-700/80 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40 transition font-sans"
@@ -298,8 +298,8 @@ export const Header: React.FC<HeaderProps> = ({
             <input
               type="text"
               autoFocus
-              aria-label="Cari karya atau kreator"
-              placeholder="Cari karya atau kreator..."
+              aria-label="Cari Karya Atau Nama Seniman"
+              placeholder="Cari Karya Atau Nama Seniman..."
               value={localSearchText}
               onChange={(e) => setLocalSearchText(e.target.value)}
               className="w-full bg-neutral-900 text-white placeholder-neutral-500 text-xs pl-8 pr-8 py-2 rounded-lg border border-neutral-700/80 focus:outline-none focus:border-cyan-500 font-sans"
@@ -347,8 +347,8 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <input
               type="text"
-              aria-label="Cari karya atau kreator"
-              placeholder="Cari karya atau kreator..."
+              aria-label="Cari Karya Atau Nama Seniman"
+              placeholder="Cari Karya Atau Nama Seniman..."
               value={localSearchText}
               onChange={(e) => setLocalSearchText(e.target.value)}
               className="w-full bg-neutral-900 text-white placeholder-neutral-500 text-xs pl-8 pr-8 py-2.5 rounded-xl border border-neutral-700/80 focus:outline-none focus:border-cyan-500 font-sans"
