@@ -94,27 +94,27 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="border-b border-neutral-800/80 bg-[#020409]/95 backdrop-blur-xl sticky top-0 z-50 w-full">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-18 flex items-center justify-between gap-2 sm:gap-3 lg:gap-5">
+    <header className="border-b border-neutral-800/80 bg-[#020409]/95 backdrop-blur-xl sticky top-0 z-50 w-full max-w-full">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-5 xl:px-8 h-16 sm:h-18 flex items-center justify-between gap-1.5 sm:gap-2.5 lg:gap-3 xl:gap-4 min-w-0 w-full">
         
         {/* Zone 1: Brand Wordmark */}
         <button
           onClick={() => handleTabClick('overview')}
-          className="flex items-center gap-2 sm:gap-3 text-left shrink-0 group focus:outline-none cursor-pointer min-w-0"
+          className="flex items-center gap-1.5 sm:gap-2.5 text-left shrink-0 group focus:outline-none cursor-pointer min-w-0"
         >
           <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg overflow-hidden border border-neutral-700/80 bg-neutral-950 p-0.5 flex items-center justify-center transition group-hover:border-cyan-400/80 shadow-sm shrink-0">
             <VecOfficialLogo className="w-full h-full" />
           </div>
-          <span className="text-xs sm:text-sm font-semibold tracking-[0.15em] sm:tracking-[0.20em] text-white font-sans group-hover:text-cyan-300 transition-colors uppercase truncate">
+          <span className="text-xs sm:text-sm font-semibold tracking-[0.12em] sm:tracking-[0.18em] text-white font-sans group-hover:text-cyan-300 transition-colors uppercase truncate">
             Veroia<span className="hidden sm:inline"> Enterprise</span>
           </span>
         </button>
 
         {/* Zone 2: Desktop Navigation Links */}
-        <nav className="hidden lg:flex items-center gap-3 xl:gap-5 text-xs xl:text-sm font-medium text-neutral-300 shrink-0">
+        <nav className="hidden lg:flex items-center gap-1 lg:gap-1.5 xl:gap-3 2xl:gap-4 text-xs xl:text-sm font-medium text-neutral-300 shrink-0 min-w-0">
           <button
             onClick={() => handleTabClick('overview')}
-            className={`whitespace-nowrap transition-colors py-1 cursor-pointer ${
+            className={`whitespace-nowrap transition-colors py-1 px-1.5 xl:px-2 rounded cursor-pointer ${
               activeTab === 'overview'
                 ? 'text-white border-b-2 border-cyan-400 font-semibold'
                 : 'text-neutral-400 hover:text-white'
@@ -125,24 +125,24 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => handleTabClick('vault')}
-            className={`whitespace-nowrap transition-colors py-1 cursor-pointer ${
+            className={`whitespace-nowrap transition-colors py-1 px-1.5 xl:px-2 rounded cursor-pointer ${
               activeTab === 'vault'
                 ? 'text-white border-b-2 border-cyan-400 font-semibold'
                 : 'text-neutral-400 hover:text-white'
             }`}
           >
-            Katalog Karya
+            <span>Katalog<span className="hidden xl:inline"> Karya</span></span>
           </button>
 
           <button
             onClick={() => handleTabClick('private-vault')}
-            className={`whitespace-nowrap transition-colors py-1 cursor-pointer flex items-center gap-1.5 ${
+            className={`whitespace-nowrap transition-colors py-1 px-1.5 xl:px-2 rounded cursor-pointer flex items-center gap-1 ${
               activeTab === 'private-vault'
                 ? 'text-white border-b-2 border-emerald-400 font-semibold'
                 : 'text-neutral-400 hover:text-white'
             }`}
           >
-            <span>Brankas Karya</span>
+            <span>Brankas<span className="hidden xl:inline"> Karya</span></span>
             {isUnlocked ? (
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Brankas Terbuka"></span>
             ) : (
@@ -154,25 +154,25 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => handleTabClick('studio')}
-            className={`whitespace-nowrap transition-colors py-1 cursor-pointer ${
+            className={`whitespace-nowrap transition-colors py-1 px-1.5 xl:px-2 rounded cursor-pointer ${
               activeTab === 'studio'
                 ? 'text-white border-b-2 border-cyan-400 font-semibold'
                 : 'text-neutral-400 hover:text-white'
             }`}
           >
-            Studio Kamera
+            <span>Studio<span className="hidden xl:inline"> Kamera</span></span>
           </button>
 
           <button
             onClick={() => handleTabClick('admin-portal')}
-            className={`whitespace-nowrap transition-colors py-1 cursor-pointer flex items-center gap-1.5 ${
+            className={`whitespace-nowrap transition-colors py-1 px-1.5 xl:px-2 rounded cursor-pointer flex items-center gap-1 ${
               activeTab === 'admin-portal'
                 ? 'text-white border-b-2 border-emerald-400 font-semibold'
                 : 'text-neutral-400 hover:text-white'
             }`}
           >
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Kontrol Admin</span>
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span><span className="hidden xl:inline">Kontrol </span>Admin</span>
           </button>
         </nav>
 
@@ -180,10 +180,10 @@ export const Header: React.FC<HeaderProps> = ({
         <form
           onSubmit={handleSearchSubmit}
           role="search"
-          className="hidden md:flex items-center relative flex-1 max-w-[190px] lg:max-w-[230px] xl:max-w-[280px] min-w-[150px] mx-1 xl:mx-2"
+          className="hidden md:flex items-center relative flex-1 min-w-[110px] sm:min-w-[130px] lg:min-w-[140px] max-w-[170px] lg:max-w-[210px] xl:max-w-[260px] min-w-0 mx-0.5 lg:mx-1 xl:mx-2"
         >
           <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-neutral-400">
-            <Search className="w-3.5 h-3.5" />
+            <Search className="w-3.5 h-3.5 shrink-0" />
           </div>
           <input
             type="text"
@@ -191,7 +191,7 @@ export const Header: React.FC<HeaderProps> = ({
             placeholder="Cari Karya Atau Nama Seniman..."
             value={localSearchText}
             onChange={(e) => setLocalSearchText(e.target.value)}
-            className="w-full bg-neutral-900/90 hover:bg-neutral-900 text-white placeholder-neutral-500 text-xs pl-8 pr-7 py-1.5 rounded-lg border border-neutral-700/80 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40 transition font-sans"
+            className="w-full min-w-0 bg-neutral-900/90 hover:bg-neutral-900 text-white placeholder-neutral-500 text-xs pl-8 pr-7 py-1.5 rounded-lg border border-neutral-700/80 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40 transition font-sans"
           />
           {localSearchText && (
             <button
@@ -210,7 +210,7 @@ export const Header: React.FC<HeaderProps> = ({
         </form>
 
         {/* Zone 3: Primary Action & Vecout */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2 shrink-0 min-w-0">
           
           {/* Mobile Search Toggle Icon (Shown on screens < md) */}
           <button
@@ -230,17 +230,18 @@ export const Header: React.FC<HeaderProps> = ({
           {onOpenRegisterModal && (
             <button
               onClick={onOpenRegisterModal}
-              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-cyan-200 bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 rounded-lg shadow-sm transition-all duration-200 cursor-pointer"
+              className="hidden sm:inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 xl:px-3 py-1.5 sm:py-2 text-xs font-semibold text-cyan-200 bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 rounded-lg shadow-sm transition-all duration-200 cursor-pointer"
               title="Pendaftaran Brankas & Kunci Baru"
             >
               <KeyRound className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-              <span className="whitespace-nowrap">Daftar Brankas</span>
+              <span className="whitespace-nowrap"><span className="hidden lg:inline xl:hidden">Daftar</span><span className="hidden xl:inline">Daftar Brankas</span><span className="lg:hidden">Daftar Brankas</span></span>
             </button>
           )}
 
           <button
             onClick={() => handleTabClick('studio')}
-            className="hidden xl:inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 border border-neutral-700/80 hover:border-cyan-500/50 rounded-lg shadow-sm transition-all duration-200 cursor-pointer"
+            className="hidden 2xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 border border-neutral-700/80 hover:border-cyan-500/50 rounded-lg shadow-sm transition-all duration-200 cursor-pointer"
+            title="Buka Studio Kamera"
           >
             <Camera className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
             <span className="whitespace-nowrap">Studio Foto</span>
@@ -264,7 +265,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Vecout Button: Always prominently visible on mobile and desktop */}
           <button
             onClick={onVecout}
-            className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-rose-300 bg-rose-950/50 hover:bg-rose-900/70 border border-rose-800/70 hover:border-rose-600 rounded-lg shadow-sm transition-all duration-200 cursor-pointer shrink-0"
+            className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 xl:px-3 py-1.5 sm:py-2 text-xs font-semibold text-rose-300 bg-rose-950/50 hover:bg-rose-900/70 border border-rose-800/70 hover:border-rose-600 rounded-lg shadow-sm transition-all duration-200 cursor-pointer shrink-0"
             title="Vecout: Kunci seluruh brankas dan keluar dari sesi aktif"
           >
             <Power className="w-3.5 h-3.5 text-rose-400 shrink-0" />

@@ -221,7 +221,7 @@ export default function App() {
   };
 
   return (
-    <div className="app-shell min-h-screen bg-[#020409] text-neutral-100 flex flex-col font-sans selection:bg-cyan-500/25 selection:text-cyan-200">
+    <div className="app-shell min-h-screen bg-[#020409] text-neutral-100 flex flex-col font-sans selection:bg-cyan-500/25 selection:text-cyan-200 w-full max-w-full min-w-0">
       
       {/* Premium Luxury Header */}
       <Header
