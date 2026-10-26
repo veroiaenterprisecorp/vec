@@ -280,27 +280,45 @@ html.light .vec-banner-feature {
   font-weight: 600 !important;
 }
 
-/* 6. C. EMPAT PILAR PERLINDUNGAN (.vec-pillar-card) */
-html.light .vec-pillar-card {
+/* 6. C. EMPAT PILAR PERLINDUNGAN, CARA KERJA & ASAL-USUL KARYA (.vec-pillar-card, .vec-step-card, .vec-provenance-card) */
+html.light .vec-pillar-card,
+html.light .vec-step-card,
+html.light .vec-provenance-card {
   background-color: #ffffff !important;
   border-color: #e2e8f0 !important;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04) !important;
 }
 
-html.light .vec-pillar-card:hover {
+html.light .vec-pillar-card:hover,
+html.light .vec-step-card:hover,
+html.light .vec-provenance-card:hover {
   border-color: #0891b2 !important;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08) !important;
 }
 
-html.light .vec-pillar-card h3 {
+html.light .vec-pillar-card h3,
+html.light .vec-step-card h3,
+html.light .vec-provenance-card h3 {
   color: #0f172a !important;
   font-weight: 700 !important;
 }
 
-html.light .vec-pillar-card p {
+html.light .vec-pillar-card p,
+html.light .vec-step-card p,
+html.light .vec-provenance-card p {
   color: #475569 !important;
 }
 
+html.light .vec-step-card .text-neutral-700 {
+  color: #cbd5e1 !important;
+}
+
+html.light .vec-step-card [class*="bg-cyan-500/10"],
+html.light .vec-step-card [class*="bg-emerald-500/10"],
+html.light .vec-step-card [class*="bg-purple-500/10"],
+html.light .vec-provenance-card [class*="bg-cyan-500/10"],
+html.light .vec-provenance-card [class*="bg-emerald-500/10"],
+html.light .vec-provenance-card [class*="bg-amber-500/10"],
 html.light .vec-pillar-card [class*="bg-cyan-500/10"],
 html.light .vec-pillar-card [class*="bg-emerald-500/10"],
 html.light .vec-pillar-card [class*="bg-amber-500/10"],
