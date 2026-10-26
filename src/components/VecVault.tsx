@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
-  PrivateVaultItem,
-  purgeAllLocalVaultCache,
-  getPublicVaultItems
+  getPublicVaultItems,
+  purgeAllLocalVaultCache
 } from '../lib/userVaultStorage';
 import { 
   ShieldCheck, 
@@ -16,34 +15,33 @@ import {
   MapPin, 
   CheckCircle2, 
   RefreshCw,
-  Sliders,
-  Filter,
-  Camera,
-  Lock,
-  User,
-  Calendar,
-  Cpu,
-  Copy,
-  Check,
-  Sparkles,
-  ExternalLink,
-  Image as ImageIcon,
-  Globe,
-  Wifi,
-  WifiOff,
-  AlertTriangle,
-  Info,
-  HelpCircle,
-  HardDrive,
-  X,
-  Maximize2,
-  ZoomIn,
-  ZoomOut,
-  Download
+  SlidersHorizontal,
+  Camera, 
+  Lock, 
+  User, 
+  Calendar, 
+  Copy, 
+  Check, 
+  Sparkles, 
+  Globe, 
+  AlertTriangle, 
+  Info, 
+  HelpCircle, 
+  X, 
+  Maximize2, 
+  ZoomIn, 
+  ZoomOut, 
+  Download,
+  Search,
+  SearchX,
+  Clock,
+  FileCheck,
+  ChevronDown,
+  ChevronUp,
+  Layers
 } from 'lucide-react';
 import { checkSupabaseConnection, isArtworkPermanentlyDestroyed } from '../lib/cloudStorage';
-import { setManualSupabaseCredentials, getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabase';
-
+import { getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabase';
 
 export interface VaultArtwork {
   id: string;
@@ -63,6 +61,8 @@ export interface VaultArtwork {
   publishedAt: string;
   storageTarget?: string;
   cloudBucket?: string;
+  verificationStatus?: 'VERIFIED_HARDWARE_TEE' | 'VERIFIED_C2PA' | 'PENDING' | 'MANIPULATION_DETECTED' | 'REJECTED_SYNTHETIC' | 'UNVERIFIED' | string;
+  category?: string;
 }
 
 interface InteractionItem {
@@ -81,11 +81,18 @@ interface InteractionItem {
 interface VecVaultProps {
   onNavigateToStudio?: () => void;
   onNavigateToPrivateVault?: () => void;
+  searchQuery?: string;
+  onSearchQueryChange?: (query: string) => void;
 }
+
+type VerificationFilterType = 'all' | 'verified' | 'unverified' | 'requires_review';
+type SortOption = 'newest' | 'title' | 'score';
 
 export const VecVault: React.FC<VecVaultProps> = ({ 
   onNavigateToStudio, 
-  onNavigateToPrivateVault 
+  onNavigateToPrivateVault,
+  searchQuery: propSearchQuery,
+  onSearchQueryChange
 }) => {
   const [artworks, setArtworks] = useState<VaultArtwork[]>([]);
   const [selectedArtworkId, setSelectedArtworkId] = useState<string>('');
@@ -101,12 +108,38 @@ export const VecVault: React.FC<VecVaultProps> = ({
     error?: string;
     advice?: string;
   } | null>(null);
+
   const [showGlobalGuideModal, setShowGlobalGuideModal] = useState<boolean>(false);
-  const [manualUrlInput, setManualUrlInput] = useState<string>(() => getSupabaseUrl());
-  const [manualKeyInput, setManualKeyInput] = useState<string>(() => getSupabaseAnonKey());
-  const [manualSaveToast, setManualSaveToast] = useState<string | null>(null);
   const [vaultToast, setVaultToast] = useState<string | null>(null);
 
+  // Search & Verification Filter States (Phase 2 & Navbar Search Sync)
+  const [searchQuery, setSearchQuery] = useState<string>(() => {
+    if (propSearchQuery !== undefined) return propSearchQuery;
+    if (typeof window !== 'undefined') {
+      const q = new URLSearchParams(window.location.search).get('q');
+      if (q) return q;
+    }
+    return '';
+  });
+
+  useEffect(() => {
+    if (propSearchQuery !== undefined && propSearchQuery !== searchQuery) {
+      setSearchQuery(propSearchQuery);
+    }
+  }, [propSearchQuery]);
+
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    if (onSearchQueryChange) {
+      onSearchQueryChange(val);
+    }
+  };
+  const [verificationFilter, setVerificationFilter] = useState<VerificationFilterType>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [activeDetailTab, setActiveDetailTab] = useState<'provenance' | 'technical' | 'curation'>('provenance');
+  const [showTechnicalDrawer, setShowTechnicalDrawer] = useState<boolean>(false);
+
+  // Interactions State
   const [filterType, setFilterType] = useState<'all' | 'COMMENT' | 'VOICE_NOTE' | 'AUTHENTIC_SEAL'>('all');
   const [commentInput, setCommentInput] = useState<string>('');
   const [isPlayingAudio, setIsPlayingAudio] = useState<string | null>(null);
@@ -114,8 +147,29 @@ export const VecVault: React.FC<VecVaultProps> = ({
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [interactions, setInteractions] = useState<InteractionItem[]>([]);
 
-  // Siklus Terhubung: Menampilkan seluruh gambar yang diizinkan (Publik/Diterbitkan)
-  // Aturan Mutlak: Meskipun brankas terkunci, karya yang diizinkan HARUS TETAP MUNCUL DI VAULT
+  // Helper: Evaluates verification status accurately based on authoritative data
+  const getArtworkVerificationCategory = (art: VaultArtwork): 'verified' | 'unverified' | 'requires_review' => {
+    const rawStatus = (art.verificationStatus || '').toUpperCase();
+    const sig = (art.c2paSignature || '').toUpperCase();
+
+    if (rawStatus === 'MANIPULATION_DETECTED' || rawStatus === 'REJECTED_SYNTHETIC') {
+      return 'requires_review';
+    }
+
+    if (
+      rawStatus === 'VERIFIED_HARDWARE_TEE' || 
+      rawStatus === 'VERIFIED_C2PA' || 
+      rawStatus === 'VERIFIED' ||
+      sig.includes('VALID') || 
+      sig.includes('HARDWARE_ATTESTED')
+    ) {
+      return 'verified';
+    }
+
+    return 'unverified';
+  };
+
+  // Siklus Terhubung: Menampilkan karya publik yang diizinkan (tanpa kebocoran data privat)
   const loadPublishedArtworks = async () => {
     setIsRefreshing(true);
     try {
@@ -126,12 +180,16 @@ export const VecVault: React.FC<VecVaultProps> = ({
         if (mUrl.startsWith('/src/assets/')) {
           mUrl = mUrl.replace('/src/assets/', '/assets/');
         }
+
+        const sig = item.c2paSignature || '';
+        const isHardwareValid = sig.includes('VALID') || sig.includes('HARDWARE_ATTESTED');
+
         return {
           id: item.id,
           title: item.title || 'Tangkapan C2PA Publik',
           artist: item.creatorName || 'VEC Master Curator',
           artistRole: `Kreator • ${item.vaultName || 'Brankas Karya'}`,
-          medium: 'Sensor CMOS RAW Attested',
+          medium: item.sensorType || 'Sensor CMOS RAW Attested',
           dimensions: item.resolution || '1920 × 1080 piksel',
           photoUrl: mUrl,
           authenticityScore: 99.40,
@@ -145,7 +203,9 @@ export const VecVault: React.FC<VecVaultProps> = ({
           isUserUploaded: true,
           publishedAt: item.captureDate || 'Terverifikasi',
           storageTarget: item.storageTarget || 'cloud_supabase',
-          cloudBucket: item.cloudBucket || 'vec-captures'
+          cloudBucket: item.cloudBucket || 'vec-captures',
+          verificationStatus: isHardwareValid ? 'VERIFIED_HARDWARE_TEE' : 'PENDING',
+          category: 'Karya Terverifikasi'
         };
       });
 
@@ -154,7 +214,7 @@ export const VecVault: React.FC<VecVaultProps> = ({
       try {
         const { data: postsData, error } = await supabase
           .from('posts')
-          .select('*')
+          .select('id, title, caption, media_url, raw_capture_digest, c2pa_manifest_hash, hardware_tee_signature, verification_status, authenticity_confidence, camera_make, camera_model, sensor_telemetry, is_published, is_destroyed, destroyed_at, created_at')
           .order('created_at', { ascending: false })
           .limit(50);
 
@@ -188,8 +248,11 @@ export const VecVault: React.FC<VecVaultProps> = ({
                 mUrl = mUrl.replace('/src/assets/', '/assets/');
               }
               const telemetry = post.sensor_telemetry || {};
-              const creatorName = telemetry.creator_name || post.author_name || 'Kolektor Terverifikasi';
+              const creatorName = telemetry.creator_name || 'Kolektor Terverifikasi';
               const vaultName = telemetry.vault_name || 'Brankas Karya';
+
+              const rawVStatus = post.verification_status || 
+                (post.hardware_tee_signature?.includes('VALID') ? 'VERIFIED_HARDWARE_TEE' : 'PENDING');
 
               return {
                 id: post.id,
@@ -208,9 +271,15 @@ export const VecVault: React.FC<VecVaultProps> = ({
                   ? `${post.caption} (Diterbitkan resmi dari ${vaultName})`
                   : `Karya seni terverifikasi C2PA diterbitkan dari ${vaultName} oleh ${creatorName}.`,
                 isUserUploaded: true,
-                publishedAt: new Date(post.created_at).toLocaleDateString('id-ID'),
+                publishedAt: new Date(post.created_at).toLocaleDateString('id-ID', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric'
+                }),
                 storageTarget: 'cloud_supabase',
-                cloudBucket: 'vec-captures'
+                cloudBucket: 'vec-captures',
+                verificationStatus: rawVStatus,
+                category: 'Koleksi Publik'
               };
             });
         }
@@ -236,9 +305,12 @@ export const VecVault: React.FC<VecVaultProps> = ({
 
       setArtworks(publishedList);
       if (publishedList.length > 0) {
-        if (!publishedList.some(a => a.id === selectedArtworkId)) {
-          setSelectedArtworkId(publishedList[0].id);
-        }
+        setSelectedArtworkId((prev) => {
+          if (prev && publishedList.some((a) => a.id === prev)) {
+            return prev;
+          }
+          return publishedList[0].id;
+        });
       } else {
         setSelectedArtworkId('');
       }
@@ -295,6 +367,7 @@ export const VecVault: React.FC<VecVaultProps> = ({
       loadPublishedArtworks();
       checkSupabaseConnection().then(setConnectionStatus);
     };
+
     const handleDestroyed = (e: any) => {
       const detail = e.detail;
       const delId = detail?.deletedId || detail?.id;
@@ -309,6 +382,7 @@ export const VecVault: React.FC<VecVaultProps> = ({
     window.addEventListener('vec-lock-state-changed', handleStorageChange);
     window.addEventListener('vec-artwork-destroyed', handleDestroyed);
     window.addEventListener('storage', handleStorageChange);
+
     return () => {
       window.removeEventListener('vec-vault-updated', handleStorageChange);
       window.removeEventListener('vec-vault-lock-state-changed', handleStorageChange);
@@ -318,13 +392,87 @@ export const VecVault: React.FC<VecVaultProps> = ({
     };
   }, []);
 
-  const activeArtwork = artworks.find((a) => a.id === selectedArtworkId) || artworks[0] || null;
+  // Filtered and Searched Artworks (Phase 2 core logic)
+  const filteredArtworks = useMemo(() => {
+    const cleanQuery = searchQuery.trim().toLowerCase();
+
+    return artworks.filter((art) => {
+      // 1. Search Query: Matches Title OR Artist/Creator Name
+      if (cleanQuery) {
+        const titleMatch = (art.title || '').toLowerCase().includes(cleanQuery);
+        const artistMatch = (art.artist || '').toLowerCase().includes(cleanQuery);
+        if (!titleMatch && !artistMatch) {
+          return false;
+        }
+      }
+
+      // 2. Verification-Status Filter
+      const cat = getArtworkVerificationCategory(art);
+      if (verificationFilter === 'verified') {
+        if (cat !== 'verified') return false;
+      } else if (verificationFilter === 'unverified') {
+        if (cat !== 'unverified') return false;
+      } else if (verificationFilter === 'requires_review') {
+        if (cat !== 'requires_review') return false;
+      }
+
+      return true;
+    }).sort((a, b) => {
+      if (sortBy === 'title') {
+        return a.title.localeCompare(b.title);
+      }
+      if (sortBy === 'score') {
+        return b.authenticityScore - a.authenticityScore;
+      }
+      return 0; // default newest order preserved
+    });
+  }, [artworks, searchQuery, verificationFilter, sortBy]);
+
+  // Keep active selected artwork synchronized with filtered results
+  useEffect(() => {
+    if (filteredArtworks.length > 0) {
+      if (!filteredArtworks.some((a) => a.id === selectedArtworkId)) {
+        setSelectedArtworkId(filteredArtworks[0].id);
+      }
+    } else {
+      setSelectedArtworkId('');
+    }
+  }, [filteredArtworks, selectedArtworkId]);
+
+  const activeArtwork = artworks.find((a) => a.id === selectedArtworkId) || filteredArtworks[0] || null;
+
+  // Verification Counts for Filter Badges
+  const counts = useMemo(() => {
+    let verified = 0;
+    let unverified = 0;
+    let requiresReview = 0;
+
+    artworks.forEach((a) => {
+      const c = getArtworkVerificationCategory(a);
+      if (c === 'verified') verified++;
+      else if (c === 'unverified') unverified++;
+      else if (c === 'requires_review') requiresReview++;
+    });
+
+    return {
+      all: artworks.length,
+      verified,
+      unverified,
+      requiresReview
+    };
+  }, [artworks]);
 
   const handleCopyHash = () => {
     if (!activeArtwork) return;
     navigator.clipboard.writeText(activeArtwork.digest);
     setCopiedHash(true);
     setTimeout(() => setCopiedHash(false), 2000);
+  };
+
+  const handleResetFilters = () => {
+    handleSearchChange('');
+    setVerificationFilter('all');
+    setSortBy('newest');
   };
 
   const handleSendComment = async () => {
@@ -396,273 +544,477 @@ export const VecVault: React.FC<VecVaultProps> = ({
     return item.type === filterType;
   });
 
-  const userPublishedCount = artworks.filter(a => a.isUserUploaded).length;
-
-  const emptyState = (
-    <div className="rounded-3xl border border-dashed border-slate-700 bg-slate-950/60 p-10 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-700 bg-slate-900 text-slate-300">
-        <ImageIcon className="h-6 w-6" />
-      </div>
-      <h3 className="mt-4 text-lg font-bold text-white">Belum ada gambar yang diizinkan</h3>
-      <p className="mt-2 text-sm text-slate-400 max-w-lg mx-auto">
-        Saat ini tidak ada karya publik yang diizinkan tampil di vault. Semua berkas yang tersimpan masih berada di brankas pribadi dan menunggu persetujuan publikasi.
-      </p>
-      {onNavigateToPrivateVault && (
-        <button
-          onClick={onNavigateToPrivateVault}
-          className="mt-5 inline-flex items-center justify-center rounded-xl bg-cyan-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-cyan-500"
-        >
-          Buka Brankas Karya
-        </button>
-      )}
-    </div>
-  );
-
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
+    <div className="space-y-8 font-sans min-w-0 w-full text-neutral-100">
+      
+      {/* ------------------------------------------------------------- */}
+      {/* 1. CATALOG HEADER & ACTION STRIP                              */}
+      {/* ------------------------------------------------------------- */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-800/80">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-cyan-400">
-            <ShieldCheck className="w-4 h-4 text-cyan-400" />
-            <span>KATALOG RESMI • PAMERAN KARYA TERVERIFIKASI & ULASAN KURATOR</span>
+            <ShieldCheck className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span className="uppercase tracking-wider">Katalog Publik • Pameran Karya Seni & Fotografi Otentik</span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-1">
-            Katalog Resmi & Pameran Karya Seni Terpilih
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Menampilkan seluruh karya seni dan foto asli terverifikasi yang telah diterbitkan oleh seniman dan kolektor.
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-1">
+            Katalog Karya Terverifikasi
+          </h1>
+          <p className="text-xs sm:text-sm text-neutral-400 mt-1 max-w-2xl leading-relaxed">
+            Jelajahi karya seni dan fotografi dunia nyata yang terdaftar secara sah dengan bukti catatan asal-usul dan verifikasi integritas.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <button
+            type="button"
             onClick={() => {
               loadPublishedArtworks();
               fetchLiveInteractions();
             }}
             disabled={isRefreshing}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition cursor-pointer"
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-medium bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 transition cursor-pointer"
+            title="Segarkan daftar karya dari sistem dan cloud"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
-            <span>Segarkan Vault</span>
-          </button>
-
-          <button
-            onClick={async () => {
-              await purgeAllLocalVaultCache();
-              await loadPublishedArtworks();
-              setVaultToast('Semua cache lokal berhasil dibersihkan & dimuat ulang murni dari Supabase.');
-              setTimeout(() => setVaultToast(null), 3500);
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-rose-950/50 hover:bg-rose-900/70 text-rose-300 border border-rose-800 transition cursor-pointer"
-            title="Hapus seluruh cache & log tersimpan di peramban dan muat ulang hanya dari database Supabase"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-rose-400" />
-            <span className="hidden sm:inline">Bersihkan Cache</span>
+            <span>Segarkan</span>
           </button>
 
           {onNavigateToPrivateVault && (
             <button
+              type="button"
               onClick={onNavigateToPrivateVault}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono font-bold bg-neutral-900 hover:bg-neutral-800 text-emerald-300 border border-emerald-500/40 transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-neutral-900 hover:bg-neutral-800 text-emerald-300 border border-emerald-500/40 transition cursor-pointer"
               title="Buka Brankas Koleksi Pribadi Anda"
             >
-              <Lock className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">Brankas Pribadi</span>
-              <span className="sm:hidden">Brankas</span>
+              <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>Brankas Pribadi</span>
             </button>
           )}
 
           {onNavigateToStudio && (
             <button
+              type="button"
               onClick={onNavigateToStudio}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition shadow-md shadow-cyan-950 cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition shadow-md shadow-cyan-950/40 cursor-pointer"
             >
-              <Camera className="w-3.5 h-3.5" />
-              <span>Jepret & Terbitkan Karya</span>
+              <Camera className="w-4 h-4 shrink-0" />
+              <span>Ambil Foto Asli</span>
             </button>
           )}
         </div>
       </div>
 
+      {/* Cloud Connectivity Status Alert (Safe Public Information) */}
       {connectionStatus && !connectionStatus.connected ? (
-        <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs font-mono shadow-xl">
+        <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs font-sans shadow-xl">
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
-              <Globe className="w-5 h-5 animate-pulse" />
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+              <Globe className="w-4 h-4 animate-pulse" />
             </div>
             <div className="space-y-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-white text-sm">Status Sinkronisasi Cloud: {connectionStatus.error || 'Perlu Diperiksa'}</span>
-                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] border border-amber-500/30">
-                  {connectionStatus.configOrigin === 'vercel_env' ? 'Vercel Env Terpasang (Perlu Redeploy / Bucket)' : 'Kredensial Default / Lokal'}
-                </span>
-              </div>
-              <p className="text-[11px] text-amber-200/90 leading-relaxed max-w-3xl">
-                {connectionStatus.advice || 'Foto yang Anda ambil tersimpan aman di perangkat ini. Agar foto otomatis muncul antar HP & Laptop saat membuka link website, ikuti tutorial 3 langkah untuk menghubungkan Vercel dan Supabase.'}
+              <span className="font-bold text-white text-sm">Mode Penyimpanan Lokal & Cadangan Perangkat</span>
+              <p className="text-xs text-amber-200/90 leading-relaxed max-w-3xl">
+                Karya publik tersimpan aman di penyimpanan peramban ini. Untuk sinkronisasi otomatis antar-perangkat, pastikan konfigurasi cloud Supabase aktif.
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={() => setShowGlobalGuideModal(true)}
-            className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition shrink-0 shadow-lg shadow-amber-950 cursor-pointer whitespace-nowrap flex items-center gap-2"
+            className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs transition shrink-0 cursor-pointer flex items-center gap-1.5"
           >
             <HelpCircle className="w-4 h-4" />
-            <span>Tutorial & Cek Kredensial Vercel</span>
+            <span>Info Sinkronisasi</span>
           </button>
-        </div>
-      ) : connectionStatus?.connected ? (
-        <div className="p-3.5 rounded-2xl bg-emerald-950/30 border border-emerald-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-mono text-emerald-300">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
-            <div>
-              <span className="font-bold text-white block sm:inline mr-1.5">Tersinkronisasi Cloud Supabase:</span>
-              <span className="text-[11px] text-emerald-300">
-                Terhubung ke {connectionStatus.url} • {connectionStatus.bucketExists ? 'Bucket "vec-captures" Siap' : 'Catatan: Buat Bucket "vec-captures" (Public) di Supabase Storage'}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setShowGlobalGuideModal(true)}
-              className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/50 flex items-center gap-1 transition cursor-pointer"
-            >
-              <Info className="w-3 h-3 text-cyan-400" />
-              <span>Info Konfigurasi & Vercel</span>
-            </button>
-          </div>
         </div>
       ) : null}
 
-      {artworks.length === 0 ? (
-        <div className="space-y-4">
-          {emptyState}
-        </div>
-      ) : (
-        <>
-          <div className="bg-[#050C1E] border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
-              <div className="flex items-center gap-2">
-                <Award className="w-4 h-4 text-cyan-400" />
-                <h3 className="text-sm font-bold text-white">
-                  Koleksi Karya Terpublikasi ({artworks.length} Karya)
-                </h3>
-                {userPublishedCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] border border-emerald-500/40">
-                    {userPublishedCount} karya diterbitkan oleh Anda
-                  </span>
-                )}
-              </div>
-              <span className="text-[11px] text-slate-400">
-                Pilih karya untuk melihat rincian keaslian & catatan kurasi
-              </span>
+      {/* ------------------------------------------------------------- */}
+      {/* 2. SEARCH BAR & VERIFICATION-STATUS FILTERS (PHASE 2)         */}
+      {/* ------------------------------------------------------------- */}
+      <div className="space-y-4 bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 sm:p-5 shadow-lg">
+        
+        {/* Row 1: Search Field + Sort Selector */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+          
+          {/* Main Search Input */}
+          <div className="relative flex-1 min-w-0">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
+              <Search className="w-4 h-4" />
             </div>
+            
+            <input
+              type="text"
+              aria-label="Cari Karya atau Nama Seniman"
+              placeholder="Cari Karya atau Nama Seniman..."
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full bg-neutral-950 text-white placeholder-neutral-500 text-xs sm:text-sm pl-10 pr-9 py-2.5 sm:py-3 rounded-xl border border-neutral-700/80 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition font-sans"
+            />
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
-              {artworks.map((art) => {
-                const isSelected = art.id === selectedArtworkId;
-                return (
-                  <div
-                    key={art.id}
-                    onClick={() => setSelectedArtworkId(art.id)}
-                    className={`group relative rounded-2xl overflow-hidden border p-2 transition-all cursor-pointer flex flex-col justify-between ${
-                      isSelected
-                        ? 'bg-slate-900 border-cyan-500 ring-2 ring-cyan-500/40 shadow-xl shadow-cyan-950/50'
-                        : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="relative h-28 rounded-xl overflow-hidden bg-slate-900 mb-2">
-                      <img
-                        src={art.photoUrl}
-                        alt={art.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                        onError={(e) => {
-                          e.currentTarget.style.opacity = '0.3';
-                        }}
-                      />
-                      {art.isUserUploaded && (
-                        <span className="absolute top-1.5 left-1.5 bg-emerald-600/90 backdrop-blur-md px-1.5 py-0.5 rounded text-[9px] font-mono font-bold text-white shadow">
-                          Karya Terverifikasi
-                        </span>
-                      )}
-                      {isSelected && (
-                        <span className="absolute bottom-1.5 right-1.5 bg-cyan-500 text-slate-950 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold shadow">
-                          Aktif Ditampilkan
-                        </span>
-                      )}
-                    </div>
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => handleSearchChange('')}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-neutral-400 hover:text-white transition cursor-pointer"
+                title="Hapus pencarian"
+                aria-label="Hapus kata kunci pencarian"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
 
-                    <div className="space-y-1">
-                      <h4 className="text-xs font-bold text-white line-clamp-1 group-hover:text-cyan-300 transition">
-                        {art.title}
-                      </h4>
-                      <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
-                        <span className="truncate max-w-[80px]">{art.curationNumber}</span>
-                        <span className="text-emerald-400 font-semibold">{art.authenticityScore}%</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+          {/* Sort Selector */}
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs text-neutral-400 hidden sm:inline">Urutkan:</span>
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                className="bg-neutral-950 text-neutral-200 text-xs py-2.5 sm:py-3 px-3 pr-8 rounded-xl border border-neutral-700/80 focus:outline-none focus:border-cyan-500 transition cursor-pointer appearance-none"
+                aria-label="Urutkan karya"
+              >
+                <option value="newest">Terbaru</option>
+                <option value="title">Judul (A-Z)</option>
+                <option value="score">Skor Keaslian</option>
+              </select>
+              <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-neutral-400">
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+              </div>
             </div>
           </div>
 
-          {activeArtwork && (
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl grid grid-cols-1 lg:grid-cols-12 min-w-0">
-              <div className="lg:col-span-5 relative h-64 sm:h-80 lg:h-auto min-h-[280px] sm:min-h-[340px] bg-black min-w-0">
-                <img
-                  src={activeArtwork.photoUrl}
-                  alt={activeArtwork.title}
-                  className="w-full h-full object-cover cursor-pointer hover:scale-[1.02] transition duration-500"
-                  referrerPolicy="no-referrer"
-                  onClick={() => {
-                    setViewerZoomLevel(1);
-                    setIsViewerModalOpen(true);
-                  }}
-                  title="Klik untuk membuka penampil gambar resolusi tinggi & zoom"
-                  onError={(e) => {
-                    e.currentTarget.style.opacity = '0.3';
-                  }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-slate-900/90 pointer-events-none"></div>
+        </div>
 
-                {/* Unified Responsive Top Overlay */}
-                <div className="absolute top-2.5 sm:top-3 left-2.5 sm:left-3 right-2.5 sm:right-3 flex flex-wrap items-center justify-between gap-1.5 z-10">
-                  <div className="flex flex-wrap items-center gap-1.5 max-w-[75%]">
-                    <div className="bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-xl border border-emerald-500/40 text-[11px] font-mono text-emerald-300 flex items-center gap-1.5 shadow-lg">
-                      <Award className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span>{activeArtwork.curationNumber}</span>
+        {/* Row 2: Verification-Status Filters (Accessible Segmented Controls) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-neutral-800/80">
+          
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            <span className="text-xs font-semibold text-neutral-400 mr-1 hidden sm:inline">
+              Status Verifikasi:
+            </span>
+
+            {/* Option 1: All Public Artworks */}
+            <button
+              type="button"
+              onClick={() => setVerificationFilter('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 cursor-pointer ${
+                verificationFilter === 'all'
+                  ? 'bg-cyan-600 text-white font-semibold shadow-sm'
+                  : 'bg-neutral-950/70 hover:bg-neutral-950 text-neutral-300 border border-neutral-800'
+              }`}
+            >
+              <span>Semua Karya Publik</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                verificationFilter === 'all' ? 'bg-cyan-700/60 text-white' : 'bg-neutral-800 text-neutral-400'
+              }`}>
+                {counts.all}
+              </span>
+            </button>
+
+            {/* Option 2: Verified */}
+            <button
+              type="button"
+              onClick={() => setVerificationFilter('verified')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 cursor-pointer ${
+                verificationFilter === 'verified'
+                  ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+                  : 'bg-neutral-950/70 hover:bg-neutral-950 text-neutral-300 border border-neutral-800'
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+              <span>Terverifikasi</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                verificationFilter === 'verified' ? 'bg-emerald-700/60 text-white' : 'bg-neutral-800 text-neutral-400'
+              }`}>
+                {counts.verified}
+              </span>
+            </button>
+
+            {/* Option 3: Not Yet Verified */}
+            <button
+              type="button"
+              onClick={() => setVerificationFilter('unverified')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 cursor-pointer ${
+                verificationFilter === 'unverified'
+                  ? 'bg-amber-600 text-white font-semibold shadow-sm'
+                  : 'bg-neutral-950/70 hover:bg-neutral-950 text-neutral-300 border border-neutral-800'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span>Belum Terverifikasi</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                verificationFilter === 'unverified' ? 'bg-amber-700/60 text-white' : 'bg-neutral-800 text-neutral-400'
+              }`}>
+                {counts.unverified}
+              </span>
+            </button>
+
+            {/* Option 4 (Only if existing data has requires_review/failed) */}
+            {counts.requiresReview > 0 && (
+              <button
+                type="button"
+                onClick={() => setVerificationFilter('requires_review')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 cursor-pointer ${
+                  verificationFilter === 'requires_review'
+                    ? 'bg-rose-600 text-white font-semibold shadow-sm'
+                    : 'bg-neutral-950/70 hover:bg-neutral-950 text-neutral-300 border border-neutral-800'
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-300 shrink-0" />
+                <span>Perlu Peninjauan</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-neutral-800 text-neutral-400">
+                  {counts.requiresReview}
+                </span>
+              </button>
+            )}
+          </div>
+
+          {/* Results Counter & Reset Action */}
+          <div className="flex items-center gap-3 text-xs text-neutral-400">
+            <span>
+              Menampilkan <strong className="text-white">{filteredArtworks.length}</strong> dari {artworks.length} karya
+            </span>
+
+            {(searchQuery || verificationFilter !== 'all') && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="text-cyan-400 hover:text-cyan-300 transition underline underline-offset-2 cursor-pointer font-medium"
+              >
+                Reset Filter
+              </button>
+            )}
+          </div>
+
+        </div>
+
+      </div>
+
+
+      {/* ------------------------------------------------------------- */}
+      {/* 3. ARTWORK GALLERY CARDS & EMPTY STATE                        */}
+      {/* ------------------------------------------------------------- */}
+      {artworks.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-neutral-800 bg-neutral-950/50 p-10 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-neutral-800 bg-neutral-900 text-neutral-400">
+            <Camera className="h-6 w-6" />
+          </div>
+          <h3 className="mt-4 text-lg font-bold text-white">Belum Ada Karya yang Diterbitkan</h3>
+          <p className="mt-2 text-xs sm:text-sm text-neutral-400 max-w-md mx-auto leading-relaxed">
+            Katalog saat ini belum memiliki karya yang diizinkan publik. Gunakan Studio Kamera untuk mengambil foto pertama atau buka brankas pribadi Anda.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            {onNavigateToStudio && (
+              <button
+                type="button"
+                onClick={onNavigateToStudio}
+                className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition cursor-pointer"
+              >
+                Buka Studio Kamera
+              </button>
+            )}
+            {onNavigateToPrivateVault && (
+              <button
+                type="button"
+                onClick={onNavigateToPrivateVault}
+                className="px-5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 text-xs transition cursor-pointer"
+              >
+                Buka Brankas Pribadi
+              </button>
+            )}
+          </div>
+        </div>
+      ) : filteredArtworks.length === 0 ? (
+        /* Friendly Empty State for Filter/Search */
+        <div className="rounded-3xl border border-dashed border-neutral-800 bg-neutral-950/60 p-8 sm:p-12 text-center space-y-3">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-900 border border-neutral-800 text-neutral-400">
+            <SearchX className="h-6 w-6 text-neutral-400" />
+          </div>
+          <h3 className="text-base sm:text-lg font-bold text-white">
+            Tidak Ada Karya yang Cocok
+          </h3>
+          <p className="text-xs sm:text-sm text-neutral-400 max-w-md mx-auto leading-relaxed">
+            Tidak ditemukan karya yang sesuai dengan kata kunci{' '}
+            {searchQuery && <strong className="text-cyan-300">"{searchQuery}"</strong>}{' '}
+            dan filter status yang dipilih.
+          </p>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-cyan-300 hover:text-white border border-cyan-500/40 text-xs font-semibold transition cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Bersihkan Pencarian & Filter</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Modern Gallery Grid of Artwork Cards */
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+            {filteredArtworks.map((art) => {
+              const isSelected = art.id === selectedArtworkId;
+              const vCategory = getArtworkVerificationCategory(art);
+
+              return (
+                <div
+                  key={art.id}
+                  onClick={() => setSelectedArtworkId(art.id)}
+                  className={`group relative rounded-2xl overflow-hidden border transition-all duration-300 cursor-pointer flex flex-col justify-between shadow-lg ${
+                    isSelected
+                      ? 'bg-neutral-900/90 border-cyan-500 ring-2 ring-cyan-500/40 shadow-cyan-950/40'
+                      : 'bg-neutral-950/70 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-900/40'
+                  }`}
+                >
+                  {/* Card Image Preview with Proportional Frame */}
+                  <div className="relative h-44 sm:h-48 overflow-hidden bg-neutral-950">
+                    <img
+                      src={art.photoUrl}
+                      alt={art.title}
+                      className="w-full h-full object-cover object-center group-hover:scale-104 transition duration-500"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        e.currentTarget.style.opacity = '0.4';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/90 via-transparent to-transparent pointer-events-none"></div>
+
+                    {/* Accurate Verification Status Badge Overlay */}
+                    <div className="absolute top-2.5 left-2.5 z-10">
+                      {vCategory === 'verified' ? (
+                        <span className="bg-black/85 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-medium text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shadow">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                          <span>Terverifikasi Asli</span>
+                        </span>
+                      ) : vCategory === 'unverified' ? (
+                        <span className="bg-black/85 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-medium text-amber-300 border border-amber-500/40 flex items-center gap-1 shadow">
+                          <Clock className="w-3 h-3 text-amber-400 shrink-0" />
+                          <span>Belum Terverifikasi</span>
+                        </span>
+                      ) : (
+                        <span className="bg-black/85 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-medium text-rose-300 border border-rose-500/40 flex items-center gap-1 shadow">
+                          <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0" />
+                          <span>Perlu Peninjauan</span>
+                        </span>
+                      )}
                     </div>
 
-                    {activeArtwork.isUserUploaded && (
-                      <div className="bg-emerald-600/90 backdrop-blur-md px-2 py-0.5 rounded-xl text-[10px] font-mono font-bold text-white shadow-lg truncate">
-                        ✓ Diterbitkan
+                    {/* Selection Active Indicator */}
+                    {isSelected && (
+                      <div className="absolute top-2.5 right-2.5 z-10 bg-cyan-600 text-white px-2 py-0.5 rounded-lg text-[10px] font-semibold shadow">
+                        Aktif
                       </div>
                     )}
+
+                    <div className="absolute bottom-2 right-2.5 text-[10px] text-neutral-400 bg-black/70 px-2 py-0.5 rounded backdrop-blur-sm">
+                      {art.dimensions || '1920 × 1080'}
+                    </div>
                   </div>
 
+                  {/* Card Content & Metadata */}
+                  <div className="p-4 space-y-2.5 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-white group-hover:text-cyan-300 transition line-clamp-1">
+                        {art.title}
+                      </h3>
+                      
+                      <div className="flex items-center justify-between text-xs text-neutral-400 mt-1">
+                        <span className="truncate max-w-[65%] text-neutral-300">{art.artist}</span>
+                        <span className="text-[11px] text-neutral-500 shrink-0">{art.publishedAt}</span>
+                      </div>
+
+                      <p className="text-xs text-neutral-400 line-clamp-2 mt-1 leading-relaxed">
+                        {art.description}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-400">
+                      <span className="flex items-center gap-1 text-neutral-400 truncate">
+                        <FileCheck className="w-3 h-3 text-cyan-400 shrink-0" />
+                        <span className="truncate">Provenance Tersedia</span>
+                      </span>
+
+                      <span className="text-cyan-400 font-semibold group-hover:underline text-[11px] shrink-0">
+                        Rincian Karya →
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+
+      {/* ------------------------------------------------------------- */}
+      {/* 4. REFINED ARTWORK DETAIL VIEW (PRIMARY + PROVENANCE + SPECS) */}
+      {/* ------------------------------------------------------------- */}
+      {activeArtwork && (
+        <section className="bg-neutral-900/90 border border-neutral-800 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl space-y-6">
+          
+          {/* Main Visual & Primary Overview Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 min-w-0">
+            
+            {/* Left: High-Res Artwork Media Frame */}
+            <div className="lg:col-span-5 relative h-72 sm:h-96 lg:h-auto min-h-[300px] sm:min-h-[380px] bg-black min-w-0">
+              <img
+                src={activeArtwork.photoUrl}
+                alt={activeArtwork.title}
+                className="w-full h-full object-cover cursor-pointer hover:scale-[1.02] transition duration-500"
+                referrerPolicy="no-referrer"
+                onClick={() => {
+                  setViewerZoomLevel(1);
+                  setIsViewerModalOpen(true);
+                }}
+                title="Klik untuk membuka penampil gambar resolusi penuh & zoom"
+                onError={(e) => {
+                  e.currentTarget.style.opacity = '0.4';
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-neutral-900/90 pointer-events-none"></div>
+
+              {/* Media Controls Overlay */}
+              <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 z-10">
+                <div className="bg-black/85 backdrop-blur-md px-3 py-1 rounded-xl border border-neutral-700 text-xs text-neutral-200 flex items-center gap-1.5 shadow">
+                  <Award className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span className="font-mono">{activeArtwork.curationNumber}</span>
+                </div>
+
+                <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => {
                       setViewerZoomLevel(1);
                       setIsViewerModalOpen(true);
                     }}
-                    className="px-2.5 py-1 rounded-xl bg-black/85 hover:bg-slate-900 text-cyan-300 hover:text-white border border-cyan-500/40 text-[11px] font-mono flex items-center gap-1 transition shadow-lg cursor-pointer shrink-0"
-                    title="Buka penampil gambar resolusi penuh & zoom"
+                    className="px-3 py-1.5 rounded-xl bg-black/85 hover:bg-neutral-800 text-cyan-300 hover:text-white border border-cyan-500/40 text-xs flex items-center gap-1.5 transition shadow cursor-pointer"
+                    title="Buka tampilan resolusi penuh dengan zoom"
                   >
-                    <Maximize2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                    <span>Zoom</span>
+                    <Maximize2 className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Zoom Resolusi Penuh</span>
                   </button>
-                </div>
-
-                <div className="absolute bottom-2.5 sm:bottom-3 left-2.5 sm:left-3 right-2.5 sm:right-3 text-[10px] sm:text-[11px] font-mono text-slate-300 bg-black/75 backdrop-blur-md p-2 rounded-xl border border-slate-800 flex items-center justify-between gap-2 min-w-0">
-                  <span className="truncate">Sensor: {activeArtwork.deviceInfo}</span>
-                  <span className="text-emerald-400 shrink-0 font-bold">100% C2PA</span>
                 </div>
               </div>
 
-              <div className="lg:col-span-7 p-4 sm:p-6 lg:p-8 flex flex-col justify-between space-y-4 sm:space-y-6 min-w-0">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-mono text-slate-400 flex-wrap">
+              {/* Bottom Sensor Attestation Strip */}
+              <div className="absolute bottom-3 left-3 right-3 text-xs text-neutral-300 bg-black/80 backdrop-blur-md p-2.5 rounded-xl border border-neutral-800 flex items-center justify-between gap-2">
+                <span className="truncate">Perangkat: {activeArtwork.deviceInfo}</span>
+                <span className="text-emerald-400 font-semibold shrink-0">CMOS Enclave</span>
+              </div>
+            </div>
+
+            {/* Right: Primary Information & Metadata */}
+            <div className="lg:col-span-7 p-5 sm:p-7 lg:p-9 flex flex-col justify-between space-y-6 min-w-0">
+              
+              <div className="space-y-4">
+                
+                {/* Header Category & Status Pill */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs text-neutral-400">
                     <span className="text-cyan-400 font-bold">{activeArtwork.artist}</span>
                     <span aria-hidden="true">·</span>
                     <span>{activeArtwork.medium}</span>
@@ -674,327 +1026,273 @@ export const VecVault: React.FC<VecVaultProps> = ({
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <h3 className="text-2xl font-bold text-white tracking-tight">
-                      {activeArtwork.title}
-                    </h3>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {activeArtwork.isUserUploaded && onNavigateToPrivateVault && (
-                        <button
-                          onClick={onNavigateToPrivateVault}
-                          className="px-3 py-1.5 rounded-xl text-cyan-300 hover:text-white bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 hover:border-cyan-400 transition cursor-pointer text-xs flex items-center gap-1.5"
-                          title="Buka Brankas Karya"
-                        >
-                          <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                          <span>Kelola di Brankas</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  {/* Verification Status Pill */}
+                  {getArtworkVerificationCategory(activeArtwork) === 'verified' ? (
+                    <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Terverifikasi Asli</span>
+                    </span>
+                  ) : getArtworkVerificationCategory(activeArtwork) === 'unverified' ? (
+                    <span className="px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-semibold flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Belum Terverifikasi</span>
+                    </span>
+                  ) : (
+                    <span className="px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs font-semibold flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                      <span>Perlu Peninjauan</span>
+                    </span>
+                  )}
+                </div>
 
-                  <p className="text-sm text-slate-300 leading-relaxed font-normal">
-                    {activeArtwork.description}
+                {/* Display Title */}
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight leading-tight">
+                    {activeArtwork.title}
+                  </h2>
+                  <p className="text-xs text-neutral-400 mt-1">
+                    Diterbitkan pada: <strong className="text-neutral-300">{activeArtwork.publishedAt}</strong> • Asal:{' '}
+                    <strong className="text-neutral-300">{activeArtwork.artistRole}</strong>
                   </p>
                 </div>
 
-                <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-1 text-xs">
-                  <div className="flex items-center justify-between text-[11px] text-slate-400">
-                    <span>Kode Keaslian Unik Karya:</span>
-                    <button
-                      onClick={handleCopyHash}
-                      className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer font-medium"
-                    >
-                      {copiedHash ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedHash ? 'Disalin' : 'Salin Kode'}</span>
-                    </button>
-                  </div>
-                  <div className="text-cyan-300 text-[11px] break-all leading-tight font-mono">
-                    {activeArtwork.digest}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800">
-                    <span className="text-slate-500 block text-[11px]">Skor Keaslian:</span>
-                    <span className="text-emerald-400 font-bold text-sm">{activeArtwork.authenticityScore}%</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800">
-                    <span className="text-slate-500 block text-[11px]">Segel Fisik:</span>
-                    <span className="text-amber-300 font-semibold text-sm">Terverifikasi Sah</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 col-span-2 sm:col-span-1">
-                    <span className="text-slate-500 block text-[11px]">Privasi Lokasi:</span>
-                    <span className="text-cyan-300 font-semibold text-sm">Terlindungi</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {artworks.length > 0 && (
-        <div className="bg-[#050C1E] rounded-3xl border border-slate-800 p-6 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
-            <div>
-              <h4 className="text-lg font-bold text-white flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-cyan-400" />
-                <span>Catatan Kurasi & Verifikasi Kolektor</span>
-              </h4>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Diskusi & stempel keaslian untuk: <strong className="text-white">"{activeArtwork?.title || 'Karya terpilih'}"</strong>
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 p-1 bg-slate-900 rounded-xl border border-slate-800 text-xs font-mono">
-                <button
-                  onClick={() => setFilterType('all')}
-                  className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                    filterType === 'all' ? 'bg-cyan-600 text-white font-bold' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Semua
-                </button>
-                <button
-                  onClick={() => setFilterType('VOICE_NOTE')}
-                  className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                    filterType === 'VOICE_NOTE' ? 'bg-cyan-600 text-white font-bold' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Voice Notes
-                </button>
-                <button
-                  onClick={() => setFilterType('AUTHENTIC_SEAL')}
-                  className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                    filterType === 'AUTHENTIC_SEAL' ? 'bg-cyan-600 text-white font-bold' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Stempel
-                </button>
-              </div>
-
-              <button
-                onClick={handleAddAuthenticSeal}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-300 border border-emerald-800/60 text-xs font-mono transition cursor-pointer"
-              >
-                <Award className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Beri Stempel Keaslian</span>
-              </button>
-
-              <button
-                onClick={handleAddVoiceNote}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/70 text-purple-300 border border-purple-800/60 text-xs font-mono transition cursor-pointer"
-              >
-                <Mic className="w-3.5 h-3.5 text-purple-400" />
-                <span>Simulasi Voice Note</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {filteredInteractions.map((item) => (
-              <div
-                key={item.id}
-                className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3 hover:border-slate-700 transition"
-              >
-                <div className="flex items-center justify-between text-xs font-mono">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white">{item.author}</span>
-                    <span className="text-[10px] text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/60">
-                      {item.role}
-                    </span>
-                    <span className="text-[11px] text-emerald-400 hidden sm:inline">
-                      Skor: {(item.score).toFixed(1)}%
-                    </span>
-                  </div>
-                  <span className="text-slate-500 text-[11px]">{item.timestamp}</span>
-                </div>
-
-                {item.type === 'COMMENT' && (
-                  <p className="text-xs text-slate-300 leading-relaxed font-sans pl-1">
-                    "{item.content}"
-                  </p>
-                )}
-
-                {item.type === 'VOICE_NOTE' && (
-                  <div className="flex items-center gap-3 bg-black/60 p-3 rounded-xl border border-purple-900/40 max-w-lg">
-                    <button
-                      onClick={() => setIsPlayingAudio(isPlayingAudio === item.id ? null : item.id)}
-                      className="w-9 h-9 rounded-full bg-purple-600 hover:bg-purple-500 flex items-center justify-center text-white transition shadow-md shadow-purple-950 shrink-0 cursor-pointer"
-                    >
-                      {isPlayingAudio === item.id ? (
-                        <Pause className="w-4 h-4" />
-                      ) : (
-                        <Play className="w-4 h-4 ml-0.5" />
-                      )}
-                    </button>
-                    <div className="flex-1">
-                      <div className="text-[11px] font-mono text-purple-300 mb-1">
-                        Catatan Suara Kurator
-                      </div>
-                      <div className="h-6 flex items-center gap-1">
-                        {(item.waveform || [20, 50, 80, 100, 60, 40, 90, 70, 30]).map((h, idx) => (
-                          <div
-                            key={idx}
-                            className={`w-1.5 rounded-full transition-all ${
-                              isPlayingAudio === item.id ? 'bg-purple-400 animate-pulse' : 'bg-purple-700/60'
-                            }`}
-                            style={{ height: `${Math.max(20, h)}%` }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <span className="text-xs font-mono text-purple-300 tabular-nums">
-                      0:{item.voiceDuration?.toFixed(0)}
-                    </span>
-                  </div>
-                )}
-
-                {item.type === 'AUTHENTIC_SEAL' && (
-                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-950/60 border border-emerald-800/60 text-xs font-mono text-emerald-300">
-                    <Award className="w-4 h-4 text-emerald-400" />
-                    <span>{item.content}</span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="pt-2 flex items-center gap-2">
-            <input
-              type="text"
-              placeholder={`Tulis kurasi atau ulasan otentik untuk "${activeArtwork?.title || 'karya terpilih'}"...`}
-              value={commentInput}
-              onChange={(e) => setCommentInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendComment()}
-              disabled={isSubmitting || !activeArtwork}
-              className="flex-1 bg-slate-950 text-xs font-mono text-white placeholder-slate-500 px-4 py-3 rounded-xl border border-slate-800 focus:outline-none focus:border-cyan-500 transition"
-            />
-            <button
-              onClick={handleSendComment}
-              disabled={isSubmitting || !commentInput.trim() || !activeArtwork}
-              className="px-5 py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-mono text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-cyan-950 cursor-pointer"
-            >
-              <span>Kirim</span>
-              <Send className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showGlobalGuideModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#050C1E] border border-cyan-500/40 rounded-3xl max-w-2xl w-full p-6 space-y-5 shadow-2xl relative my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
-                  <Globe className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-white font-mono">
-                    Tutorial Koneksi Vercel & Supabase Cloud
-                  </h3>
-                  <p className="text-[11px] text-slate-400 font-mono">
-                    Jawaban mengapa variabel belum terhubung & cara sinkronisasi lintas perangkat (HP ↔ Laptop)
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowGlobalGuideModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 text-xs font-mono">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 font-bold">STATUS KONEKSI SAAT INI:</span>
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                  connectionStatus?.connected 
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
-                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                }`}>
-                  {connectionStatus?.connected ? '✓ TERHUBUNG KE SUPABASE' : '⚠ BELUM TERHUBUNG'}
-                </span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-300 pt-1">
-                <div>
-                  <span className="text-slate-500 block">Supabase URL:</span>
-                  <span className="text-cyan-300 break-all">{connectionStatus?.url || manualUrlInput}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Sumber Kredensial:</span>
-                  <span className="text-white">
-                    {connectionStatus?.configOrigin === 'vercel_env' 
-                      ? 'Vercel Environment Variable (Build)' 
-                      : connectionStatus?.configOrigin === 'browser_storage' 
-                      ? 'Penyimpanan Manual Browser' 
-                      : 'Proyek Default (cruijnhylcdojbilzgwd)'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Status Storage Bucket:</span>
-                  <span className={connectionStatus?.bucketExists ? 'text-emerald-400' : 'text-amber-400'}>
-                    {connectionStatus?.bucketExists ? '✓ Bucket "vec-captures" Siap' : '⚠ Bucket "vec-captures" Belum Ada'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Status Database Posts:</span>
-                  <span className={connectionStatus?.dbReachable ? 'text-emerald-400' : 'text-slate-400'}>
-                    {connectionStatus?.dbReachable ? '✓ Tabel Posts Terkoneksi' : 'Menunggu Query'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3.5 text-xs font-mono max-h-80 overflow-y-auto pr-1">
-              <div className="p-3.5 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 space-y-1.5">
-                <span className="text-cyan-300 font-bold flex items-center gap-1.5 text-xs">
-                  <Sparkles className="w-4 h-4 text-cyan-400" />
-                  Pertanyaan: Mana yang benar, VITE_SUPABASE_URL atau SUPABASE_URL?
-                </span>
-                <p className="text-slate-300 text-[11px] leading-relaxed">
-                  Di framework <strong>Vite</strong> (React SPA yang berjalan di browser pengguna), semua variabel publik diwajibkan memiliki awalan <code>VITE_</code> agar dapat dibaca di sisi browser.
+                {/* Description */}
+                <p className="text-sm text-neutral-300 leading-relaxed font-normal">
+                  {activeArtwork.description}
                 </p>
-                <div className="p-2 rounded bg-slate-950 border border-slate-800 space-y-1 text-[11px]">
-                  <div className="text-emerald-400 font-bold">✓ Rekomendasi Resmi:</div>
-                  <div className="text-slate-300"><code>VITE_SUPABASE_URL</code> = <code>https://cruijnhylcdojbilzgwd.supabase.co</code></div>
-                  <div className="text-slate-300"><code>VITE_SUPABASE_ANON_KEY</code> = <code>eyJh...</code> (anon public key)</div>
+
+                {/* Honest & Transparent Verification Explanation */}
+                <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 text-xs space-y-1">
+                  <div className="text-neutral-300 font-semibold flex items-center gap-1.5">
+                    <Info className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <span>Catatan Transparansi Verifikasi:</span>
+                  </div>
+                  <p className="text-neutral-400 leading-relaxed text-[11px]">
+                    Integritas rekaman foto ini diamankan melalui tanda tangan sensor kamera dan kode ringkasan unik (SHA-256). Bukti teknis ini memastikan bahwa file gambar tidak mengalami manipulasi digital eksternal sejak pertama kali diambil.
+                  </p>
                 </div>
+
+              </div>
+
+              {/* Provenance Key Values Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs pt-2">
+                <div className="p-3 rounded-xl bg-neutral-950/70 border border-neutral-800">
+                  <span className="text-neutral-400 block text-[11px]">Skor Keaslian:</span>
+                  <span className="text-emerald-400 font-bold text-sm sm:text-base">{activeArtwork.authenticityScore}%</span>
+                </div>
+                <div className="p-3 rounded-xl bg-neutral-950/70 border border-neutral-800">
+                  <span className="text-neutral-400 block text-[11px]">Segel Fisik Kanvas:</span>
+                  <span className="text-amber-300 font-semibold text-sm">Terpasang & Sah</span>
+                </div>
+                <div className="p-3 rounded-xl bg-neutral-950/70 border border-neutral-800 col-span-2 sm:col-span-1">
+                  <span className="text-neutral-400 block text-[11px]">Privasi Lokasi:</span>
+                  <span className="text-cyan-300 font-semibold text-sm">Koordinat Terlindungi</span>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* Secondary Details: Provenance & Technical Tabs */}
+          <div className="p-5 sm:p-7 border-t border-neutral-800/80 space-y-4">
+            
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-800/80 pb-3">
+              <div className="flex items-center gap-2">
+                <FileCheck className="w-4 h-4 text-cyan-400" />
+                <h3 className="text-sm sm:text-base font-bold text-white">
+                  Informasi Asal-Usul & Integritas File
+                </h3>
+              </div>
+
+              {/* Hash Copy Control */}
+              <button
+                type="button"
+                onClick={handleCopyHash}
+                className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 transition cursor-pointer font-medium bg-neutral-950 px-3 py-1.5 rounded-xl border border-neutral-800"
+              >
+                {copiedHash ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedHash ? 'Kode Keaslian Disalin' : 'Salin Kode Hash'}</span>
+              </button>
+            </div>
+
+            {/* Structured Provenance & Technical Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 space-y-1">
+                <span className="text-neutral-400 block text-[11px]">Kode Ringkasan (SHA-256):</span>
+                <span className="font-mono text-cyan-300 text-[11px] break-all block leading-tight">
+                  {activeArtwork.digest}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 space-y-1">
+                <span className="text-neutral-400 block text-[11px]">Tanda Tangan Enclave C2PA:</span>
+                <span className="font-mono text-emerald-400 text-[11px] truncate block">
+                  {activeArtwork.c2paSignature}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 space-y-1">
+                <span className="text-neutral-400 block text-[11px]">Perangkat & Lensa Pengambil:</span>
+                <span className="text-neutral-200 text-xs block font-medium">
+                  {activeArtwork.deviceInfo}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 space-y-1">
+                <span className="text-neutral-400 block text-[11px]">Penyimpanan & Bucket:</span>
+                <span className="text-neutral-200 text-xs block font-medium">
+                  {activeArtwork.cloudBucket || 'vec-captures'} • Terenkripsi
+                </span>
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t border-slate-800">
-              <span className="text-[11px] text-slate-400 font-mono">
-                Semua foto yang dijepret kini otomatis tampil di puncak galeri.
-              </span>
+          </div>
+
+          {/* Curation Comments & Interactions Section */}
+          <div className="p-5 sm:p-7 border-t border-neutral-800/80 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-800/80">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-cyan-400" />
+                  <span>Catatan Kurasi & Verifikasi Kolektor</span>
+                </h3>
+                <p className="text-xs text-neutral-400 mt-0.5">
+                  Ulasan apresiasi dan stempel keaslian untuk: <strong className="text-white">"{activeArtwork.title}"</strong>
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAddAuthenticSeal}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/60 text-xs transition cursor-pointer"
+                >
+                  <Award className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Beri Stempel Keaslian</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAddVoiceNote}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900 text-purple-300 border border-purple-800/60 text-xs transition cursor-pointer"
+                >
+                  <Mic className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Catatan Suara</span>
+                </button>
+              </div>
+            </div>
+
+            {/* List of Interactions */}
+            <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+              {filteredInteractions.length === 0 ? (
+                <div className="text-xs text-neutral-400 py-4 text-center italic">
+                  Belum ada catatan kurasi untuk karya ini. Jadilah yang pertama memberikan ulasan apresiasi di bawah.
+                </div>
+              ) : (
+                filteredInteractions.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-3.5 rounded-xl bg-neutral-950/70 border border-neutral-800 space-y-2 hover:border-neutral-700 transition text-xs"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white">{item.author}</span>
+                        <span className="text-[10px] text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/60">
+                          {item.role}
+                        </span>
+                      </div>
+                      <span className="text-neutral-400 text-[11px]">{item.timestamp}</span>
+                    </div>
+
+                    {item.type === 'COMMENT' && (
+                      <p className="text-xs text-neutral-300 leading-relaxed pl-1">
+                        "{item.content}"
+                      </p>
+                    )}
+
+                    {item.type === 'VOICE_NOTE' && (
+                      <div className="flex items-center gap-3 bg-black/60 p-2.5 rounded-xl border border-purple-900/40 max-w-md">
+                        <button
+                          type="button"
+                          onClick={() => setIsPlayingAudio(isPlayingAudio === item.id ? null : item.id)}
+                          className="w-8 h-8 rounded-full bg-purple-600 hover:bg-purple-500 flex items-center justify-center text-white transition shadow shrink-0 cursor-pointer"
+                        >
+                          {isPlayingAudio === item.id ? (
+                            <Pause className="w-3.5 h-3.5" />
+                          ) : (
+                            <Play className="w-3.5 h-3.5 ml-0.5" />
+                          )}
+                        </button>
+                        <div className="flex-1">
+                          <div className="text-[10px] text-purple-300">Catatan Suara Kurator</div>
+                          <div className="h-5 flex items-center gap-1 mt-0.5">
+                            {(item.waveform || [20, 50, 80, 100, 60, 40, 90, 70, 30]).map((h, idx) => (
+                              <div
+                                key={idx}
+                                className={`w-1 rounded-full transition-all ${
+                                  isPlayingAudio === item.id ? 'bg-purple-400 animate-pulse' : 'bg-purple-700/60'
+                                }`}
+                                style={{ height: `${Math.max(20, h)}%` }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <span className="text-xs text-purple-300 tabular-nums">
+                          0:{item.voiceDuration?.toFixed(0)}
+                        </span>
+                      </div>
+                    )}
+
+                    {item.type === 'AUTHENTIC_SEAL' && (
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-950/60 border border-emerald-800/60 text-xs text-emerald-300">
+                        <Award className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>{item.content}</span>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Comment Input */}
+            <div className="pt-2 flex items-center gap-2">
+              <input
+                type="text"
+                placeholder={`Tulis kurasi atau apresiasi untuk "${activeArtwork.title}"...`}
+                value={commentInput}
+                onChange={(e) => setCommentInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSendComment()}
+                disabled={isSubmitting}
+                className="flex-1 bg-neutral-950 text-xs text-white placeholder-neutral-500 px-4 py-3 rounded-xl border border-neutral-700/80 focus:outline-none focus:border-cyan-500 transition"
+              />
               <button
-                onClick={() => setShowGlobalGuideModal(false)}
-                className="px-5 py-2.5 rounded-xl text-xs font-mono font-bold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition cursor-pointer"
+                type="button"
+                onClick={handleSendComment}
+                disabled={isSubmitting || !commentInput.trim()}
+                className="px-5 py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-semibold transition flex items-center gap-2 shadow cursor-pointer"
               >
-                Tutup Panduan
+                <span>Kirim</span>
+                <Send className="w-3.5 h-3.5" />
               </button>
             </div>
+
           </div>
-        </div>
+
+        </section>
       )}
 
-      {vaultToast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-slate-900 border border-emerald-500/60 shadow-2xl text-white text-xs font-mono animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{vaultToast}</span>
-        </div>
-      )}
 
+      {/* ------------------------------------------------------------- */}
+      {/* 5. FULL RESOLUTION IMAGE VIEWER MODAL WITH ZOOM               */}
+      {/* ------------------------------------------------------------- */}
       {isViewerModalOpen && activeArtwork && (
         <div 
           className="fixed inset-0 z-50 bg-black/92 backdrop-blur-md flex flex-col p-4 sm:p-6 animate-in fade-in"
           onClick={() => setIsViewerModalOpen(false)}
         >
           <div 
-            className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs font-mono"
+            className="flex items-center justify-between pb-3 border-b border-neutral-800 text-xs"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3">
@@ -1003,27 +1301,29 @@ export const VecVault: React.FC<VecVaultProps> = ({
               </div>
               <div>
                 <h4 className="text-white font-bold text-sm line-clamp-1">{activeArtwork.title}</h4>
-                <p className="text-[11px] text-slate-400">{activeArtwork.artist} • {activeArtwork.dimensions || '1920 × 1080'}</p>
+                <p className="text-[11px] text-neutral-400">{activeArtwork.artist} • {activeArtwork.dimensions || '1920 × 1080'}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1">
+              <div className="flex items-center gap-1 bg-neutral-900 border border-neutral-800 rounded-xl px-2.5 py-1">
                 <button
+                  type="button"
                   onClick={() => setViewerZoomLevel((z) => Math.max(0.5, Number((z - 0.25).toFixed(2))))}
                   disabled={viewerZoomLevel <= 0.5}
-                  className="p-1 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer"
+                  className="p-1 text-neutral-400 hover:text-white disabled:opacity-30 cursor-pointer"
                   title="Perkecil"
                 >
                   <ZoomOut className="w-3.5 h-3.5" />
                 </button>
-                <span className="text-[11px] text-cyan-300 w-12 text-center font-bold">
+                <span className="text-[11px] text-cyan-300 w-12 text-center font-bold font-mono">
                   {Math.round(viewerZoomLevel * 100)}%
                 </span>
                 <button
+                  type="button"
                   onClick={() => setViewerZoomLevel((z) => Math.min(3.5, Number((z + 0.25).toFixed(2))))}
                   disabled={viewerZoomLevel >= 3.5}
-                  className="p-1 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer"
+                  className="p-1 text-neutral-400 hover:text-white disabled:opacity-30 cursor-pointer"
                   title="Perbesar"
                 >
                   <ZoomIn className="w-3.5 h-3.5" />
@@ -1034,17 +1334,19 @@ export const VecVault: React.FC<VecVaultProps> = ({
                 <a
                   href={activeArtwork.photoUrl}
                   download={`${activeArtwork.title.replace(/\s+/g, '_')}_VEC_C2PA.jpg`}
-                  className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow"
+                  className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs flex items-center gap-1.5 transition shadow"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Unduh Resolusi Asli</span>
+                  <span className="hidden sm:inline">Unduh Gambar</span>
                 </a>
               )}
 
               <button
+                type="button"
                 onClick={() => setIsViewerModalOpen(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                className="p-1.5 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition cursor-pointer"
+                title="Tutup penampil resolusi penuh"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1062,13 +1364,13 @@ export const VecVault: React.FC<VecVaultProps> = ({
               <img
                 src={activeArtwork.photoUrl}
                 alt={activeArtwork.title}
-                className="max-h-[75vh] max-w-[90vw] object-contain rounded-2xl shadow-2xl border border-slate-800"
+                className="max-h-[75vh] max-w-[90vw] object-contain rounded-2xl shadow-2xl border border-neutral-800"
               />
             </div>
           </div>
 
           <div 
-            className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2"
+            className="pt-2 border-t border-neutral-800/80 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-400 gap-2"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-2 truncate max-w-xl">
@@ -1076,20 +1378,89 @@ export const VecVault: React.FC<VecVaultProps> = ({
               <span className="text-white shrink-0 font-medium">Kode Keaslian:</span>
               <span className="text-cyan-300 truncate font-mono">{activeArtwork.digest}</span>
             </div>
-            <div className="text-[11px] text-slate-400 font-medium">
+            <div className="text-[11px] text-neutral-400 font-medium">
               Kamera: {activeArtwork.deviceInfo} • Keaslian: {activeArtwork.authenticityScore}%
             </div>
           </div>
         </div>
       )}
 
-      {/* Toast Notifikasi Vault */}
+      {/* Guide / Connectivity Modal */}
+      {showGlobalGuideModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-neutral-900 border border-cyan-500/40 rounded-3xl max-w-2xl w-full p-6 space-y-5 shadow-2xl relative my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
+                  <Globe className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    Status Koneksi Basis Data & Sinkronisasi
+                  </h3>
+                  <p className="text-xs text-neutral-400">
+                    Informasi keterhubungan katalog dengan Supabase Cloud Storage
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGlobalGuideModal(false)}
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-neutral-400 font-bold">STATUS KONEKSI SAAT INI:</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                  connectionStatus?.connected 
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
+                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                }`}>
+                  {connectionStatus?.connected ? '✓ TERHUBUNG KE SUPABASE' : '⚠ MODE LOKAL / MENUNGGU SINKRONISASI'}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-neutral-300 pt-1">
+                <div>
+                  <span className="text-neutral-400 block text-[11px]">Endpoint Proyek:</span>
+                  <span className="text-cyan-300 break-all">{connectionStatus?.url || getSupabaseUrl()}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-400 block text-[11px]">Status Storage Bucket:</span>
+                  <span className={connectionStatus?.bucketExists ? 'text-emerald-400' : 'text-amber-400'}>
+                    {connectionStatus?.bucketExists ? '✓ Bucket "vec-captures" Siap' : '⚠ Menunggu Bucket'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-neutral-800">
+              <span className="text-[11px] text-neutral-400">
+                Seluruh karya yang diterbitkan publik dapat diakses pengunjung secara aman.
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowGlobalGuideModal(false)}
+                className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 transition cursor-pointer"
+              >
+                Tutup Panduan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
       {vaultToast && (
         <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-medium border border-emerald-400/40 animate-in fade-in slide-in-from-bottom-2">
           <CheckCircle2 className="w-4 h-4 text-white" />
           <span>{vaultToast}</span>
         </div>
       )}
+
     </div>
   );
 };

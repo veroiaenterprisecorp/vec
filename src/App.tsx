@@ -28,12 +28,24 @@ import { ThemeMode, getInitialTheme, applyTheme, toggleTheme } from './lib/theme
 export type AppTab = 'overview' | 'private-vault' | 'vault' | 'studio' | 'admin-portal';
 
 export default function App() {
+  const [catalogSearchQuery, setCatalogSearchQuery] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const q = new URLSearchParams(window.location.search).get('q');
+      if (q) return q;
+    }
+    return '';
+  });
+
   const [activeTab, setActiveTab] = useState<AppTab>(() => {
     if (typeof window !== 'undefined') {
       const search = window.location.search.toLowerCase();
       const hash = window.location.hash.toLowerCase();
       if (search.includes('portal=') || search.includes('admin') || hash.includes('admin') || hash.includes('portal')) {
         return 'admin-portal';
+      }
+      const q = new URLSearchParams(window.location.search).get('q');
+      if (q && q.trim()) {
+        return 'vault';
       }
     }
     return 'overview';
@@ -78,6 +90,13 @@ export default function App() {
       const hash = window.location.hash.toLowerCase();
       if (search.includes('portal=') || search.includes('admin') || hash.includes('admin') || hash.includes('portal')) {
         setActiveTab('admin-portal');
+      }
+      const q = new URLSearchParams(window.location.search).get('q');
+      if (q !== null) {
+        setCatalogSearchQuery(q);
+        if (q.trim()) {
+          setActiveTab('vault');
+        }
       }
       if (hash.includes('monitoring')) setAdminSubTab('monitoring');
       if (hash.includes('gallery')) setAdminSubTab('gallery');
@@ -186,6 +205,21 @@ export default function App() {
     }
   };
 
+  const handleHeaderSearch = (query: string) => {
+    const clean = query.trim();
+    setCatalogSearchQuery(clean);
+    setActiveTab('vault');
+    if (typeof window !== 'undefined' && window.history.pushState) {
+      const url = new URL(window.location.href);
+      if (clean) {
+        url.searchParams.set('q', clean);
+      } else {
+        url.searchParams.delete('q');
+      }
+      window.history.pushState({}, '', url.toString());
+    }
+  };
+
   return (
     <div className="app-shell min-h-screen bg-[#020409] text-neutral-100 flex flex-col font-sans selection:bg-cyan-500/25 selection:text-cyan-200">
       
@@ -193,6 +227,8 @@ export default function App() {
       <Header
         activeTab={activeTab}
         setActiveTab={handleNavigate}
+        searchQuery={catalogSearchQuery}
+        onSearch={handleHeaderSearch}
         onOpenSyncHub={() => {
           setAdminSubTab('sync');
           setActiveTab('admin-portal');
@@ -229,6 +265,19 @@ export default function App() {
             <VecVault 
               onNavigateToStudio={() => setActiveTab('studio')}
               onNavigateToPrivateVault={() => setActiveTab('private-vault')}
+              searchQuery={catalogSearchQuery}
+              onSearchQueryChange={(newQuery) => {
+                setCatalogSearchQuery(newQuery);
+                if (typeof window !== 'undefined' && window.history.replaceState) {
+                  const url = new URL(window.location.href);
+                  if (newQuery.trim()) {
+                    url.searchParams.set('q', newQuery.trim());
+                  } else {
+                    url.searchParams.delete('q');
+                  }
+                  window.history.replaceState({}, '', url.toString());
+                }
+              }}
             />
           )}
 

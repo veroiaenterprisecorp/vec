@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { VecOfficialLogo } from './VecOfficialLogo';
-import { Camera, Lock, Power, KeyRound, ShieldCheck, Menu, X, Sun, Moon } from 'lucide-react';
+import { Camera, Lock, Power, KeyRound, ShieldCheck, Menu, X, Sun, Moon, Search } from 'lucide-react';
 import { isVaultUnlocked } from '../lib/vaultKeyAuth';
 import { ThemeMode, getInitialTheme, toggleTheme } from '../lib/theme';
 
 interface HeaderProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  searchQuery?: string;
+  onSearch?: (query: string) => void;
   onOpenSyncHub?: () => void;
   onCopyAll?: () => void;
   copied?: boolean;
@@ -20,6 +22,8 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
+  searchQuery = '',
+  onSearch,
   onVecout,
   onOpenRegisterModal,
   theme,
@@ -27,13 +31,20 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => isVaultUnlocked());
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState<boolean>(false);
   const [currentTheme, setCurrentTheme] = useState<ThemeMode>(() => theme || getInitialTheme());
+  const [localSearchText, setLocalSearchText] = useState<string>(() => searchQuery);
 
   useEffect(() => {
     if (theme) {
       setCurrentTheme(theme);
     }
   }, [theme]);
+
+  // Keep local search input synchronized if searchQuery prop changes from external component
+  useEffect(() => {
+    setLocalSearchText(searchQuery);
+  }, [searchQuery]);
 
   useEffect(() => {
     const handleThemeChange = (e: any) => {
@@ -67,11 +78,24 @@ export const Header: React.FC<HeaderProps> = ({
   const handleTabClick = (tab: string) => {
     setActiveTab(tab);
     setIsMobileMenuOpen(false);
+    setIsMobileSearchOpen(false);
+  };
+
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const query = localSearchText.trim();
+    if (onSearch) {
+      onSearch(query);
+    } else {
+      setActiveTab('vault');
+    }
+    setIsMobileSearchOpen(false);
+    setIsMobileMenuOpen(false);
   };
 
   return (
     <header className="border-b border-neutral-800/80 bg-[#020409]/95 backdrop-blur-xl sticky top-0 z-50 w-full">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-18 flex items-center justify-between gap-2 sm:gap-4 lg:gap-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-18 flex items-center justify-between gap-2 sm:gap-3 lg:gap-5">
         
         {/* Zone 1: Brand Wordmark */}
         <button
@@ -87,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         {/* Zone 2: Desktop Navigation Links */}
-        <nav className="hidden lg:flex items-center gap-4 xl:gap-7 text-xs xl:text-sm font-medium text-neutral-300 shrink-0">
+        <nav className="hidden lg:flex items-center gap-3 xl:gap-5 text-xs xl:text-sm font-medium text-neutral-300 shrink-0">
           <button
             onClick={() => handleTabClick('overview')}
             className={`whitespace-nowrap transition-colors py-1 cursor-pointer ${
@@ -152,8 +176,57 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </nav>
 
+        {/* Zone 2.5: Compact Persistent Navbar Search Input (Desktop) */}
+        <form
+          onSubmit={handleSearchSubmit}
+          role="search"
+          className="hidden md:flex items-center relative flex-1 max-w-[190px] lg:max-w-[230px] xl:max-w-[280px] min-w-[150px] mx-1 xl:mx-2"
+        >
+          <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-neutral-400">
+            <Search className="w-3.5 h-3.5" />
+          </div>
+          <input
+            type="text"
+            aria-label="Cari karya atau kreator"
+            placeholder="Cari karya atau kreator..."
+            value={localSearchText}
+            onChange={(e) => setLocalSearchText(e.target.value)}
+            className="w-full bg-neutral-900/90 hover:bg-neutral-900 text-white placeholder-neutral-500 text-xs pl-8 pr-7 py-1.5 rounded-lg border border-neutral-700/80 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40 transition font-sans"
+          />
+          {localSearchText && (
+            <button
+              type="button"
+              onClick={() => {
+                setLocalSearchText('');
+                if (onSearch) onSearch('');
+              }}
+              className="absolute inset-y-0 right-0 pr-2 flex items-center text-neutral-400 hover:text-white transition cursor-pointer"
+              title="Hapus pencarian"
+              aria-label="Hapus kata kunci"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </form>
+
         {/* Zone 3: Primary Action & Vecout */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          
+          {/* Mobile Search Toggle Icon (Shown on screens < md) */}
+          <button
+            type="button"
+            onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
+            className={`md:hidden p-1.5 sm:p-2 rounded-lg text-neutral-300 hover:text-white border transition cursor-pointer flex items-center justify-center ${
+              isMobileSearchOpen 
+                ? 'bg-cyan-950/80 text-cyan-300 border-cyan-500/50' 
+                : 'bg-neutral-900 border-neutral-800 hover:bg-neutral-800'
+            }`}
+            aria-label={isMobileSearchOpen ? 'Tutup pencarian' : 'Buka pencarian karya atau kreator'}
+            title="Cari karya atau kreator"
+          >
+            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
+          </button>
+
           {onOpenRegisterModal && (
             <button
               onClick={onOpenRegisterModal}
@@ -215,9 +288,86 @@ export const Header: React.FC<HeaderProps> = ({
 
       </div>
 
+      {/* Mobile / Tablet Expandable Search Row (< md) */}
+      {isMobileSearchOpen && (
+        <div className="md:hidden border-t border-neutral-800/80 bg-neutral-950/98 px-3 sm:px-4 py-2 flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+          <form onSubmit={handleSearchSubmit} className="relative flex-1" role="search">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400">
+              <Search className="w-3.5 h-3.5" />
+            </div>
+            <input
+              type="text"
+              autoFocus
+              aria-label="Cari karya atau kreator"
+              placeholder="Cari karya atau kreator..."
+              value={localSearchText}
+              onChange={(e) => setLocalSearchText(e.target.value)}
+              className="w-full bg-neutral-900 text-white placeholder-neutral-500 text-xs pl-8 pr-8 py-2 rounded-lg border border-neutral-700/80 focus:outline-none focus:border-cyan-500 font-sans"
+            />
+            {localSearchText && (
+              <button
+                type="button"
+                onClick={() => {
+                  setLocalSearchText('');
+                  if (onSearch) onSearch('');
+                }}
+                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-neutral-400 hover:text-white cursor-pointer"
+                aria-label="Hapus kata kunci"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </form>
+          <button
+            type="button"
+            onClick={() => handleSearchSubmit()}
+            className="px-3 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shrink-0 transition cursor-pointer"
+          >
+            Cari
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsMobileSearchOpen(false)}
+            className="p-1.5 text-neutral-400 hover:text-white shrink-0 cursor-pointer"
+            aria-label="Tutup bar pencarian"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Expandable Mobile Navigation Menu */}
       {isMobileMenuOpen && (
         <div className="lg:hidden border-t border-neutral-850 bg-[#030612]/98 backdrop-blur-2xl px-4 py-4 space-y-3 shadow-2xl animate-in fade-in duration-150">
+          
+          {/* Mobile Menu Search Bar */}
+          <form onSubmit={handleSearchSubmit} className="relative w-full mb-1" role="search">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400">
+              <Search className="w-3.5 h-3.5" />
+            </div>
+            <input
+              type="text"
+              aria-label="Cari karya atau kreator"
+              placeholder="Cari karya atau kreator..."
+              value={localSearchText}
+              onChange={(e) => setLocalSearchText(e.target.value)}
+              className="w-full bg-neutral-900 text-white placeholder-neutral-500 text-xs pl-8 pr-8 py-2.5 rounded-xl border border-neutral-700/80 focus:outline-none focus:border-cyan-500 font-sans"
+            />
+            {localSearchText && (
+              <button
+                type="button"
+                onClick={() => {
+                  setLocalSearchText('');
+                  if (onSearch) onSearch('');
+                }}
+                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-neutral-400 hover:text-white cursor-pointer"
+                aria-label="Hapus kata kunci"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </form>
+
           <div className="grid grid-cols-1 gap-1 text-sm font-medium">
             <button
               onClick={() => handleTabClick('overview')}
