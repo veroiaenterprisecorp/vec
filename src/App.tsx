@@ -365,9 +365,9 @@ export default function App() {
 
       {/* Toast Notification */}
       {showToast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-neutral-900 border border-cyan-500/60 shadow-2xl text-white text-xs font-mono">
+        <div className="fixed bottom-5 right-4 sm:right-6 left-4 sm:left-auto max-w-sm z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-neutral-900/95 backdrop-blur-md border border-cyan-500/60 shadow-2xl text-white text-xs font-sans">
           <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{toastMessage}</span>
+          <span className="leading-snug">{toastMessage}</span>
         </div>
       )}
 
