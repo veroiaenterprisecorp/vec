@@ -38,10 +38,15 @@ import {
   FileCheck,
   ChevronDown,
   ChevronUp,
-  Layers
+  Layers,
+  Cpu,
+  Fingerprint
 } from 'lucide-react';
 import { checkSupabaseConnection, isArtworkPermanentlyDestroyed } from '../lib/cloudStorage';
 import { getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabase';
+import { VeroiaProcessorModal } from './VeroiaProcessorModal';
+import { getVGuardInspection, getGenevoraFingerprint } from '../lib/veroiaProcessor';
+import { PrivateVaultItem } from '../lib/userVaultStorage';
 
 export interface VaultArtwork {
   id: string;
@@ -110,6 +115,7 @@ export const VecVault: React.FC<VecVaultProps> = ({
   } | null>(null);
 
   const [showGlobalGuideModal, setShowGlobalGuideModal] = useState<boolean>(false);
+  const [isProcessorModalOpen, setIsProcessorModalOpen] = useState<boolean>(false);
   const [vaultToast, setVaultToast] = useState<string | null>(null);
 
   // Search & Verification Filter States (Phase 2 & Navbar Search Sync)
@@ -1147,7 +1153,92 @@ export const VecVault: React.FC<VecVaultProps> = ({
               </div>
             </div>
 
+            {/* Veroia Processor (VGUARD & GENEVORA) Integration Card */}
+            {(() => {
+              const vguardRecord = getVGuardInspection(activeArtwork.id);
+              const genevoraRecord = getGenevoraFingerprint(activeArtwork.id);
+
+              return (
+                <div className="mt-4 p-4 sm:p-5 rounded-2xl bg-neutral-950/90 border border-cyan-500/30 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-cyan-950 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
+                        <Cpu className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                          <span>Veroia Processor Pipeline</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950 text-cyan-300 border border-cyan-800">
+                            VGUARD & GENEVORA
+                          </span>
+                        </h4>
+                        <p className="text-[11px] text-neutral-400">
+                          Urutan Resmi: TWIN → VGUARD → HUMANGUARD → GENEVORA → HAPPY → BEAUTY
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsProcessorModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-md transition cursor-pointer shrink-0"
+                    >
+                      <Fingerprint className="w-3.5 h-3.5" />
+                      <span>Buka Pemeriksaan & Fingerprint</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
+                    <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-neutral-400 font-semibold flex items-center gap-1">
+                          <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Status Modul VGUARD:</span>
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
+                          !vguardRecord || vguardRecord.status === 'BELUM DIPERIKSA'
+                            ? 'bg-neutral-950 text-neutral-400 border-neutral-700'
+                            : vguardRecord.status === 'TIDAK ADA INDIKASI YANG DITEMUKAN'
+                            ? 'bg-emerald-950 text-emerald-300 border-emerald-800/60'
+                            : vguardRecord.status === 'ADA INDIKASI YANG PERLU DITINJAU'
+                            ? 'bg-rose-950 text-rose-300 border-rose-800/60'
+                            : 'bg-amber-950 text-amber-300 border-amber-800/60'
+                        }`}>
+                          {vguardRecord?.status || 'BELUM DIPERIKSA'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-neutral-400">
+                        {vguardRecord 
+                          ? `${vguardRecord.similarWorkUrls?.length || 0} tautan referensi • Pemeriksa: ${vguardRecord.inspectorName}`
+                          : 'Karya belum melewati form pemeriksaan bukti kesamaan dan indikasi AI.'}
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-neutral-400 font-semibold flex items-center gap-1">
+                          <Fingerprint className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Fingerprint GENEVORA (SHA-256):</span>
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
+                          genevoraRecord
+                            ? 'bg-emerald-950 text-emerald-300 border-emerald-800/60'
+                            : 'bg-neutral-950 text-amber-400 border-amber-700/60'
+                        }`}>
+                          {genevoraRecord ? 'SHA-256-v1 Aktif' : 'Belum Dihitung'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] font-mono text-neutral-300 truncate">
+                        {genevoraRecord ? genevoraRecord.sha256 : 'Hitung hash dari byte asli berkas karya.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
           </div>
+
 
           {/* Curation Comments & Interactions Section */}
           <div className="p-5 sm:p-7 border-t border-neutral-800/80 space-y-5">
@@ -1461,6 +1552,32 @@ export const VecVault: React.FC<VecVaultProps> = ({
         </div>
       )}
 
+      {/* Veroia Processor Modal */}
+
+      {isProcessorModalOpen && activeArtwork && (
+        <VeroiaProcessorModal
+          isOpen={isProcessorModalOpen}
+          onClose={() => setIsProcessorModalOpen(false)}
+          initialArtwork={{
+            id: activeArtwork.id,
+            title: activeArtwork.title,
+            photoUrl: activeArtwork.photoUrl,
+            digest: activeArtwork.digest,
+            resolution: activeArtwork.dimensions || '1920 × 1080',
+            fileSize: '3.4 MB',
+            captureDate: activeArtwork.publishedAt,
+            deviceInfo: activeArtwork.deviceInfo,
+            isPrivate: false,
+            isPublished: true,
+            c2paSignature: activeArtwork.c2paSignature,
+            sensorType: 'Direct CMOS RAW',
+            creatorName: activeArtwork.artist,
+            description: activeArtwork.description
+          }}
+        />
+      )}
+
     </div>
   );
 };
+

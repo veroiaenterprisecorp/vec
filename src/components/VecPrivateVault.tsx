@@ -35,6 +35,7 @@ import {
 import { VaultRegistrationModal } from './VaultRegistrationModal';
 import { VaultKeyUnlockModal } from './VaultKeyUnlockModal';
 import { PermanentDeleteModal, DeleteArtworkTarget } from './PermanentDeleteModal';
+import { VeroiaProcessorModal } from './VeroiaProcessorModal';
 import { supabase } from '../lib/supabase';
 import { 
   ShieldCheck, 
@@ -100,6 +101,7 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
   
   // High-Resolution Lightbox Zoom Modal States
   const [selectedPhoto, setSelectedPhoto] = useState<PrivateVaultItem | null>(null);
+  const [processorModalItem, setProcessorModalItem] = useState<PrivateVaultItem | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [itemPendingDelete, setItemPendingDelete] = useState<DeleteArtworkTarget | null>(null);
@@ -1088,6 +1090,17 @@ export const VecPrivateVault: React.FC<VecPrivateVaultProps> = ({
                     </a>
                   </div>
 
+                  {/* Veroia Processor (VGUARD & GENEVORA) Trigger */}
+                  <button
+                    type="button"
+                    onClick={() => setProcessorModalItem(item)}
+                    className="w-full py-1.5 px-2 rounded-xl bg-cyan-950/70 hover:bg-cyan-900 text-cyan-300 border border-cyan-800/80 text-xs font-mono flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    title="Buka Veroia Processor untuk pemeriksaan VGUARD dan fingerprint GENEVORA"
+                  >
+                    <Cpu className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Veroia Processor (VGUARD & GENEVORA)</span>
+                  </button>
+
                   {/* Secondary Row: Privacy Switcher & Delete */}
                   <div className="flex items-center justify-between gap-2 pt-1">
                     <button
@@ -1391,6 +1404,19 @@ CREATE POLICY "Public can upload capture objects" ON storage.objects FOR INSERT 
         }}
       />
 
+      {/* Veroia Processor (VGUARD & GENEVORA) Modal */}
+      {processorModalItem && (
+        <VeroiaProcessorModal
+          isOpen={Boolean(processorModalItem)}
+          onClose={() => setProcessorModalItem(null)}
+          initialArtwork={processorModalItem}
+          onArtworkUpdated={() => {
+            setItems(getPrivateVaultItems());
+          }}
+        />
+      )}
+
     </div>
   );
 };
+
